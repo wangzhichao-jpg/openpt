@@ -58,6 +58,7 @@ def write_xlsx(path: str | Path, rows: list[dict[str, Any]]) -> None:
         "统计量",
         "声称值",
         "来源",
+        "计算数据来源",
         "显示小数位",
         "按报告模型复现值",
         "按推荐模型重算值",

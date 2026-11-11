@@ -437,6 +437,18 @@ def review(
     for row in rows:
         if row["状态"] in ("NOTE", "DIFFERENCE") and not row["差异类型"]:
             row["差异类型"] = "REVIEW_NOTE" if row["状态"] == "NOTE" else "REVIEW_REQUIRED"
+        name = row.get("统计量", "")
+        participant_id = name.split(":", 1)[1] if ":" in name else None
+        participant = next(
+            (p for p in data.get("participants", []) if p["id"] == participant_id), None
+        )
+        if participant:
+            locations = [participant.get("source", "")]
+        elif name in ("x*", "s*", "NIQR", "u(X)"):
+            locations = [p.get("source", "") for p in data.get("participants", [])]
+        else:
+            locations = data.get("sources", [])
+        row["计算数据来源"] = "、".join(location for location in locations if location)
     priority = {"DIFFERENCE": 0, "NOTE": 1, "MATCH": 2}
     return sorted(rows, key=lambda row: priority[row["状态"]])
 
@@ -447,6 +459,7 @@ def write_csv(path: str | Path, rows: list[dict[str, Any]]) -> None:
         "统计量",
         "声称值",
         "来源",
+        "计算数据来源",
         "显示小数位",
         "按报告模型复现值",
         "按推荐模型重算值",
