@@ -1,0 +1,16 @@
+numpy==2.5.4
+scipy==1.18.1
+openpyxl==3.1.5
+et_xmlfile==2.0.0
+python-docx==1.2.0
+lxml==6.0.2
+typing_extensions==4.15.0
+pytest==8.4.2
+pytest-cov==6.3.0
+coverage==7.10.7
+iniconfig==2.1.0
+packaging==25.0
+pluggy==1.6.0
+pygments==2.19.2
+pt13528==0.1.11
+setuptools==80.9.0

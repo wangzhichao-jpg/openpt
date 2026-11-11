@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools==80.9.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "openpt"
+version = "0.0.1"
+description = "能力验证统计工作台原型，不可用于正式评价"
+requires-python = ">=3.12"
+dependencies = ["numpy==2.5.4", "scipy==1.18.1", "openpyxl==3.1.5", "python-docx==1.2.0"]
+
+[project.optional-dependencies]
+test = ["pytest==8.4.2", "pytest-cov==6.3.0", "pt13528==0.1.11"]
+
+[project.scripts]
+openpt = "openpt.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["openpt*"]
+
+[tool.setuptools.package-data]
+openpt = ["config/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
