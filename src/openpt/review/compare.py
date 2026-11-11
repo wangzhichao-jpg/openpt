@@ -26,7 +26,9 @@ def _t_reproduction(
     cfg = data["config"]
     groups = data["stability"]
     name = claim.get("timegroup") or "稳定期"
-    model = claim.get("model") or "recommended"
+    model = claim.get("model") or (
+        "repeats_pooled" if cfg.get("observation_level") == "all_repeats" else "recommended"
+    )
     selected = (
         result.get("稳定性", {}) if name == "稳定期" else result.get("其他稳定性", {}).get(name, {})
     )
@@ -34,7 +36,14 @@ def _t_reproduction(
     if selected.get("status") == "DESIGN_REVIEW":
         return None, None, "实验设计需审核，不计算候选模型"
     if model in ("repeats_pooled", "repeats_welch"):
-        report_result = stability(groups.get("基线"), groups[name], model=model)
+        reference = cfg.get("reference")
+        report_result = stability(
+            groups.get("基线"),
+            groups[name],
+            model=model,
+            method=cfg.get("stability_method") or "two_sample",
+            reference=float(reference) if reference not in (None, "") else None,
+        )
         detail = (
             f"技术重复仅用于报告模型复现，须核查伪重复及自由度；报告模型 df={report_result['df']}，"
             f"推荐模型 df={selected.get('df')}；模型={model}"
@@ -292,7 +301,11 @@ def _review_claim(
 ) -> list[dict[str, Any]]:
     """复核一条声称值并产生必要的附加中间量差异。"""
     name = claim["name"]
-    model = claim.get("model") or "recommended"
+    model = claim.get("model") or (
+        "repeats_pooled"
+        if claim["name"] == "t" and data["config"].get("observation_level") == "all_repeats"
+        else "recommended"
+    )
     try:
         digits = int(claim["digits"])
         if isinstance(claim["digits"], bool) or float(claim["digits"]) != digits:

@@ -115,7 +115,13 @@ def assign_value(
     else:
         x = _number(value, "指定值")
         base_u = _number(uncertainty, "指定值标准不确定度", nonnegative=True)
-        formula = "GL002 4.3.1、4.3.2：采用已评定并输入的标准不确定度"
+        descriptions = {
+            "known": "已知值：使用制备模型中已评定并输入的 u(X)",
+            "certified": "有证参考值：使用证书或已评定并输入的 u(X)",
+            "reference": "参考值：使用比对或并行测量已评定并输入的 u(X)",
+            "expert_consensus": "专家公议值：使用已评定并输入的公议值 u(X)",
+        }
+        formula = "GL002 4.3.1、4.3.2：" + descriptions[method] + "；u_base=u_input"
     duplicate = hom_mapping == "both" or stab_mapping == "both"
     duplicate |= hom_in_base and hom_mapping in ("assigned", "sigma_prime")
     duplicate |= stab_in_base and stab_mapping in ("assigned", "sigma_prime")

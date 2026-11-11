@@ -333,6 +333,12 @@ def _other_results(
     s = result.get("稳定性")
     if s:
         _stability_table(doc, "稳定期", s, sig)
+        report_model = result.get("报告层级稳定性")
+        if report_model:
+            doc.add_paragraph(
+                "报告复现层级：all_repeats，仅用于复现，不作推荐结论；"
+                f"t={_shown(report_model.get('t'), sig)}，状态={report_model.get('status')}。"
+            )
         for name, extra in result.get("其他稳定性", {}).items():
             _stability_table(doc, str(name), extra, sig)
     else:
@@ -402,11 +408,15 @@ def _assigned_table(doc: Any, result: dict[str, Any]) -> None:
     doc.add_heading("指定值与不确定度", 1)
     labels = [
         ("定值方法", "method"),
+        ("公议计算方法", "consensus_method"),
         ("指定值", "value"),
         ("标准不确定度 u(X)", "u"),
         ("基础标准不确定度", "base_u"),
         ("指定值来源", "source"),
         ("不确定度来源", "uncertainty_source"),
+        ("指定值扩展不确定度 U(X)", "U_assigned"),
+        ("指定值包含因子 k", "k_assigned"),
+        ("结果间不相关", "independent"),
         ("临时 σ_pt", "sigma_temporary"),
         ("最终 σ_pt", "sigma_final"),
         ("σ_pt 确定程序", "sigma_procedure"),
@@ -421,7 +431,10 @@ def _assigned_table(doc: Any, result: dict[str, Any]) -> None:
     ]
     _table(doc, ["项目", "结果"], [[label, _shown(assigned.get(key))] for label, key in labels])
     doc.add_paragraph(assigned.get("formula", ""))
-    doc.add_paragraph("扩展方法：独立分量平方和开方；σ′ 分量映射须经批准，ISO 13528 待核对条款号。")
+    doc.add_paragraph(
+        "扩展方法：u(X)=√(u_base²+Σu分量²)，σ′=√(σ_pt²+Σu分量²)；"
+        "假定分量独立，σ′ 映射须经批准，ISO 13528 待核对条款号。"
+    )
     for warning in assigned.get("warnings", []):
         doc.add_paragraph("设计提示：" + warning)
 
@@ -452,6 +465,21 @@ def _participant_table(
                 warnings.update(score.get("warnings", []))
         if rows:
             _table(doc, ["参加者", "统计量", "值", "状态", "评价", "原因"], rows)
+            _table(
+                doc,
+                ["参加者", "测量值", "u(x)", "U(x)", "k", "数据来源"],
+                [
+                    [
+                        p["id"],
+                        _shown(p["value"]),
+                        _shown(p.get("u")),
+                        _shown(p.get("U")),
+                        _shown(p.get("k")),
+                        p.get("source", "未提供来源"),
+                    ]
+                    for p in data["participants"]
+                ],
+            )
         else:
             doc.add_paragraph("未提供参加者结果。")
         for formula in sorted(formulas):

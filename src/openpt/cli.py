@@ -16,6 +16,7 @@ from .core.robust import algorithm_a, algorithm_s, median_niqr
 from .core.scores import performance_score
 from .core.stability import analyze as stability
 from .core.zscore import zscore
+from .errors import InputError
 from .io.excel import read_workbook, template
 from .report.docx import make_report
 
@@ -90,7 +91,11 @@ def _assigned_results(data: dict[str, Any]) -> dict[str, Any]:
     assigned = assign_value(
         a["method"], participants=[p["value"] for p in data["participants"]], **options
     )
-    result: dict[str, Any] = {"指定值与不确定度": assigned.to_dict()}
+    assigned_details = assigned.to_dict()
+    assigned_details.update(
+        {key: a.get(key) for key in ("U_assigned", "k_assigned", "independent")}
+    )
+    result: dict[str, Any] = {"指定值与不确定度": assigned_details}
     kind = _option(data["config"], "score_type", "z")
     if kind not in ("z", "zprime", "zeta", "En", "D", "D%", "all"):
         raise ValueError("未知统计量类型")
@@ -138,7 +143,7 @@ def _assigned_results(data: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
-def calculate(data: dict[str, Any]) -> dict[str, Any]:
+def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]:
     """根据输入选择 GL003 与 GL002 计算方法。"""
     cfg = data["config"]
     alpha = float(_option(cfg, "alpha", 0.05))
@@ -169,8 +174,8 @@ def calculate(data: dict[str, Any]) -> dict[str, Any]:
         level = _option(cfg, "observation_level", "unit_means")
         if level not in ("unit_means", "all_repeats"):
             raise ValueError("未知实验层级")
-        if level == "all_repeats":
-            raise ValueError("全部重复值仅供复核模型使用，不可用于常规结论")
+        if level == "all_repeats" and not review_mode:
+            raise InputError("全部重复值仅供复核模型使用，不可用于常规结论")
         design_options = {
             "design": _option(cfg, "stability_design", "independent"),
             "reference_uncertainty_negligible": _option(
@@ -187,6 +192,17 @@ def calculate(data: dict[str, Any]) -> dict[str, Any]:
             reference,
             **design_options,
         ).to_dict()
+        if level == "all_repeats":
+            result["报告层级稳定性"] = stability(
+                groups.get("基线"),
+                groups["稳定期"],
+                sigma,
+                alpha,
+                method,
+                reference,
+                model="repeats_pooled",
+                **design_options,
+            ).to_dict()
         extra = {}
         for name, observations in groups.items():
             if name not in ("基线", "稳定期"):
@@ -305,7 +321,7 @@ def main(argv: list[str] | None = None) -> int:
         _validate_output_paths(args)
         digest = hashlib.sha256(Path(args.input).read_bytes()).hexdigest()
         data = read_workbook(args.input)
-        result = calculate(data)
+        result = calculate(data, review_mode=args.command == "review")
         differences = None
         if args.command == "review":
             from .review.compare import review, write_csv

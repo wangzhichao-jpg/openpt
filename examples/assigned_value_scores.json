@@ -77,7 +77,10 @@
     "stab_in_base": false,
     "status": "OK",
     "warnings": [],
-    "formula": "GL002 4.3.1、4.3.2：采用已评定并输入的标准不确定度"
+    "formula": "GL002 4.3.1、4.3.2：有证参考值：使用证书或已评定并输入的 u(X)；u_base=u_input",
+    "U_assigned": 2.039607805437114,
+    "k_assigned": 2,
+    "independent": true
   },
   "参加者统计量": {
     "P1": {

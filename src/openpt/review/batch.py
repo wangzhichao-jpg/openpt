@@ -20,7 +20,7 @@ def batch_review(
     rows = []
     for path in paths:
         data = read_workbook(path)
-        for row in review(data, calculate(data), mapping):
+        for row in review(data, calculate(data, review_mode=True), mapping):
             rows.append({"项目": data["info"]["项目名称"], "输入文件": str(path), **row})
     priority = {"DIFFERENCE": 0, "NOTE": 1, "MATCH": 2}
     return sorted(rows, key=lambda row: priority[row["状态"]])
