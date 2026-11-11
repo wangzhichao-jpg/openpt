@@ -6,7 +6,6 @@ numpy==2.5.4
 openpyxl==3.1.5
 packaging==26.3
 pluggy==1.7.0
-pt13528==0.1.11
 Pygments==2.21.0
 pytest==8.4.2
 pytest-cov==6.3.0

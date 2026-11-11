@@ -5,4 +5,4 @@ __pycache__/
 .coverage
 build/
 dist/
-tests/fixtures_internal/*
+.ruff_cache/

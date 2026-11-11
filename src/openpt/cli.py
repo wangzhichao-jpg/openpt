@@ -36,14 +36,18 @@ def main(argv=None):
     t=sub.add_parser('template'); t.add_argument('output')
     for name in ('run','review'):
         p=sub.add_parser(name); p.add_argument('input'); p.add_argument('--docx',required=True); p.add_argument('--json',required=True)
-        if name=='review': p.add_argument('--differences',required=True)
+        if name=='review':
+            p.add_argument('--differences',required=True)
+            p.add_argument('--mapping',help='可选 JSON 评分映射')
     args=parser.parse_args(argv)
     try:
         if args.command=='template': template(args.output); return 0
         data=read_workbook(args.input); result=calculate(data); differences=None
         if args.command=='review':
             from .review.compare import review, write_csv
-            differences=review(data,result); write_csv(args.differences,differences)
+            mapping=json.loads(Path(args.mapping).read_text(encoding='utf-8')) if args.mapping else None
+            if mapping is not None and not isinstance(mapping,dict): raise ValueError('评分映射必须是 JSON 对象')
+            differences=review(data,result,mapping); write_csv(args.differences,differences)
         Path(args.json).write_text(json.dumps(result,ensure_ascii=False,indent=2,allow_nan=False)+'\n',encoding='utf-8')
         make_report(args.docx,data,result,differences)
         return 0

@@ -1,0 +1,3 @@
+include THIRD_PARTY_LICENSES.md
+prune tests
+prune tools

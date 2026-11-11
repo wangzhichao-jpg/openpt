@@ -9,10 +9,11 @@ def display(value,digits):
     if value is None: return None
     return Decimal(str(value)).quantize(Decimal(1).scaleb(-digits),rounding=ROUND_HALF_UP)
 
-def review(data, result):
+def review(data, result, mapping=None):
+    mapping = mapping or {'homogeneity':'均匀性与稳定性评估', 'performance':'能力统计量计算'}
     rows=[]; cfg=data['config']; groups=data['stability']
     for claim in data['claims']:
-        name=claim['name']; model=claim.get('model') or 'recommended'; rec=None; reproduced=None
+        name=claim['name']; model=claim.get('model') or 'recommended'; rec=None; reproduced=None; detail=''
         if name in ('F','Ss'):
             rec=result.get('均匀性',{}).get(name); reproduced=rec
         elif name in ('x*','s*'):
@@ -20,11 +21,14 @@ def review(data, result):
         elif name=='t':
             rec=result.get('稳定性',{}).get('t')
             if model in ('repeats_pooled','repeats_welch'):
-                reproduced=stability(groups.get('基线'),groups['稳定期'],model=model)['t']
+                report_result=stability(groups.get('基线'),groups['稳定期'],model=model)
+                reproduced=report_result['t']
+                detail=f"；报告模型 df={report_result['df']}，推荐模型 df={result.get('稳定性',{}).get('df')}；模型={model}"
             elif model=='displayed_summary':
                 keys=('mean1','mean2','s1','s2','n1','n2')
                 if all(cfg.get(k) not in (None,'') for k in keys):
                     reproduced=summary_t(*(float(cfg[k]) if k not in ('n1','n2') else int(cfg[k]) for k in keys))['t']
+                    detail=f"；报告 s1={cfg['s1']}，推荐模型 s1={result.get('稳定性',{}).get('s1')}"
             elif model=='recommended': reproduced=rec
         elif name.startswith('z:'):
             participant=next((p for p in data['participants'] if p['id']==name[2:]),None)
@@ -35,7 +39,7 @@ def review(data, result):
             match=display(reproduced,digits)==display(claim['value'],digits) if reproduced is not None else None
         except (ValueError,TypeError,InvalidOperation,AssertionError): raise ValueError('报告声称值显示小数位须为0至12的整数') from None
         note = '技术重复仅用于报告模型复现，须核查伪重复及自由度' if model.startswith('repeats') else '按报告修约中间值重算；须核查各中间值' if model=='displayed_summary' else ''
-        rows.append({'统计量':name,'声称值':claim['value'],'来源':claim['source'],'按报告模型复现值':reproduced,'按推荐模型重算值':rec,'显示一致':match,'状态':'NOT_EVALUATED' if match is None else 'MATCH' if match else 'DIFFERENCE','评分条目':'3' if name in ('F','Ss','t') else '7/9、8/10','说明':note})
+        rows.append({'统计量':name,'声称值':claim['value'],'来源':claim['source'],'按报告模型复现值':reproduced,'按推荐模型重算值':rec,'显示一致':match,'状态':'NOT_EVALUATED' if match is None else 'MATCH' if match else 'DIFFERENCE','评分条目':mapping.get('homogeneity', '均匀性与稳定性评估') if name in ('F','Ss','t') else mapping.get('performance', '能力统计量计算'),'说明':note+detail})
     return rows
 
 def write_csv(path,rows):

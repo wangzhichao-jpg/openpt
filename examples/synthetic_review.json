@@ -1,0 +1,63 @@
+{
+  "均匀性": {
+    "status": "OK",
+    "warnings": [],
+    "g": 10,
+    "m": 2,
+    "means": [
+      100.5,
+      101.5,
+      102.5,
+      103.5,
+      104.5,
+      105.5,
+      106.5,
+      107.5,
+      108.5,
+      109.5
+    ],
+    "mean": 105.0,
+    "SS_between": 165.0,
+    "SS_within": 5.0,
+    "df_between": 9,
+    "df_within": 10,
+    "MS_between": 18.333333333333332,
+    "MS_within": 0.5,
+    "F": 36.666666666666664,
+    "F_critical": 3.020382947021374,
+    "p": 1.7246757431041793e-06,
+    "variance_raw": 8.916666666666666,
+    "Ss": 2.9860788111948193,
+    "sigma": null,
+    "threshold": null,
+    "F_pass": false,
+    "Ss_pass": null,
+    "Ss_status": "NOT_EVALUATED",
+    "strict": false,
+    "conclusion": false
+  },
+  "稳定性": {
+    "t": 0.06433340349803006,
+    "df": 11,
+    "p": 0.9498589932196957,
+    "critical": 2.200985160091639,
+    "pass": true,
+    "difference": 0.11666666666667425,
+    "se": 1.8134695247430315,
+    "s1": 3.0276503540974917,
+    "s2": 0.7005949852327858,
+    "mean1": 105.0,
+    "mean2": 105.11666666666667,
+    "n1": 10,
+    "n2": 3,
+    "status": "DESIGN_WARNING",
+    "model": "unit_pooled",
+    "method": "two_sample",
+    "threshold": null,
+    "mean_difference_pass": null,
+    "mean_difference_status": "NOT_EVALUATED",
+    "warnings": [
+      "GL003 5.2 建议每组不少于6个观测单元"
+    ]
+  }
+}
