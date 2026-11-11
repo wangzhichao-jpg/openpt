@@ -24,7 +24,7 @@ def _shown(value: Any, digits: int = 4, places: int | None = None) -> str:
     if isinstance(value, int):
         return str(value)
     if isinstance(value, float):
-        return f"{value:.{places}f}" if places is not None else f"{value:.{digits}g}"
+        return f"{value:.{places}f}" if places is not None else f"{value:#.{digits}g}"
     return str(value)
 
 
@@ -65,6 +65,9 @@ def _table(doc: Any, headers: list[str], rows: list[list[Any]]) -> None:
 
 def _data_places(data: dict[str, Any]) -> int:
     """以已导入数字的十进制表示估计原始小数位。"""
+    recorded = data.get("data_decimal_places")
+    if isinstance(recorded, int):
+        return min(12, recorded + 1)
     values = [v for group in data.get("homogeneity", []) for v in group]
     for groups in data.get("stability", {}).values():
         values.extend(v for group in groups for v in group)
@@ -231,9 +234,17 @@ def make_report(
     style._element.rPr.rFonts.set(qn("w:eastAsia"), "宋体")
     style.font.size = Pt(9)
     cfg = data.get("config", {})
-    sig = int(cfg.get("display_sig_digits") or 4)
-    mean_places = int(cfg.get("display_mean_decimals") or _data_places(data))
-    ss_places = int(cfg.get("display_ss_decimals") or 3)
+    sig = int(cfg["display_sig_digits"]) if cfg.get("display_sig_digits") not in (None, "") else 4
+    mean_places = (
+        int(cfg["display_mean_decimals"])
+        if cfg.get("display_mean_decimals") not in (None, "")
+        else _data_places(data)
+    )
+    ss_places = (
+        int(cfg["display_ss_decimals"]) if cfg.get("display_ss_decimals") not in (None, "") else 3
+    )
+    if not 1 <= sig <= 15 or not 0 <= mean_places <= 12 or not 0 <= ss_places <= 12:
+        raise ValueError("输出精度配置超出范围")
     doc.add_heading("能力验证计算书", 0)
     doc.add_paragraph("计算结果供具备资质的人员复核使用。")
     doc.add_heading("项目信息", 1)

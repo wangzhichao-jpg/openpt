@@ -4,6 +4,7 @@
 import re
 from collections import defaultdict
 from collections.abc import Iterator
+from decimal import Decimal
 from math import isfinite
 from pathlib import Path
 from typing import Any
@@ -118,6 +119,8 @@ def read_workbook(path: str | Path) -> dict[str, Any]:
             raise InputError(f"{name}!{c.coordinate}: 数值无效")
         return float(c.value)
 
+    measured_precision: list[int] = []
+
     def observations(
         name: str, stability: bool = False
     ) -> tuple[dict[str, Any], list[str], dict[str, list[str]]]:
@@ -138,6 +141,12 @@ def read_workbook(path: str | Path) -> dict[str, Any]:
             if rep in grouped[key]:
                 raise InputError(f"{name}!{r[0].row}: 重复编号")
             grouped[key][rep] = numeric(val, name)
+            number_format = re.search(r"\.([0#]+)", val.number_format)
+            if number_format:
+                measured_precision.append(len(number_format.group(1)))
+            else:
+                exponent = Decimal(str(val.value)).as_tuple().exponent
+                measured_precision.append(max(0, -exponent) if isinstance(exponent, int) else 0)
             sources.append(f"{name}!{val.coordinate}")
         groups = defaultdict(list)
         unit_ids: dict[str, list[str]] = defaultdict(list)
@@ -189,4 +198,5 @@ def read_workbook(path: str | Path) -> dict[str, Any]:
         "participants": participants,
         "claims": claims,
         "sources": hs + ss,
+        "data_decimal_places": max(measured_precision) if measured_precision else None,
     }
