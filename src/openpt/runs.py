@@ -124,6 +124,7 @@ def _calculate_snapshot(root: Path, config: dict[str, Any]) -> tuple[Any, Any, A
 def create_run(args: Any, root: Path) -> tuple[Path, Any, Any, Any, str]:
     """创建唯一运行目录，保存输入、配置、环境、结果、计算书及清单。"""
     from .report.docx import make_report
+    from .report.multi import export_reports
     from .review.compare import write_csv
 
     source = Path(args.input)
@@ -198,6 +199,9 @@ def create_run(args: Any, root: Path) -> tuple[Path, Any, Any, Any, str]:
         if differences is not None:
             write_csv(directory / "differences.csv", differences)
         make_report(directory / "report.docx", data, result, differences, input_sha256=digest)
+        export_reports(
+            directory / "report.docx", directory / "report.xlsx", directory / "report.html", result
+        )
         (directory / "log.txt").write_text("完成；软件不自动放行。\n", encoding="utf-8")
         hashes = {}
         for path in sorted(directory.rglob("*")):

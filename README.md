@@ -58,7 +58,7 @@ python -m pytest -m "not internal"
 
 `openpt run input.xlsx --runs-dir runs` 或 `openpt review input.xlsx --runs-dir runs` 会创建新的运行目录，保存原始输入字节、配置、环境、结果、DOCX、日志及哈希清单；默认运行目录根为当前目录的 `runs/`。`--sample-record sample-output/sample.json` 可附带抽样记录。为兼容旧接口，计算书和 JSON 同时仍写入输入文件旁或指定输出位置，普通输出不能写进已有运行目录。
 
-`openpt reproduce 运行目录` 首先核验清单，再重新计算并逐字段比较；环境不同会警告。`openpt pack 运行目录 -o 新文件.zip` 打包，`openpt verify 新文件.zip` 检查清单；不解压或执行包内代码，也不覆盖已有 ZIP。清单格式为 `{"files": {"相对文件名": "小写 SHA-256"}}`，清单本身不列入 `files`。清单没有数字签名，攻击者同时修改清单与内容时无法验证真实性；应通过可信渠道独立保存 ZIP 哈希或使用外部签名。人工决定和三格式计算书尚在施工。
+`openpt reproduce 运行目录` 首先核验清单，再重新计算并逐字段比较；环境不同会警告。`openpt pack 运行目录 -o 新文件.zip` 打包，`openpt verify 新文件.zip` 检查清单；不解压或执行包内代码，也不覆盖已有 ZIP。清单格式为 `{"files": {"相对文件名": "小写 SHA-256"}}`，清单本身不列入 `files`。清单没有数字签名，攻击者同时修改清单与内容时无法验证真实性；应通过可信渠道独立保存 ZIP 哈希或使用外部签名。每次运行同时生成 DOCX、XLSX 和内联样式 HTML。`openpt decide 运行目录 --item 均匀性 --decision 接受 --by 复核人 --note 备注` 会追加决定并生成新的带序号计算书，不改原始输入和旧计算书；这是运行目录追加写入的明确例外。决定追加后会更新清单，若中途失败导致清单不一致须人工恢复。软件不自动放行。
 
 ## 配置与边界
 

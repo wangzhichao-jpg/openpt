@@ -258,6 +258,12 @@ def _parser() -> argparse.ArgumentParser:
     sampling.add_argument("--seed", type=int, required=True, help="非负随机种子")
     sampling.add_argument("--strata", help="分层 JSON 文件")
     sampling.add_argument("--output", default="sample-output", help="新的输出目录")
+    decision = sub.add_parser("decide", help="追加人工决定并生成新版本计算书")
+    decision.add_argument("directory", help="已有运行目录")
+    decision.add_argument("--item", required=True, help="复核条目")
+    decision.add_argument("--decision", required=True, choices=("接受", "退回", "需补充"))
+    decision.add_argument("--by", required=True, dest="person", help="决定人员")
+    decision.add_argument("--note", default="", help="决定备注")
     reproduction = sub.add_parser("reproduce", help="校验快照并重新计算")
     reproduction.add_argument("directory", help="已有运行目录")
     pack = sub.add_parser("pack", help="按 manifest.json 打包已有运行目录")
@@ -363,6 +369,12 @@ def main(argv: list[str] | None = None) -> int:
             write_sample(args.output, record)
             for warning in record["warnings"]:
                 print(warning)
+            return 0
+        if args.command == "decide":
+            from .decisions import decide
+
+            decide(Path(args.directory), args.item, args.decision, args.person, args.note)
+            print("已记录人工决定；软件不自动放行。")
             return 0
         if args.command == "reproduce":
             from .runs import reproduce

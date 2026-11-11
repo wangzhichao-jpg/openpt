@@ -650,6 +650,7 @@ def make_report(
     result: dict[str, Any],
     differences: list[dict[str, Any]] | None = None,
     input_sha256: str | None = None,
+    decisions: list[dict[str, Any]] | None = None,
 ) -> None:
     """生成 GL003、GL002 计算书；附录保留未经修约的计算值。"""
     doc = Document()
@@ -720,7 +721,28 @@ def make_report(
     else:
         doc.add_paragraph("结果中未发现上述未评价状态；未输入或未计算的事项仍需人工检查。")
     doc.add_heading("人工复核", 1)
-    doc.add_paragraph("待人工复核；软件不自动放行。")
+    doc.add_paragraph("待人工复核；软件不自动放行，以下决定仅供人工复核。")
+    latest = {str(item.get("item")): item for item in decisions or []}
+    _table(
+        doc,
+        ["条目", "人工决定"],
+        [
+            [str(item), str(latest[item]["decision"]) if item in latest else "待人工复核"]
+            for item in result
+        ],
+    )
+    if decisions:
+        _table(
+            doc,
+            ["时间（UTC）", "条目", "决定", "人员", "备注", "结果 SHA-256"],
+            [
+                [
+                    item.get(key, "")
+                    for key in ("time", "item", "decision", "by", "note", "result_sha256")
+                ]
+                for item in decisions
+            ],
+        )
     doc.add_paragraph("计算人：________________    日期：____________")
     doc.add_paragraph("复核人：________________    日期：____________")
     doc.add_page_break()
