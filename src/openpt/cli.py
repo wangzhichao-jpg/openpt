@@ -252,6 +252,12 @@ def _parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True, title="命令")
     t = sub.add_parser("template", help="生成空白 Excel 模板")
     t.add_argument("output", help="模板文件路径")
+    sampling = sub.add_parser("sample", help="随机抽样及生成重复检测顺序")
+    sampling.add_argument("--units", type=int, required=True, help="总体单元数")
+    sampling.add_argument("--pick", type=int, required=True, help="抽样数")
+    sampling.add_argument("--seed", type=int, required=True, help="非负随机种子")
+    sampling.add_argument("--strata", help="分层 JSON 文件")
+    sampling.add_argument("--output", default="sample-output", help="新的输出目录")
     pack = sub.add_parser("pack", help="按 manifest.json 打包已有运行目录")
     pack.add_argument("directory", help="运行目录")
     pack.add_argument("-o", "--output", required=True, help="新的 ZIP 文件")
@@ -316,6 +322,19 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "template":
             template(args.output)
+            return 0
+        if args.command == "sample":
+            from .sampling import sample, write_sample
+
+            strata = (
+                json.loads(Path(args.strata).read_text(encoding="utf-8")) if args.strata else None
+            )
+            if strata is not None and not isinstance(strata, dict):
+                raise ValueError("分层必须是 JSON 对象")
+            record = sample(args.units, args.pick, args.seed, strata)
+            write_sample(args.output, record)
+            for warning in record["warnings"]:
+                print(warning)
             return 0
         if args.command == "pack":
             from .audit import pack_directory
