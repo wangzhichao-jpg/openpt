@@ -6,6 +6,19 @@
     "warnings": [],
     "g": 10,
     "m": 2,
+    "counts": [
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2
+    ],
+    "n0": 2.0,
     "means": [
       100.5,
       101.5,
@@ -36,7 +49,9 @@
     "Ss_pass": false,
     "Ss_status": "OK",
     "strict": false,
-    "conclusion": false
+    "conclusion": false,
+    "sigma_source": null,
+    "sigma_stage": null
   },
   "稳定性": {
     "t": 0.06433340349803005,
@@ -54,6 +69,8 @@
     "n2": 3,
     "status": "OK",
     "reference": null,
+    "reference_source": null,
+    "observation_level": "unit_means",
     "model": "unit_pooled",
     "method": "two_sample",
     "threshold": 1.5,
@@ -81,6 +98,8 @@
       "n2": 3,
       "status": "OK",
       "reference": null,
+      "reference_source": null,
+      "observation_level": "unit_means",
       "model": "unit_pooled",
       "method": "two_sample",
       "threshold": 1.5,
@@ -116,6 +135,14 @@
         "s": 0.8018590898655449
       }
     ]
+  },
+  "中位数NIQR": {
+    "median": 105.5,
+    "q1": 105.25,
+    "q3": 105.75,
+    "iqr": 0.5,
+    "niqr": 0.37065,
+    "status": "OK"
   },
   "算法A_收敛对照": {
     "x": 105.5,

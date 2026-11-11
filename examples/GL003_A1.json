@@ -6,6 +6,19 @@
     "warnings": [],
     "g": 10,
     "m": 2,
+    "counts": [
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2
+    ],
+    "n0": 2.0,
     "means": [
       251.75,
       239.5,
@@ -18,13 +31,13 @@
       258.2,
       251.60000000000002
     ],
-    "mean": 250.81499999999997,
-    "SS_between": 434.3405,
-    "SS_within": 413.28500000000025,
+    "mean": 250.815,
+    "SS_between": 434.34049999999996,
+    "SS_within": 413.2850000000002,
     "df_between": 9,
     "df_within": 10,
-    "MS_between": 48.26005555555556,
-    "MS_within": 41.32850000000003,
+    "MS_between": 48.26005555555555,
+    "MS_within": 41.32850000000002,
     "F": 1.167718536979458,
     "F_critical": 3.020382947021374,
     "p": 0.40354534348704724,
@@ -36,6 +49,8 @@
     "Ss_pass": null,
     "Ss_status": "NOT_EVALUATED",
     "strict": false,
-    "conclusion": true
+    "conclusion": true,
+    "sigma_source": null,
+    "sigma_stage": null
   }
 }
