@@ -252,6 +252,11 @@ def _parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True, title="命令")
     t = sub.add_parser("template", help="生成空白 Excel 模板")
     t.add_argument("output", help="模板文件路径")
+    pack = sub.add_parser("pack", help="按 manifest.json 打包已有运行目录")
+    pack.add_argument("directory", help="运行目录")
+    pack.add_argument("-o", "--output", required=True, help="新的 ZIP 文件")
+    verify = sub.add_parser("verify", help="检查 ZIP 中的清单和文件哈希")
+    verify.add_argument("archive", help="审计包 ZIP")
     validate = sub.add_parser("validate", help="只读检查测量表并输出 JSON 问题清单")
     validate.add_argument("input", help="XLSX 或 CSV 文件")
     validate.add_argument("--columns", help="标准字段到原始列名的 JSON 映射")
@@ -312,6 +317,21 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "template":
             template(args.output)
             return 0
+        if args.command == "pack":
+            from .audit import pack_directory
+
+            pack_directory(args.directory, args.output)
+            return 0
+        if args.command == "verify":
+            from .audit import verify_zip
+
+            audit_differences = verify_zip(args.archive)
+            print(
+                "\n".join(audit_differences)
+                if audit_differences
+                else "清单哈希一致（未验证清单真实性）"
+            )
+            return 1 if audit_differences else 0
         if args.command == "validate":
             from .io.validation import inspect_input
 
