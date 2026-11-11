@@ -29,6 +29,7 @@ class HomogeneityResult(ResultMapping):
     """GL003 4.2、4.3 的平衡设计结果。"""
 
     status: str
+    design_status: str
     design_warnings: list[str]
     warnings: list[str]
     g: int
@@ -106,6 +107,7 @@ class StabilityResult(ResultMapping):
     threshold: float | None = None
     mean_difference_pass: bool | None = None
     mean_difference_status: str = "NOT_EVALUATED"
+    design_status: str = "OK"
     design_warnings: list[str] = field(default_factory=list)
 
     @classmethod

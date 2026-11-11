@@ -217,6 +217,73 @@ def _other_results(
         doc.add_paragraph("未提供可评价的指定值、标准差或参加者结果。")
 
 
+def _project_methods(doc: Any, data: dict[str, Any], cfg: dict[str, Any]) -> None:
+    """列出项目信息及各方法的条款。"""
+    doc.add_heading("能力验证计算书", 0)
+    doc.add_paragraph("计算结果供具备资质的人员复核使用。")
+    doc.add_heading("项目信息", 1)
+    _table(doc, ["项目", "内容"], [[k, _shown(v)] for k, v in data.get("info", {}).items()])
+    doc.add_heading("方法与配置", 1)
+    method = (
+        "单均值 t 检验：CNAS-GL003:2018 5.2.1"
+        if cfg.get("stability_method") == "one_sample"
+        else "两均值 t 检验：CNAS-GL003:2018 5.2.2"
+    )
+    _table(
+        doc,
+        ["项目", "选择与依据"],
+        [
+            ["均匀性方法", "单因子方差分析：CNAS-GL003:2018 4.2"],
+            ["并列用途判据", "样品间标准差判据：CNAS-GL003:2018 4.3"],
+            ["稳定性方法", method + "；均值差：5.3"],
+            ["稳健统计方法", "算法 A：CNAS-GL002:2018 附录 A.2"],
+            ["显著性水平", _shown(cfg.get("alpha", 0.05))],
+            ["严格配置", "启用" if cfg.get("strict_homogeneity") else "未启用"],
+        ],
+    )
+
+
+def _difference_table(doc: Any, differences: list[dict[str, Any]]) -> None:
+    """只在正文列出有差异或需要提示的复核行。"""
+    doc.add_heading("报告复核差异", 1)
+    headers = [
+        "统计量",
+        "声称值",
+        "报告模型",
+        "推荐模型",
+        "显示一致",
+        "差异类型",
+        "差异说明",
+        "评分条目",
+    ]
+    rows = []
+    for row in differences:
+        if row.get("状态") == "MATCH" and not row.get("差异类型") and not row.get("说明"):
+            continue
+        matches = row.get("显示一致")
+        text = str(row.get("说明", ""))
+        text = text.replace("repeats_pooled", "合并方差模型").replace(
+            "repeats_welch", "非齐方差模型"
+        )
+        text = text.replace("df=", "自由度=").replace("s1=", "基线标准差=")
+        rows.append(
+            [
+                row.get("统计量", ""),
+                _shown(row.get("声称值")),
+                _shown(row.get("按报告模型复现值")),
+                _shown(row.get("按推荐模型重算值")),
+                "未评价" if matches is None else "一致" if matches else "不一致",
+                row.get("差异类型", ""),
+                text,
+                row.get("评分条目", ""),
+            ]
+        )
+    if rows:
+        _table(doc, headers, rows)
+    else:
+        doc.add_paragraph("未发现差异；完整逐项比较见差异清单。")
+
+
 def make_report(
     path: str | Path,
     data: dict[str, Any],
@@ -245,73 +312,13 @@ def make_report(
     )
     if not 1 <= sig <= 15 or not 0 <= mean_places <= 12 or not 0 <= ss_places <= 12:
         raise ValueError("输出精度配置超出范围")
-    doc.add_heading("能力验证计算书", 0)
-    doc.add_paragraph("计算结果供具备资质的人员复核使用。")
-    doc.add_heading("项目信息", 1)
-    _table(doc, ["项目", "内容"], [[k, _shown(v)] for k, v in data.get("info", {}).items()])
-    doc.add_heading("方法与配置", 1)
-    _table(
-        doc,
-        ["项目", "选择与依据"],
-        [
-            ["均匀性方法", "单因子方差分析：CNAS-GL003:2018 4.2"],
-            ["并列用途判据", "样品间标准差判据：CNAS-GL003:2018 4.3"],
-            [
-                "稳定性方法",
-                (
-                    "单均值 t 检验：CNAS-GL003:2018 5.2.1"
-                    if cfg.get("stability_method") == "one_sample"
-                    else "两均值 t 检验：CNAS-GL003:2018 5.2.2"
-                )
-                + "；均值差：5.3",
-            ],
-            ["稳健统计方法", "算法 A：CNAS-GL002:2018 附录 A.2"],
-            ["显著性水平", _shown(cfg.get("alpha", 0.05))],
-            ["严格配置", "启用" if cfg.get("strict_homogeneity") else "未启用"],
-        ],
-    )
+    _project_methods(doc, data, cfg)
     doc.add_heading("原始数据", 1)
     _raw_tables(doc, data)
     _homogeneity(doc, result, mean_places, sig, ss_places)
     _other_results(doc, data, result, sig, mean_places)
     if differences is not None:
-        doc.add_heading("报告复核差异", 1)
-        headers = [
-            "统计量",
-            "声称值",
-            "报告模型",
-            "推荐模型",
-            "显示一致",
-            "差异类型",
-            "差异说明",
-            "评分条目",
-        ]
-        rows = [
-            [
-                r.get("统计量", ""),
-                _shown(r.get("声称值")),
-                _shown(r.get("按报告模型复现值")),
-                _shown(r.get("按推荐模型重算值")),
-                "未评价"
-                if r.get("显示一致") is None
-                else "一致"
-                if r.get("显示一致")
-                else "不一致",
-                r.get("差异类型", ""),
-                str(r.get("说明", ""))
-                .replace("repeats_pooled", "合并方差模型")
-                .replace("repeats_welch", "非齐方差模型")
-                .replace("df=", "自由度=")
-                .replace("s1=", "基线标准差="),
-                r.get("评分条目", ""),
-            ]
-            for r in differences
-            if r.get("状态") != "MATCH" or r.get("差异类型") or r.get("说明")
-        ]
-        if rows:
-            _table(doc, headers, rows)
-        else:
-            doc.add_paragraph("未发现差异；完整逐项比较见差异清单。")
+        _difference_table(doc, differences)
     doc.add_heading("人工复核", 1)
     doc.add_paragraph("计算人：________________    日期：____________")
     doc.add_paragraph("复核人：________________    日期：____________")

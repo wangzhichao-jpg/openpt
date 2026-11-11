@@ -7,6 +7,7 @@ import json
 import sys
 from pathlib import Path
 from typing import Any
+from zipfile import BadZipFile
 
 from .core.homogeneity import analyze as homogeneity
 from .core.robust import algorithm_a
@@ -16,10 +17,45 @@ from .io.excel import read_workbook, template
 from .report.docx import make_report
 
 
+def _option(config: dict[str, Any], key: str, default: Any) -> Any:
+    value = config.get(key)
+    return default if value in (None, "") else value
+
+
+def _participant_results(data: dict[str, Any], sigma: float | None) -> dict[str, Any]:
+    """计算 GL002 附录 A.2 算法 A 及 GL002 4.4 的 z。"""
+    cfg = data["config"]
+    simplified = _option(cfg, "algorithm_a_simplified", False)
+    if not isinstance(simplified, bool):
+        raise ValueError("algorithm_a_simplified 必须是布尔值")
+    result = {
+        "算法A": algorithm_a(
+            [p["value"] for p in data["participants"]],
+            tolerance=float(_option(cfg, "algorithm_a_tolerance", 1e-10)),
+            max_iterations=int(_option(cfg, "algorithm_a_max_iterations", 1000)),
+            simplified=simplified,
+            rule=str(_option(cfg, "algorithm_a_rule", "gl002")),
+        ).to_dict()
+    }
+    sigma_pt = float(cfg["sigma_pt"]) if cfg.get("sigma_pt") not in (None, "") else sigma
+    if cfg.get("assigned") not in (None, "") and sigma_pt is not None:
+        result["参加者z"] = {
+            p["id"]: zscore(
+                p["value"],
+                float(cfg["assigned"]),
+                sigma_pt,
+                float(_option(cfg, "z_satisfactory", 2)),
+                float(_option(cfg, "z_unsatisfactory", 3)),
+            ).to_dict()
+            for p in data["participants"]
+        }
+    return result
+
+
 def calculate(data: dict[str, Any]) -> dict[str, Any]:
     """根据输入选择 GL003 与 GL002 计算方法。"""
     cfg = data["config"]
-    alpha = float(cfg.get("alpha") or 0.05)
+    alpha = float(_option(cfg, "alpha", 0.05))
     raw = cfg.get("sigma")
     sigma = float(raw) if raw not in (None, "") else None
     if cfg.get("gbt28043_extension"):
@@ -49,32 +85,14 @@ def calculate(data: dict[str, Any]) -> dict[str, Any]:
         if extra:
             result["其他稳定性"] = extra
     if data["participants"]:
-        result["算法A"] = algorithm_a(
-            [p["value"] for p in data["participants"]],
-            tolerance=float(cfg.get("algorithm_a_tolerance") or 1e-10),
-            max_iterations=int(cfg.get("algorithm_a_max_iterations") or 1000),
-            simplified=bool(cfg.get("algorithm_a_simplified", False)),
-            rule=str(cfg.get("algorithm_a_rule") or "gl002"),
-        ).to_dict()
-        sigma_pt = float(cfg["sigma_pt"]) if cfg.get("sigma_pt") not in (None, "") else sigma
-        if cfg.get("assigned") not in (None, "") and sigma_pt is not None:
-            result["参加者z"] = {
-                p["id"]: zscore(
-                    p["value"],
-                    float(cfg["assigned"]),
-                    sigma_pt,
-                    float(cfg.get("z_satisfactory") or 2),
-                    float(cfg.get("z_unsatisfactory") or 3),
-                ).to_dict()
-                for p in data["participants"]
-            }
+        result.update(_participant_results(data, sigma))
     if not result:
         raise ValueError("没有可计算的数据")
     return result
 
 
-def main(argv: list[str] | None = None) -> int:
-    """执行模板、计算或复核命令，返回进程退出码。"""
+def _parser() -> argparse.ArgumentParser:
+    """创建带中文说明的命令行参数。"""
     parser = argparse.ArgumentParser(prog="openpt", description="能力验证统计工作台")
     parser.add_argument("--version", action="version", version="openpt 0.0.1", help="显示版本")
     sub = parser.add_subparsers(dest="command", required=True, title="命令")
@@ -90,7 +108,12 @@ def main(argv: list[str] | None = None) -> int:
         if name == "review":
             p.add_argument("--differences", help="差异 CSV 路径；默认写入输入文件旁")
             p.add_argument("--mapping", help="可选 JSON 评分映射")
-    args = parser.parse_args(argv)
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    """执行模板、计算或复核命令，返回进程退出码。"""
+    args = _parser().parse_args(argv)
     try:
         if args.command == "template":
             template(args.output)
@@ -127,7 +150,7 @@ def main(argv: list[str] | None = None) -> int:
         digest = hashlib.sha256(Path(args.input).read_bytes()).hexdigest()
         make_report(args.docx, data, result, differences, input_sha256=digest)
         return 0
-    except (ValueError, TypeError, OSError, KeyError, OverflowError) as exc:
+    except (ValueError, TypeError, OSError, KeyError, OverflowError, BadZipFile) as exc:
         print(f"错误：{exc}", file=sys.stderr)
         return 2
 

@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from openpyxl import load_workbook
 
-from openpt.cli import main
+from openpt.cli import calculate, main
 from openpt.io.excel import read_workbook, template
 
 
@@ -50,6 +50,16 @@ def test_cell_type_and_unit(tmp_path: Path, field: str, value: str) -> None:
     book.save(path)
     with pytest.raises(ValueError, match=f"均匀性!{field}"):
         read_workbook(path)
+
+
+def test_invalid_zero_alpha_is_not_replaced(tmp_path: Path) -> None:
+    """GL003 4.2 的显著性水平必须严格在零和一之间。"""
+    path = tmp_path / "data.xlsx"
+    _make(path)
+    data = read_workbook(path)
+    data["config"]["alpha"] = 0
+    with pytest.raises(ValueError, match="alpha"):
+        calculate(data)
 
 
 def test_unequal_repetitions_and_empty_sheet(tmp_path: Path) -> None:

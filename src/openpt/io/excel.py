@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""固定模板及来源定位。"""
+"""固定模板、输入校验及来源定位。"""
 
 import re
 from collections import defaultdict
@@ -67,127 +67,154 @@ def template(path: str | Path) -> None:
     book.save(path)
 
 
+def _rows(book: Any, name: str) -> Iterator[Any]:
+    """检查表头和公式，再逐行返回原始单元格。"""
+    ws = book[name]
+    headers = [ws.cell(1, i).value for i in range(1, len(SHEETS[name]) + 1)]
+    if name == "报告声称值" and headers[-1] is None:
+        headers[-1] = "时间组"
+    if headers != SHEETS[name]:
+        raise InputError(f"{name}!1 表头错误")
+    for cells in ws.iter_rows(min_row=2, max_col=len(SHEETS[name])):
+        if not any(c.value is not None for c in cells):
+            continue
+        if any(c.data_type == "f" for c in cells):
+            raise InputError(f"{name}!{cells[0].row}: 不接受公式")
+        yield cells
+
+
+def _numeric(cell: Any, name: str) -> float:
+    """读取有限数值，不将文字隐式转换为数值。"""
+    if (
+        isinstance(cell.value, bool)
+        or not isinstance(cell.value, (int, float))
+        or not isfinite(cell.value)
+    ):
+        raise InputError(f"{name}!{cell.coordinate}: 数值无效")
+    return float(cell.value)
+
+
+def _metadata(book: Any) -> tuple[dict[str, Any], dict[str, Any]]:
+    """读取项目字段和方法配置。"""
+    rows = list(_rows(book, "项目信息"))
+    info = {str(r[0].value): r[1].value for r in rows if r[0].value}
+    locations = {str(r[0].value): r[1].coordinate for r in rows if r[0].value}
+    for required in ("项目名称", "单位"):
+        if not info.get(required):
+            position = locations.get(required)
+            location = f"项目信息!{position}" if position else "项目信息"
+            raise InputError(f"{location}: {required}必填")
+    config = {}
+    for row in _rows(book, "方法配置"):
+        if not row[0].value:
+            continue
+        label = str(row[0].value)
+        match = re.search(r"（([a-zA-Z_][a-zA-Z_0-9]*)）$", label)
+        key = match.group(1) if match else label
+        value = row[1].value
+        if key == "strict_homogeneity" and value in ("启用", "关闭"):
+            value = value == "启用"
+        if key == "stability_method" and value in ("两均值", "单均值"):
+            value = {"两均值": "two_sample", "单均值": "one_sample"}[value]
+        config[key] = value
+    return info, config
+
+
+def _precision(cell: Any) -> int:
+    """优先从 Excel 数字格式提取显示小数位。"""
+    number_format = re.search(r"\.([0#]+)", cell.number_format)
+    if number_format:
+        return len(number_format.group(1))
+    exponent = Decimal(str(cell.value)).as_tuple().exponent
+    return max(0, -exponent) if isinstance(exponent, int) else 0
+
+
+def _observations(
+    book: Any, name: str, unit: str, precision: list[int], stability: bool = False
+) -> tuple[dict[str, Any], list[str], dict[str, list[str]]]:
+    """读取包装单元和重复测量，并验证平衡设计。"""
+    grouped: dict[tuple[str, str], dict[str, float]] = defaultdict(dict)
+    sources = []
+    for row in _rows(book, name):
+        group, uid, rep, val, actual_unit = (
+            (row[0].value, row[1].value, row[2].value, row[3], row[4].value)
+            if stability
+            else ("均匀性", row[0].value, row[1].value, row[2], row[3].value)
+        )
+        if not group or uid is None or rep is None:
+            raise InputError(f"{name}!{row[0].row}: 缺少分组或编号")
+        if actual_unit != unit:
+            raise InputError(f"{name}!{row[-1].coordinate}: 单位不一致")
+        key, repeat = (str(group), str(uid)), str(rep)
+        if repeat in grouped[key]:
+            raise InputError(f"{name}!{row[0].row}: 重复编号")
+        grouped[key][repeat] = _numeric(val, name)
+        precision.append(_precision(val))
+        sources.append(f"{name}!{val.coordinate}")
+    groups: dict[str, list[list[float]]] = defaultdict(list)
+    unit_ids: dict[str, list[str]] = defaultdict(list)
+    for (group, uid), values in grouped.items():
+        groups[group].append(list(values.values()))
+        unit_ids[group].append(uid)
+    for group, items in groups.items():
+        if len({len(x) for x in items}) > 1:
+            raise InputError(f"{name}: {group} 重复数不平衡")
+        if not stability and items and len(items[0]) < 2:
+            raise InputError(f"{sources[0]}: 每个单元至少需要两次重复")
+    return dict(groups), sources, dict(unit_ids)
+
+
+def _participants(book: Any, unit: str) -> list[dict[str, Any]]:
+    """读取参加者结果和单元格位置。"""
+    values = []
+    seen: set[str] = set()
+    for row in _rows(book, "参加者结果"):
+        if row[0].value is None or row[2].value != unit:
+            raise InputError(f"参加者结果!{row[0].row}: 编号或单位错误")
+        participant_id = str(row[0].value)
+        if participant_id in seen:
+            raise InputError(f"参加者结果!{row[0].coordinate}: 编号重复")
+        seen.add(participant_id)
+        values.append(
+            {
+                "id": str(row[0].value),
+                "value": _numeric(row[1], "参加者结果"),
+                "source": f"参加者结果!{row[1].coordinate}",
+            }
+        )
+    return values
+
+
+def _claims(book: Any) -> list[dict[str, Any]]:
+    """读取报告声称值及其来源。"""
+    values = []
+    for row in _rows(book, "报告声称值"):
+        if row[0].value is None or row[1].value is None or not row[3].value:
+            raise InputError(f"报告声称值!{row[0].row}: 项目、声称值及来源必填")
+        values.append(
+            {
+                "name": str(row[0].value),
+                "value": _numeric(row[1], "报告声称值"),
+                "digits": row[2].value,
+                "source": str(row[3].value),
+                "model": row[4].value,
+                "timegroup": row[5].value,
+                "cell": f"报告声称值!{row[1].coordinate}",
+            }
+        )
+    return values
+
+
 def read_workbook(path: str | Path) -> dict[str, Any]:
     """导入 GL003 和 GL002 输入并记录测量单元格来源。"""
     book = load_workbook(Path(path), data_only=False)
     missing = set(SHEETS) - set(book.sheetnames)
     if missing:
         raise InputError("缺少工作表：" + ", ".join(sorted(missing)))
-
-    def rows(name: str) -> Iterator[Any]:
-        ws = book[name]
-        headers = [ws.cell(1, i).value for i in range(1, len(SHEETS[name]) + 1)]
-        if name == "报告声称值" and headers[-1] is None:
-            headers[-1] = "时间组"  # 兼容旧模板
-        if headers != SHEETS[name]:
-            raise InputError(f"{name}!1 表头错误")
-        for cells in ws.iter_rows(min_row=2, max_col=len(SHEETS[name])):
-            if not any(c.value is not None for c in cells):
-                continue
-            if any(c.data_type == "f" for c in cells):
-                raise InputError(f"{name}!{cells[0].row}: 不接受公式")
-            yield cells
-
-    info_rows = list(rows("项目信息"))
-    info = {str(r[0].value): r[1].value for r in info_rows if r[0].value}
-    info_locations = {str(r[0].value): r[1].coordinate for r in info_rows if r[0].value}
-    config = {}
-    for r in rows("方法配置"):
-        if not r[0].value:
-            continue
-        label = str(r[0].value)
-        match = re.search(r"（([a-zA-Z_][a-zA-Z_0-9]*)）$", label)
-        key = match.group(1) if match else label
-        value = r[1].value
-        if key == "strict_homogeneity" and value in ("启用", "关闭"):
-            value = value == "启用"
-        if key == "stability_method" and value in ("两均值", "单均值"):
-            value = {"两均值": "two_sample", "单均值": "one_sample"}[value]
-        config[key] = value
-    for required in ("项目名称", "单位"):
-        if not info.get(required):
-            position = info_locations.get(required)
-            location = f"项目信息!{position}" if position else "项目信息"
-            raise InputError(f"{location}: {required}必填")
-
-    def numeric(c: Any, name: str) -> float:
-        if (
-            isinstance(c.value, bool)
-            or not isinstance(c.value, (int, float))
-            or not isfinite(c.value)
-        ):
-            raise InputError(f"{name}!{c.coordinate}: 数值无效")
-        return float(c.value)
-
-    measured_precision: list[int] = []
-
-    def observations(
-        name: str, stability: bool = False
-    ) -> tuple[dict[str, Any], list[str], dict[str, list[str]]]:
-        grouped: dict[tuple[str, str], dict[str, float]] = defaultdict(dict)
-        sources = []
-        for r in rows(name):
-            group, uid, rep, val, unit = (
-                (r[0].value, r[1].value, r[2].value, r[3], r[4].value)
-                if stability
-                else ("均匀性", r[0].value, r[1].value, r[2], r[3].value)
-            )
-            if not group or uid is None or rep is None:
-                raise InputError(f"{name}!{r[0].row}: 缺少分组或编号")
-            if unit != info["单位"]:
-                raise InputError(f"{name}!{r[-1].coordinate}: 单位不一致")
-            key = (str(group), str(uid))
-            rep = str(rep)
-            if rep in grouped[key]:
-                raise InputError(f"{name}!{r[0].row}: 重复编号")
-            grouped[key][rep] = numeric(val, name)
-            number_format = re.search(r"\.([0#]+)", val.number_format)
-            if number_format:
-                measured_precision.append(len(number_format.group(1)))
-            else:
-                exponent = Decimal(str(val.value)).as_tuple().exponent
-                measured_precision.append(max(0, -exponent) if isinstance(exponent, int) else 0)
-            sources.append(f"{name}!{val.coordinate}")
-        groups = defaultdict(list)
-        unit_ids: dict[str, list[str]] = defaultdict(list)
-        for (group, uid), values in grouped.items():
-            groups[group].append(list(values.values()))
-            unit_ids[group].append(uid)
-        for group, items in groups.items():
-            if len({len(x) for x in items}) > 1:
-                raise InputError(f"{name}: {group} 重复数不平衡")
-            if not stability and items and len(items[0]) < 2:
-                raise InputError(f"{sources[0]}: 每个单元至少需要两次重复")
-        return dict(groups), sources, dict(unit_ids)
-
-    hom, hs, hom_ids = observations("均匀性")
-    stab, ss, stab_ids = observations("稳定性", True)
-    participants = []
-    for r in rows("参加者结果"):
-        if r[0].value is None or r[2].value != info["单位"]:
-            raise InputError(f"参加者结果!{r[0].row}: 编号或单位错误")
-        participants.append(
-            {
-                "id": str(r[0].value),
-                "value": numeric(r[1], "参加者结果"),
-                "source": f"参加者结果!{r[1].coordinate}",
-            }
-        )
-    claims = []
-    for r in rows("报告声称值"):
-        if r[0].value is None or r[1].value is None or not r[3].value:
-            raise InputError(f"报告声称值!{r[0].row}: 项目、声称值及来源必填")
-        claims.append(
-            {
-                "name": str(r[0].value),
-                "value": numeric(r[1], "报告声称值"),
-                "digits": r[2].value,
-                "source": str(r[3].value),
-                "model": r[4].value,
-                "timegroup": r[5].value,
-                "cell": f"报告声称值!{r[1].coordinate}",
-            }
-        )
+    info, config = _metadata(book)
+    precision: list[int] = []
+    hom, hs, hom_ids = _observations(book, "均匀性", info["单位"], precision)
+    stab, ss, stab_ids = _observations(book, "稳定性", info["单位"], precision, True)
     return {
         "info": info,
         "config": config,
@@ -195,8 +222,8 @@ def read_workbook(path: str | Path) -> dict[str, Any]:
         "homogeneity_units": hom_ids.get("均匀性", []),
         "stability": stab,
         "stability_units": stab_ids,
-        "participants": participants,
-        "claims": claims,
+        "participants": _participants(book, info["单位"]),
+        "claims": _claims(book),
         "sources": hs + ss,
-        "data_decimal_places": max(measured_precision) if measured_precision else None,
+        "data_decimal_places": max(precision) if precision else None,
     }

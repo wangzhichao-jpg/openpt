@@ -31,6 +31,32 @@ def _gl002_stable(x: float, s: float, next_x: float, next_s: float) -> bool:
         ) and Decimal(str(x)).quantize(quantum) == Decimal(str(next_x)).quantize(quantum)
 
 
+def _iterate(
+    data: Any, x: float, s: float, rule: str, tolerance: float, max_iterations: int
+) -> tuple[float, float, bool, list[dict[str, Any]]]:
+    """按选定规则迭代 GL002 附录 A.2 的截尾和修正公式。"""
+    history: list[dict[str, Any]] = []
+    converged = rule == "simplified"
+    for i in range(0 if rule == "simplified" else max_iterations):
+        with np.errstate(over="ignore", invalid="ignore"):
+            clipped = np.clip(data, x - ALG_A_CLIP * s, x + ALG_A_CLIP * s)
+            nx = float(clipped.mean())
+            ns = float(ALG_A_SD_FACTOR * np.std(clipped, ddof=1))
+        if not math.isfinite(nx) or not math.isfinite(ns):
+            raise InputError("数值溢出")
+        history.append({"iteration": i + 1, "x": nx, "s": ns})
+        stable = (
+            _gl002_stable(x, s, nx, ns) and i > 0
+            if rule == "gl002"
+            else abs(nx - x) <= tolerance and abs(ns - s) <= tolerance
+        )
+        x, s = nx, ns
+        if stable:
+            converged = True
+            break
+    return x, s, converged, history
+
+
 def algorithm_a(
     values: Any,
     tolerance: float = 1e-10,
@@ -61,26 +87,7 @@ def algorithm_a(
         s = float(MAD_FACTOR * np.median(np.abs(a - x)))
     if not math.isfinite(x) or not math.isfinite(s):
         raise InputError("稳健统计初始值数值溢出")
-    history = []
-    converged = rule == "simplified"
-    for i in range(0 if rule == "simplified" else max_iterations):
-        with np.errstate(over="ignore", invalid="ignore"):
-            clipped = np.clip(a, x - ALG_A_CLIP * s, x + ALG_A_CLIP * s)
-            nx = float(clipped.mean())
-            ns = float(ALG_A_SD_FACTOR * np.std(clipped, ddof=1))
-        if not math.isfinite(nx) or not math.isfinite(ns):
-            raise InputError("数值溢出")
-        history.append({"iteration": i + 1, "x": nx, "s": ns})
-        stable = (
-            _gl002_stable(x, s, nx, ns) and i > 0
-            if rule == "gl002"
-            else abs(nx - x) <= tolerance and abs(ns - s) <= tolerance
-        )
-        if stable:
-            x, s = nx, ns
-            converged = True
-            break
-        x, s = nx, ns
+    x, s, converged, history = _iterate(a, x, s, rule, tolerance, max_iterations)
     result: dict[str, Any] = {
         "x": x,
         "s": s,

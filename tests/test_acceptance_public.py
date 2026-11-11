@@ -53,6 +53,7 @@ def test_u06_small_design() -> None:
     """合成的少于 GL003 4.1 样品数要求的设计。"""
     result = analyze(CASES["A1"]["data"][:8])
     assert result["design_warnings"] and result["status"] == "OK"
+    assert result["design_status"] == "DESIGN_WARNING"
 
 
 def test_u07_public_equivalent() -> None:

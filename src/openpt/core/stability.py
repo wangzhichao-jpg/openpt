@@ -65,24 +65,65 @@ def summary_t(
     if t is not None and not math.isfinite(t):
         t = None
     critical = float(t_distribution.ppf(1 - alpha / 2, df)) if df else None
-    return StabilityResult.from_dict(
-        {
-            "t": t,
-            "df": df,
-            "p": float(2 * t_distribution.sf(t, df)) if t is not None and df else None,
-            "critical": critical,
-            "pass": t < critical if t is not None and critical else None,
-            "difference": difference,
-            "se": se,
-            "s1": s1,
-            "s2": s2,
-            "mean1": mean1,
-            "mean2": mean2,
-            "n1": n1,
-            "n2": n2,
-            "status": "OK" if t is not None else "INDETERMINATE",
-        }
+    return StabilityResult(
+        t=t,
+        df=df,
+        p=float(2 * t_distribution.sf(t, df)) if t is not None and df else None,
+        critical=critical,
+        passed=t < critical if t is not None and critical else None,
+        difference=difference,
+        se=se,
+        s1=s1,
+        s2=s2,
+        mean1=mean1,
+        mean2=mean2,
+        n1=n1,
+        n2=n2,
+        status="OK" if t is not None else "INDETERMINATE",
     )
+
+
+def _one_sample(y: Any, reference: float | None, alpha: float) -> dict[str, Any]:
+    """按 GL003 5.2.1 计算均值与参考值的 t 检验。"""
+    if reference is None or not math.isfinite(reference):
+        raise InputError("单样本检验需要参考值")
+    n = len(y)
+    with np.errstate(over="ignore", invalid="ignore"):
+        mean, sd = float(y.mean()), float(y.std(ddof=1))
+    se = sd / math.sqrt(n)
+    diff = abs(mean - reference)
+    if not all(math.isfinite(v) for v in (mean, sd, se, diff)):
+        raise InputError("稳定性统计量数值溢出")
+    t = diff / se if se else None
+    if t is not None and not math.isfinite(t):
+        raise InputError("稳定性 t 值数值溢出")
+    df = n - 1
+    crit = float(t_distribution.ppf(1 - alpha / 2, df))
+    return StabilityResult(
+        t=t,
+        df=df,
+        p=float(2 * t_distribution.sf(t, df)) if t is not None else None,
+        critical=crit,
+        passed=t < crit if t is not None else None,
+        difference=diff,
+        se=se,
+        s1=sd,
+        mean1=mean,
+        reference=reference,
+        n1=n,
+        status="OK" if t is not None else "INDETERMINATE",
+    ).to_dict()
+
+
+def _two_sample(baseline: Any, y: Any, alpha: float, model: str) -> dict[str, Any]:
+    """按 GL003 5.2.2 或复核模型计算两均值 t。"""
+    x = _observations(baseline, model != "unit_pooled")
+    with np.errstate(over="ignore", invalid="ignore"):
+        mean_x, mean_y = float(x.mean()), float(y.mean())
+        sd_x, sd_y = float(x.std(ddof=1)), float(y.std(ddof=1))
+    return summary_t(
+        mean_x, mean_y, sd_x, sd_y, len(x), len(y), alpha, model == "repeats_welch"
+    ).to_dict()
 
 
 def analyze(
@@ -104,51 +145,11 @@ def analyze(
     if sigma is not None and (not math.isfinite(sigma) or sigma <= 0):
         raise InputError("sigma 无效")
     y = _observations(followup, model != "unit_pooled")
-    result: dict[str, Any]
-    if method == "one_sample":
-        if reference is None or not math.isfinite(reference):
-            raise InputError("单样本检验需要参考值")
-        n = len(y)
-        mean = float(y.mean())
-        with np.errstate(over="ignore", invalid="ignore"):
-            sd = float(y.std(ddof=1))
-        se = sd / math.sqrt(n)
-        diff = abs(mean - reference)
-        if not all(math.isfinite(v) for v in (mean, sd, se, diff)):
-            raise InputError("稳定性统计量数值溢出")
-        t = diff / se if se else None
-        if t is not None and not math.isfinite(t):
-            raise InputError("稳定性 t 值数值溢出")
-        df = n - 1
-        crit = float(t_distribution.ppf(1 - alpha / 2, df))
-        result = {
-            "t": t,
-            "df": df,
-            "p": float(2 * t_distribution.sf(t, df)) if t is not None else None,
-            "critical": crit,
-            "pass": t < crit if t is not None else None,
-            "difference": diff,
-            "se": se,
-            "s1": sd,
-            "mean1": mean,
-            "reference": reference,
-            "n1": n,
-            "status": "OK" if t is not None else "INDETERMINATE",
-        }
-    else:
-        x = _observations(baseline, model != "unit_pooled")
-        with np.errstate(over="ignore", invalid="ignore"):
-            sd_x, sd_y = float(x.std(ddof=1)), float(y.std(ddof=1))
-        result = summary_t(
-            float(x.mean()),
-            float(y.mean()),
-            sd_x,
-            sd_y,
-            len(x),
-            len(y),
-            alpha,
-            model == "repeats_welch",
-        ).to_dict()
+    result = (
+        _one_sample(y, reference, alpha)
+        if method == "one_sample"
+        else _two_sample(baseline, y, alpha, model)
+    )
     result.update(
         {
             "model": model,
@@ -162,5 +163,6 @@ def analyze(
         }
     )
     if len(followup) < 6 or (method == "two_sample" and len(baseline) < 6):
+        result["design_status"] = "DESIGN_WARNING"
         result["design_warnings"].append("GL003 5.2 建议每组不少于6个观测单元")
     return StabilityResult.from_dict(result)
