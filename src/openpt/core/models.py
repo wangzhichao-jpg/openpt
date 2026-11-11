@@ -56,6 +56,8 @@ class HomogeneityResult(ResultMapping):
     Ss_status: str
     strict: bool
     conclusion: bool | None
+    sigma_source: str | None = None
+    sigma_stage: str | None = None
 
 
 @dataclass

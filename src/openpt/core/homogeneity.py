@@ -28,7 +28,7 @@ def _anova(data: Any) -> dict[str, Any]:
     with np.errstate(over="ignore", invalid="ignore"):
         means = [float(row.mean()) for row in groups]
         grand = float(sum(n * mean for n, mean in zip(counts, means, strict=True)) / total)
-        ssb = float(sum(n * (mean - grand) ** 2 for n, mean in zip(counts, means, strict=True)))
+        ssb = float(np.sum(np.asarray(counts) * (np.asarray(means) - grand) ** 2))
         ssw = float(sum(np.sum((row - mean) ** 2) for row, mean in zip(groups, means, strict=True)))
     db, dw = g - 1, total - g
     msb, msw = ssb / db, ssw / dw
@@ -53,13 +53,22 @@ def _anova(data: Any) -> dict[str, Any]:
 
 
 def analyze(
-    data: Any, sigma: float | None = None, alpha: float = 0.05, strict: bool = False
+    data: Any,
+    sigma: float | None = None,
+    alpha: float = 0.05,
+    strict: bool = False,
+    sigma_source: str | None = None,
+    sigma_stage: str | None = None,
 ) -> HomogeneityResult:
     """按 GL003 4.2、4.3 计算 F=MS组间/MS组内 和 Ss。"""
     if not 0 < alpha < 1:
         raise InputError("alpha 必须在 0 和 1 之间")
     if sigma is not None and (not math.isfinite(sigma) or sigma <= 0):
         raise InputError("sigma 必须为正有限数")
+    if sigma_stage not in (None, "temporary", "final"):
+        raise InputError("sigma 阶段应为 temporary 或 final")
+    if sigma_source is not None and not isinstance(sigma_source, str):
+        raise InputError("sigma 来源必须为文字")
     values = _anova(data)
     raw, msb, msw = values["variance_raw"], values["MS_between"], values["MS_within"]
     db, dw = values["df_between"], values["df_within"]
@@ -93,10 +102,18 @@ def analyze(
         p=float(f_distribution.sf(stat, db, dw)) if stat is not None else None,
         Ss=ss,
         sigma=sigma,
+        sigma_source=sigma_source,
+        sigma_stage=sigma_stage if sigma is not None else None,
         threshold=threshold,
         F_pass=fpass,
         Ss_pass=sspass,
-        Ss_status="OK" if sigma is not None else "NOT_EVALUATED",
+        Ss_status=(
+            "NOT_EVALUATED"
+            if sigma is None
+            else "PROVISIONAL"
+            if sigma_stage == "temporary"
+            else "OK"
+        ),
         strict=strict,
         conclusion=conclusion,
     )

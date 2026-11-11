@@ -253,6 +253,11 @@ def _homogeneity_conclusion(
             "未评价：F 或 Ss 判据无法计算" if h["conclusion"] is None else _shown(h["conclusion"])
         )
         doc.add_paragraph("严格配置综合结论：" + conclusion + "。")
+    stage = {"temporary": "临时值", "final": "最终值"}.get(h.get("sigma_stage"), "未登记")
+    doc.add_paragraph(
+        f"σ 阶段：{stage}；来源：{h.get('sigma_source') or '未登记'}；"
+        f"用途判据状态：{h['Ss_status']}。"
+    )
     doc.add_paragraph("计算状态：" + str(h["status"]))
     for warning in h.get("design_warnings", []) + h.get("warnings", []):
         doc.add_paragraph("提示：" + warning)

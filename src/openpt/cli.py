@@ -70,7 +70,14 @@ def calculate(data: dict[str, Any]) -> dict[str, Any]:
         strict = cfg.get("strict_homogeneity", False)
         if not isinstance(strict, bool):
             raise ValueError("strict_homogeneity 必须是布尔值")
-        result["均匀性"] = homogeneity(data["homogeneity"], sigma, alpha, strict).to_dict()
+        result["均匀性"] = homogeneity(
+            data["homogeneity"],
+            sigma,
+            alpha,
+            strict,
+            _option(cfg, "sigma_source", None),
+            _option(cfg, "sigma_stage", None),
+        ).to_dict()
     groups = data["stability"]
     method = cfg.get("stability_method") or "two_sample"
     if groups:
