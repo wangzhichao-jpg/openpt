@@ -8,7 +8,7 @@ from typing import Any
 import numpy as np
 
 from ..errors import InputError
-from .models import AlgorithmAResult
+from .models import AlgorithmAResult, MedianIqrResult
 
 # CNAS-GL002:2018 附录 A.2，式 A.2、A.3、A.6。
 MAD_FACTOR = 1.483
@@ -16,6 +16,8 @@ ALG_A_CLIP = 1.5
 ALG_A_SD_FACTOR = 1.134
 # 稳健指定值标准不确定度的约定计算因子。
 UNCERTAINTY_FACTOR = 1.25
+# CNAS-GL002:2018 附录 A.4，式 A.13。
+NIQR_FACTOR = 0.7413
 
 
 def _gl002_stable(x: float, s: float, next_x: float, next_s: float) -> bool:
@@ -103,3 +105,21 @@ def algorithm_a(
         "history": history,
     }
     return AlgorithmAResult(**result)
+
+
+def median_niqr(values: Any) -> MedianIqrResult:
+    """按 GL002 A.4 计算中位数、四分位距和 NIQR=0.7413×IQR。"""
+    try:
+        data = np.asarray(values, dtype=float)
+    except (ValueError, TypeError):
+        raise InputError("参加者结果必须为有限数值") from None
+    if data.ndim != 1 or len(data) < 2 or not np.isfinite(data).all():
+        raise InputError("至少两个有限参加者结果")
+    with np.errstate(over="ignore", invalid="ignore"):
+        median = float(np.median(data))
+        q1, q3 = (float(x) for x in np.quantile(data, [0.25, 0.75], method="linear"))
+        iqr = q3 - q1
+        niqr = NIQR_FACTOR * iqr
+    if not all(math.isfinite(v) for v in (median, q1, q3, iqr, niqr)):
+        raise InputError("四分位统计量数值溢出")
+    return MedianIqrResult(median=median, q1=q1, q3=q3, iqr=iqr, niqr=niqr, status="OK")

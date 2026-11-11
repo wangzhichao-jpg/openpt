@@ -162,7 +162,19 @@ def analyze(
             "design_warnings": [],
         }
     )
-    if len(followup) < 6 or (method == "two_sample" and len(baseline) < 6):
+    if method == "one_sample" and len(followup) < 6:
+        result["design_warnings"].append(
+            f"GL003 5.2.1 注：n≥6；当前稳定期为 {len(followup)} 个包装单元"
+        )
+    if method == "two_sample" and (len(followup) < 6 or len(baseline) < 6):
+        result["design_warnings"].append(
+            f"GL003 5.2.2 注：n1、n2 均≥6；当前基线 {len(baseline)} 个、"
+            f"稳定期 {len(followup)} 个包装单元"
+        )
+    if sigma is not None and len(followup) < 3:
+        result["design_warnings"].append(
+            f"GL003 5.3 注：抽样数≥3；当前稳定期为 {len(followup)} 个包装单元"
+        )
+    if result["design_warnings"]:
         result["design_status"] = "DESIGN_WARNING"
-        result["design_warnings"].append("GL003 5.2 建议每组不少于6个观测单元")
     return StabilityResult.from_dict(result)

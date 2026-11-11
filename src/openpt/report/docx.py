@@ -13,12 +13,13 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Cm, Pt
+from openpyxl.utils.cell import column_index_from_string, coordinate_from_string, get_column_letter
 
 
 def _shown(value: Any, digits: int = 4, places: int | None = None) -> str:
     """输出指定精度，空值和布尔值使用中文。"""
     if value is None:
-        return "未评价"
+        return "未评价（未提供数据或无法计算）"
     if isinstance(value, bool):
         return "通过" if value else "不通过"
     if isinstance(value, int):
@@ -80,6 +81,42 @@ def _data_places(data: dict[str, Any]) -> int:
     return min(12, max(0, max(places)) + 1)
 
 
+def _source_ranges(sources: list[str]) -> list[str]:
+    """将单元格位置合并为同一工作表的连续矩形区域。"""
+    grouped: dict[str, dict[int, set[int]]] = {}
+    fallback = []
+    for source in sources:
+        try:
+            sheet, address = source.rsplit("!", 1)
+            column, row = coordinate_from_string(address)
+            index = column_index_from_string(column)
+            grouped.setdefault(sheet, {}).setdefault(index, set()).add(row)
+        except (ValueError, TypeError):
+            fallback.append(source)
+    ranges = []
+    for sheet, columns in grouped.items():
+        intervals: dict[tuple[int, int], list[int]] = {}
+        for column, positions in columns.items():
+            ordered = sorted(positions)
+            start = previous = ordered[0]
+            for current in [*ordered[1:], ordered[-1] + 2]:
+                if current != previous + 1:
+                    intervals.setdefault((start, previous), []).append(column)
+                    start = current
+                previous = current
+        for (start_row, end_row), indices in intervals.items():
+            ordered_columns = sorted(indices)
+            start_col = previous_col = ordered_columns[0]
+            for current_col in [*ordered_columns[1:], ordered_columns[-1] + 2]:
+                if current_col != previous_col + 1:
+                    left = f"{get_column_letter(start_col)}{start_row}"
+                    right = f"{get_column_letter(previous_col)}{end_row}"
+                    ranges.append(f"{sheet}!{left}" if left == right else f"{sheet}!{left}:{right}")
+                    start_col = current_col
+                previous_col = current_col
+    return ranges + fallback
+
+
 def _raw_tables(doc: Any, data: dict[str, Any]) -> None:
     """按单元和重复次数显示均匀性与稳定性原始值。"""
     blocks = [("均匀性", data.get("homogeneity", []), data.get("homogeneity_units", []))]
@@ -87,7 +124,8 @@ def _raw_tables(doc: Any, data: dict[str, Any]) -> None:
         (f"稳定性：{key}", value, data.get("stability_units", {}).get(key, []))
         for key, value in data.get("stability", {}).items()
     )
-    sources = data.get("sources", [])
+    sources = list(data.get("sources", []))
+    sources.extend(p["source"] for p in data.get("participants", []) if p.get("source"))
     for name, groups, unit_ids in blocks:
         if not groups:
             continue
@@ -103,13 +141,18 @@ def _raw_tables(doc: Any, data: dict[str, Any]) -> None:
             ],
         )
     if sources:
-        doc.add_paragraph("数据来源：" + "、".join(sources))
+        doc.add_paragraph("数据来源：" + "、".join(_source_ranges(sources)))
     else:
         doc.add_paragraph("未提供原始测量值。")
 
 
 def _homogeneity(
-    doc: Any, result: dict[str, Any], mean_places: int, sig: int, ss_places: int
+    doc: Any,
+    result: dict[str, Any],
+    mean_places: int,
+    sig: int,
+    ss_places: int,
+    alpha: float,
 ) -> None:
     """按 GL003 4.2、4.3 显示方差分析和用途判据。"""
     h = result.get("均匀性")
@@ -119,10 +162,26 @@ def _homogeneity(
         return
     _table(
         doc,
-        ["变异来源", "自由度", "平方和", "均方"],
+        ["变异来源", "自由度", "平方和", "均方", "F", "F 临界值", "p"],
         [
-            ["样品间", h["df_between"], _shown(h["SS_between"]), _shown(h["MS_between"])],
-            ["样品内", h["df_within"], _shown(h["SS_within"]), _shown(h["MS_within"])],
+            [
+                "样品间",
+                h["df_between"],
+                _shown(h["SS_between"]),
+                _shown(h["MS_between"]),
+                _shown(h["F"], sig),
+                _shown(h["F_critical"], sig),
+                _shown(h["p"], sig),
+            ],
+            [
+                "样品内",
+                h["df_within"],
+                _shown(h["SS_within"]),
+                _shown(h["MS_within"]),
+                "—",
+                "—",
+                "—",
+            ],
         ],
     )
     _table(
@@ -134,11 +193,42 @@ def _homogeneity(
             ["F 临界值", _shown(h["F_critical"], sig)],
             ["p 值", _shown(h["p"], sig)],
             ["样品间标准差", _shown(h["Ss"], places=ss_places)],
-            ["用途判据限值", _shown(h["threshold"], places=ss_places)],
+            [
+                "用途判据限值",
+                _shown(h["threshold"], places=ss_places)
+                if h["threshold"] is not None
+                else "未评价（未提供 σ）",
+            ],
         ],
     )
-    doc.add_paragraph("选定方法结论：" + _shown(h["conclusion"]))
-    doc.add_paragraph("并列提示：样品间标准差判据" + _shown(h["Ss_pass"]))
+    if h["F"] is None:
+        doc.add_paragraph("按 GL003 4.2：未评价，组内均方为零或数值超出范围，F 无法计算。")
+    else:
+        relation = "<" if h["F"] < h["F_critical"] else "≥"
+        judgement = (
+            "样品间无显著性差异，按 F 检验判定均匀"
+            if h["F_pass"]
+            else "样品间存在显著性差异，按 F 检验判定不均匀"
+        )
+        doc.add_paragraph(
+            f"按 GL003 4.2：F={_shown(h['F'], sig)} {relation} "
+            f"F{alpha:g}({h['df_between']},{h['df_within']})={_shown(h['F_critical'], sig)}，"
+            f"{judgement}；按未修约值比较。"
+        )
+    if h["threshold"] is None:
+        doc.add_paragraph(f"并列提示：Ss={_shown(h['Ss'], places=ss_places)}；未评价：未提供 σ。")
+    else:
+        relation = "≤" if h["Ss_pass"] else ">"
+        judgement = "通过" if h["Ss_pass"] else "不通过"
+        doc.add_paragraph(
+            f"并列提示（GL003 4.3）：Ss={_shown(h['Ss'], places=ss_places)} {relation} "
+            f"0.3σ={_shown(h['threshold'], places=ss_places)}，用途判据{judgement}。"
+        )
+    if h.get("strict"):
+        conclusion = (
+            "未评价：F 或 Ss 判据无法计算" if h["conclusion"] is None else _shown(h["conclusion"])
+        )
+        doc.add_paragraph("严格配置综合结论：" + conclusion + "。")
     doc.add_paragraph("计算状态：" + str(h["status"]))
     for warning in h.get("design_warnings", []) + h.get("warnings", []):
         doc.add_paragraph("提示：" + warning)
@@ -156,8 +246,36 @@ def _stability_table(doc: Any, name: str, s: dict[str, Any], sig: int) -> None:
         ("t 检验结论", "pass"),
         ("均值差判据", "mean_difference_pass"),
     ]
-    _table(doc, ["项目", "结果"], [[label, _shown(s.get(key), sig)] for label, key in names])
-    doc.add_paragraph("计算状态：" + str(s.get("status", "未评价")))
+    rows = []
+    for label, key in names:
+        value = s.get(key)
+        if value is None and key == "mean_difference_pass":
+            shown = "未评价（未提供 σ）"
+        elif value is None and key in ("t", "p", "pass"):
+            shown = "未评价（标准误为零或统计量不可计算）"
+        else:
+            shown = _shown(value, sig)
+        rows.append([label, shown])
+    _table(doc, ["项目", "结果"], rows)
+    if s.get("t") is None:
+        doc.add_paragraph("t 检验未评价：标准误为零或统计量不可计算。")
+    else:
+        relation = "<" if s.get("pass") else "≥"
+        conclusion = "未发现显著变化" if s.get("pass") else "存在显著变化"
+        doc.add_paragraph(
+            f"按 GL003 5.2：t={_shown(s['t'], sig)} {relation} "
+            f"临界值 {_shown(s.get('critical'), sig)}，{conclusion}。"
+        )
+    if s.get("threshold") is None:
+        doc.add_paragraph("均值差判据未评价：未提供 σ。")
+    else:
+        relation = "≤" if s.get("mean_difference_pass") else ">"
+        conclusion = "通过" if s.get("mean_difference_pass") else "不通过"
+        doc.add_paragraph(
+            f"按 GL003 5.3：均值差 {_shown(s['difference'], sig)} {relation} "
+            f"0.3σ={_shown(s['threshold'], sig)}，判据{conclusion}。"
+        )
+    doc.add_paragraph("计算状态：" + str(s.get("status", "未评价：计算状态未提供")))
     for warning in s.get("design_warnings", []):
         doc.add_paragraph("设计提示：" + warning)
 
@@ -194,6 +312,18 @@ def _other_results(
         )
         rules = {"gl002": "GL002 第三有效位规则", "absolute": "绝对容差", "simplified": "简化法"}
         doc.add_paragraph("停止规则：" + rules.get(a.get("rule"), "未提供"))
+        converged = result.get("算法A_收敛对照")
+        if converged and not converged.get("converged"):
+            doc.add_paragraph("停止规则敏感性未评价：绝对容差对照未收敛。")
+        elif converged and (
+            _shown(a.get("x"), places=mean_places) != _shown(converged.get("x"), places=mean_places)
+            or _shown(a.get("s"), sig) != _shown(converged.get("s"), sig)
+        ):
+            doc.add_paragraph(
+                f"停止规则敏感：选定规则的稳健标准差为 {_shown(a.get('s'), sig)}，"
+                f"绝对容差收敛对照为 {_shown(converged.get('s'), sig)}；"
+                "两者在显示位数下不同，不据此认定报告错误。"
+            )
     else:
         doc.add_paragraph("未提供参加者结果。")
     doc.add_heading("参加者评价", 1)
@@ -201,13 +331,14 @@ def _other_results(
     if scores:
         _table(
             doc,
-            ["参加者", "结果", "z 值", "评价"],
+            ["参加者", "结果", "z 值", "评价", "数据来源"],
             [
                 [
                     p["id"],
                     _shown(p["value"]),
                     _shown(scores[p["id"]]["z"], sig),
                     scores[p["id"]]["classification"],
+                    p.get("source", "未提供来源"),
                 ]
                 for p in data["participants"]
                 if p["id"] in scores
@@ -256,32 +387,46 @@ def _difference_table(doc: Any, differences: list[dict[str, Any]]) -> None:
         "差异说明",
         "评分条目",
     ]
-    rows = []
-    for row in differences:
-        if row.get("状态") == "MATCH" and not row.get("差异类型") and not row.get("说明"):
+    for level, title in (("DIFFERENCE", "需核查的差异"), ("NOTE", "提示事项")):
+        selected = [row for row in differences if row.get("状态") == level]
+        doc.add_heading(title, 2)
+        if not selected:
+            doc.add_paragraph("无。")
             continue
-        matches = row.get("显示一致")
-        text = str(row.get("说明", ""))
-        text = text.replace("repeats_pooled", "合并方差模型").replace(
-            "repeats_welch", "非齐方差模型"
-        )
-        text = text.replace("df=", "自由度=").replace("s1=", "基线标准差=")
-        rows.append(
-            [
-                row.get("统计量", ""),
-                _shown(row.get("声称值")),
-                _shown(row.get("按报告模型复现值")),
-                _shown(row.get("按推荐模型重算值")),
-                "未评价" if matches is None else "一致" if matches else "不一致",
-                row.get("差异类型", ""),
-                text,
-                row.get("评分条目", ""),
-            ]
-        )
-    if rows:
+        rows = []
+        for row in selected:
+            matches = row.get("显示一致")
+            text = str(row.get("说明", ""))
+            text = text.replace("repeats_pooled", "合并方差模型").replace(
+                "repeats_welch", "非齐方差模型"
+            )
+            text = text.replace("df=", "自由度=").replace("s1=", "基线标准差=")
+            digits = row.get("显示小数位")
+            claim_places = digits if isinstance(digits, int) and 0 <= digits <= 12 else None
+            design = row.get("差异类型") == "DESIGN_WARNING"
+            not_applicable = "不适用（设计提示）"
+            rows.append(
+                [
+                    row.get("统计量", ""),
+                    not_applicable if design else _shown(row.get("声称值"), places=claim_places),
+                    not_applicable if design else _shown(row.get("按报告模型复现值")),
+                    not_applicable if design else _shown(row.get("按推荐模型重算值")),
+                    not_applicable
+                    if design
+                    else "未评价（缺少数据）"
+                    if matches is None
+                    else "一致"
+                    if matches
+                    else "不一致",
+                    row.get("差异类型", ""),
+                    text,
+                    row.get("评分条目", ""),
+                ]
+            )
         _table(doc, headers, rows)
-    else:
-        doc.add_paragraph("未发现差异；完整逐项比较见差异清单。")
+    matches = sum(row.get("状态") == "MATCH" for row in differences)
+    doc.add_heading("一致结果", 2)
+    doc.add_paragraph(f"共 {matches} 项；完整逐项比较见差异清单。")
 
 
 def make_report(
@@ -315,7 +460,7 @@ def make_report(
     _project_methods(doc, data, cfg)
     doc.add_heading("原始数据", 1)
     _raw_tables(doc, data)
-    _homogeneity(doc, result, mean_places, sig, ss_places)
+    _homogeneity(doc, result, mean_places, sig, ss_places, float(cfg.get("alpha") or 0.05))
     _other_results(doc, data, result, sig, mean_places)
     if differences is not None:
         _difference_table(doc, differences)

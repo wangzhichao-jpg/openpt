@@ -75,6 +75,18 @@ class AlgorithmAResult(ResultMapping):
 
 
 @dataclass
+class MedianIqrResult(ResultMapping):
+    """GL002 附录 A.4 的中位数及标准化四分位距。"""
+
+    median: float
+    q1: float
+    q3: float
+    iqr: float
+    niqr: float
+    status: str
+
+
+@dataclass
 class ZScoreResult(ResultMapping):
     """GL002 4.4 和 4.5 的比分数结果。"""
 

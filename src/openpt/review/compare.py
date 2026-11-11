@@ -71,6 +71,8 @@ def _values(
         value = result.get("算法A", {}).get(key)
         if claim.get("model") == "absolute" and data.get("participants"):
             alternative = algorithm_a([p["value"] for p in data["participants"]], rule="absolute")
+            if not alternative.converged:
+                return None, value, "绝对容差模型未收敛，未评价；报告停止规则待底稿确认"
             return alternative[key], value, "绝对容差作为候选报告模型，原报告停止规则待底稿确认"
         return value, value, ""
     if name == "t":
@@ -113,13 +115,21 @@ def _row(
         )
     except (ValueError, TypeError, InvalidOperation):
         raise ValueError("报告数值或显示小数位无效") from None
-    if match is False or recommended_match is False:
+    # 对只有一个可计算模型的量，显示不一致才构成数值差异；多模型量在调用处判定。
+    if match is False and name not in ("t", "x*", "s*"):
         categories.append("VALUE_MISMATCH")
-        if name.startswith("z:"):
-            note = (note + "；原因待底稿确认").lstrip("；")
-        elif recommended_match is False:
-            note = (note + "；推荐模型与声称值不一致").lstrip("；")
-    # 缺乏数据时不能断言所有模型均不能复现。
+        note = (note + "；原因待底稿确认").lstrip("；")
+    if match is None:
+        note = (note + "；未评价：缺少输入或所选模型无法计算").lstrip("；")
+    status = (
+        "DIFFERENCE"
+        if "VALUE_MISMATCH" in categories
+        else (
+            "NOTE"
+            if match is not True or recommended_match is False or categories or note
+            else "MATCH"
+        )
+    )
     return {
         "统计量": name,
         "声称值": claim,
@@ -129,11 +139,7 @@ def _row(
         "按推荐模型重算值": float(recommended) if isinstance(recommended, Decimal) else recommended,
         "显示一致": match,
         "推荐一致": recommended_match,
-        "状态": "NOT_EVALUATED"
-        if match is None
-        else "MATCH"
-        if match and recommended_match is not False
-        else "DIFFERENCE",
+        "状态": status,
         "差异类型": "|".join(dict.fromkeys(categories)),
         "评分条目": item,
         "说明": note,
@@ -142,8 +148,8 @@ def _row(
 
 def _candidate_models(
     data: dict[str, Any], result: dict[str, Any], claim: dict[str, Any], digits: int
-) -> bool:
-    """仅在全部适用模型均可计算且显示不同时标记不能复现。"""
+) -> bool | None:
+    """全部可计算且均不一致为真；有候选一致为假；资料不足为未定。"""
     group = claim.get("timegroup") or "稳定期"
     try:
         candidates = [
@@ -155,12 +161,29 @@ def _candidate_models(
             summary, _, _ = _t_reproduction(data, result, summary_claim)
             if summary is not None:
                 candidates.append(summary)
-        return all(
-            v is not None and display(v, digits) != display(claim["value"], digits)
+        if any(
+            v is not None and display(v, digits) == display(claim["value"], digits)
             for v in candidates
-        )
+        ):
+            return False
+        return True if all(v is not None for v in candidates) else None
     except (ValueError, KeyError):
-        return False
+        return None
+
+
+def _algorithm_candidates(
+    data: dict[str, Any], name: str, claim: float, digits: int
+) -> bool | None:
+    """检查算法 A 三种停止规则；数据不足时不推断无法复现。"""
+    try:
+        values = [p["value"] for p in data["participants"]]
+        results = [algorithm_a(values, rule=rule) for rule in ("gl002", "absolute", "simplified")]
+        valid = [r[name] for r in results if r.converged and r.status == "OK"]
+        if any(display(value, digits) == display(claim, digits) for value in valid):
+            return False
+        return True if len(valid) == len(results) else None
+    except (ValueError, KeyError):
+        return None
 
 
 def _review_claim(
@@ -180,9 +203,15 @@ def _review_claim(
     except (ValueError, TypeError, OverflowError):
         raise ValueError("报告声称值显示小数位须为0至12的整数") from None
     reproduced, rec, note = _values(data, result, claim)
+    types = []
     if name == "Ss" and result.get("均匀性", {}).get("Ss_pass") is False:
         note = f"样品间标准差超过 0.3σ：{rec} > {result['均匀性']['threshold']}"
-    types = []
+        cfg = data["config"]
+        if cfg.get("sigma_composite") not in (None, ""):
+            note += "；报告处置：将样品间标准差合成为 σ′"
+        else:
+            note += "；报告处置方式未提供"
+        types.append("CRITERION_EXCEEDED")
     if model.startswith("repeats"):
         types.append("PSEUDO_REPLICATION")
     if model == "repeats_welch" and "repeats_pooled" in models:
@@ -195,8 +224,36 @@ def _review_claim(
         else mapping.get("performance", "能力统计量计算")
     )
     row = _row(name, claim["value"], digits, claim["source"], reproduced, rec, note, types, item)
-    if name == "t" and row["显示一致"] is False and _candidate_models(data, result, claim, digits):
-        row["差异类型"] += "|NOT_REPRODUCIBLE"
+    if name == "t" and row["显示一致"] is False:
+        candidate_result = _candidate_models(data, result, claim, digits)
+        if candidate_result is True:
+            row["差异类型"] = "|".join(
+                filter(None, (row["差异类型"], "VALUE_MISMATCH", "NOT_REPRODUCIBLE"))
+            )
+            row["状态"] = "DIFFERENCE"
+        elif candidate_result is False:
+            row["说明"] += "；其他候选模型可按显示位数复现"
+        else:
+            row["说明"] += "；候选模型数据不足，未能确认数值差异"
+    if name in ("x*", "s*"):
+        if row["显示一致"] is True and row["推荐一致"] is False:
+            row["差异类型"] = "|".join(filter(None, (row["差异类型"], "STOP_RULE_SENSITIVITY")))
+            row["状态"] = "NOTE"
+            row["说明"] += "；停止规则敏感，不据此认定报告错误"
+        elif row["显示一致"] is False:
+            key = "x" if name == "x*" else "s"
+            candidates = _algorithm_candidates(data, key, claim["value"], digits)
+            if candidates is True:
+                row["差异类型"] = "|".join(
+                    filter(None, (row["差异类型"], "VALUE_MISMATCH", "NOT_REPRODUCIBLE"))
+                )
+                row["状态"] = "DIFFERENCE"
+                row["说明"] += "；全部可选停止规则均不一致，原因待底稿确认"
+            elif candidates is False:
+                row["差异类型"] = "|".join(filter(None, (row["差异类型"], "STOP_RULE_SENSITIVITY")))
+                row["说明"] += "；其他停止规则可复现，不据此认定报告错误"
+            else:
+                row["说明"] += "；候选停止规则无法完整计算，未能确认数值差异"
     rows = [row]
     if name == "t" and model == "displayed_summary" and data["config"].get("s1") is not None:
         s1 = result.get("稳定性", {}).get("s1")
@@ -250,6 +307,36 @@ def _composite_row(
     )
 
 
+def _design_rows(result: dict[str, Any], mapping: dict[str, str]) -> list[dict[str, Any]]:
+    """将稳定性抽样设计提示单独列入复核清单。"""
+    periods = []
+    if result.get("稳定性"):
+        periods.append(("稳定期", result["稳定性"]))
+    periods.extend(result.get("其他稳定性", {}).items())
+    rows = []
+    for name, values in periods:
+        warnings = values.get("design_warnings", [])
+        if not warnings:
+            continue
+        rows.append(
+            {
+                "统计量": f"{name}设计",
+                "声称值": None,
+                "来源": "稳定性工作表",
+                "显示小数位": None,
+                "按报告模型复现值": None,
+                "按推荐模型重算值": None,
+                "显示一致": None,
+                "推荐一致": None,
+                "状态": "NOTE",
+                "差异类型": "DESIGN_WARNING",
+                "评分条目": mapping.get("homogeneity", "均匀性与稳定性评估"),
+                "说明": "；".join(warnings),
+            }
+        )
+    return rows
+
+
 def review(
     data: dict[str, Any], result: dict[str, Any], mapping: dict[str, str] | None = None
 ) -> list[dict[str, Any]]:
@@ -262,7 +349,9 @@ def review(
     composite = _composite_row(data, result, mapping)
     if composite is not None:
         rows.append(composite)
-    return rows
+    rows.extend(_design_rows(result, mapping))
+    priority = {"DIFFERENCE": 0, "NOTE": 1, "MATCH": 2}
+    return sorted(rows, key=lambda row: priority[row["状态"]])
 
 
 def write_csv(path: str | Path, rows: list[dict[str, Any]]) -> None:

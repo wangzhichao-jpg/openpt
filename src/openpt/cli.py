@@ -28,15 +28,20 @@ def _participant_results(data: dict[str, Any], sigma: float | None) -> dict[str,
     simplified = _option(cfg, "algorithm_a_simplified", False)
     if not isinstance(simplified, bool):
         raise ValueError("algorithm_a_simplified 必须是布尔值")
+    values = [p["value"] for p in data["participants"]]
     result = {
         "算法A": algorithm_a(
-            [p["value"] for p in data["participants"]],
+            values,
             tolerance=float(_option(cfg, "algorithm_a_tolerance", 1e-10)),
             max_iterations=int(_option(cfg, "algorithm_a_max_iterations", 1000)),
             simplified=simplified,
             rule=str(_option(cfg, "algorithm_a_rule", "gl002")),
         ).to_dict()
     }
+    # 绝对容差对照独立于选定停止规则，供附录和敏感性提示使用。
+    result["算法A_收敛对照"] = algorithm_a(
+        values, rule="absolute", tolerance=1e-12, max_iterations=10000
+    ).to_dict()
     sigma_pt = float(cfg["sigma_pt"]) if cfg.get("sigma_pt") not in (None, "") else sigma
     if cfg.get("assigned") not in (None, "") and sigma_pt is not None:
         result["参加者z"] = {
