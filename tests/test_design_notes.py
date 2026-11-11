@@ -15,6 +15,12 @@ def test_two_mean_and_difference_design_clauses() -> None:
     assert result.design_status == "DESIGN_WARNING"
 
 
+def test_difference_design_requires_replicates() -> None:
+    """GL003 5.3 注：每个抽取样品分别重复测试两次。"""
+    result = analyze([[1], [2], [3], [4], [5], [6]], [[1], [2], [3], [4], [5], [6]], sigma=1)
+    assert any("每个抽取样品重复测试2次" in item for item in result.design_warnings)
+
+
 def test_one_mean_design_clause() -> None:
     """GL003 5.2.1 注：单均值 t 建议不少于六个观测单位。"""
     result = analyze(None, [[1, 2], [2, 3], [3, 4]], method="one_sample", reference=2)

@@ -175,6 +175,10 @@ def analyze(
         result["design_warnings"].append(
             f"GL003 5.3 注：抽样数≥3；当前稳定期为 {len(followup)} 个包装单元"
         )
+    if sigma is not None and any(len(unit) < 2 for unit in followup):
+        result["design_warnings"].append(
+            "GL003 5.3 注：每个抽取样品重复测试2次；当前至少一个单元的重复次数不足"
+        )
     if result["design_warnings"]:
         result["design_status"] = "DESIGN_WARNING"
     return StabilityResult.from_dict(result)
