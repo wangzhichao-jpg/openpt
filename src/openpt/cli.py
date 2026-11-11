@@ -29,7 +29,7 @@ def calculate(data: dict[str, Any]) -> dict[str, Any]:
         strict = cfg.get("strict_homogeneity", False)
         if not isinstance(strict, bool):
             raise ValueError("strict_homogeneity 必须是布尔值")
-        result["均匀性"] = homogeneity(data["homogeneity"], sigma, alpha, strict)
+        result["均匀性"] = homogeneity(data["homogeneity"], sigma, alpha, strict).to_dict()
     groups = data["stability"]
     method = cfg.get("stability_method") or "two_sample"
     if groups:
@@ -39,13 +39,13 @@ def calculate(data: dict[str, Any]) -> dict[str, Any]:
         reference = float(raw) if raw not in (None, "") else None
         result["稳定性"] = stability(
             groups.get("基线"), groups["稳定期"], sigma, alpha, method, reference
-        )
+        ).to_dict()
         extra = {}
         for name, observations in groups.items():
             if name not in ("基线", "稳定期"):
                 extra[name] = stability(
                     groups.get("基线"), observations, sigma, alpha, method, reference
-                )
+                ).to_dict()
         if extra:
             result["其他稳定性"] = extra
     if data["participants"]:
@@ -55,7 +55,7 @@ def calculate(data: dict[str, Any]) -> dict[str, Any]:
             max_iterations=int(cfg.get("algorithm_a_max_iterations") or 1000),
             simplified=bool(cfg.get("algorithm_a_simplified", False)),
             rule=str(cfg.get("algorithm_a_rule") or "gl002"),
-        )
+        ).to_dict()
         sigma_pt = float(cfg["sigma_pt"]) if cfg.get("sigma_pt") not in (None, "") else sigma
         if cfg.get("assigned") not in (None, "") and sigma_pt is not None:
             result["参加者z"] = {
@@ -65,7 +65,7 @@ def calculate(data: dict[str, Any]) -> dict[str, Any]:
                     sigma_pt,
                     float(cfg.get("z_satisfactory") or 2),
                     float(cfg.get("z_unsatisfactory") or 3),
-                )
+                ).to_dict()
                 for p in data["participants"]
             }
     if not result:

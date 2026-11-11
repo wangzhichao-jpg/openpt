@@ -40,7 +40,7 @@ def test_u04_constant_matrix() -> None:
     """合成相同值使 F 为零除零。"""
     result = analyze([[10, 10]] * 10)
     assert result["F"] is None and result["status"] == "INDETERMINATE"
-    json.dumps(result, allow_nan=False)
+    json.dumps(result.to_dict(), allow_nan=False)
 
 
 def test_u05_missing_sigma() -> None:

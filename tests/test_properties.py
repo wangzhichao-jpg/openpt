@@ -27,7 +27,7 @@ def test_random_balanced_matrices_no_nonfinite(rows: list[tuple[float, float]]) 
         result = analyze(rows)
     except InputError:
         return
-    json.dumps(result, allow_nan=False)
+    json.dumps(result.to_dict(), allow_nan=False)
 
 
 @given(st.floats(allow_nan=False, allow_infinity=False, width=64))
@@ -38,4 +38,4 @@ def test_constant_matrix_no_nonfinite(value: float) -> None:
         result = analyze([[value, value]] * 10)
     except InputError:
         return
-    json.dumps(result, allow_nan=False)
+    json.dumps(result.to_dict(), allow_nan=False)

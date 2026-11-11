@@ -8,6 +8,7 @@ from typing import Any
 import numpy as np
 
 from ..errors import InputError
+from .models import AlgorithmAResult
 
 # CNAS-GL002:2018 附录 A.2，式 A.2、A.3、A.6。
 MAD_FACTOR = 1.483
@@ -36,7 +37,7 @@ def algorithm_a(
     max_iterations: int = 1000,
     simplified: bool = False,
     rule: str = "gl002",
-) -> dict[str, Any]:
+) -> AlgorithmAResult:
     """按 GL002 附录 A.2 用中位数及截尾数据计算稳健均值、标准差。"""
     try:
         a = np.asarray(values, dtype=float)
@@ -76,7 +77,7 @@ def algorithm_a(
             converged = True
             break
         x, s = nx, ns
-    return {
+    result: dict[str, Any] = {
         "x": x,
         "s": s,
         "u_x": UNCERTAINTY_FACTOR * s / math.sqrt(len(a)),
@@ -90,3 +91,4 @@ def algorithm_a(
         "tolerance": tolerance,
         "history": history,
     }
+    return AlgorithmAResult(**result)

@@ -8,11 +8,12 @@ import numpy as np
 from scipy.stats import f as f_distribution
 
 from ..errors import InputError
+from .models import HomogeneityResult
 
 
 def analyze(
     data: Any, sigma: float | None = None, alpha: float = 0.05, strict: bool = False
-) -> dict[str, Any]:
+) -> HomogeneityResult:
     """按 GL003 4.2、4.3 计算 F=MS组间/MS组内 和 Ss。"""
     try:
         a = np.asarray(data, dtype=float)
@@ -48,7 +49,7 @@ def analyze(
         if strict
         else fpass
     )
-    return {
+    result: dict[str, Any] = {
         "status": "INDETERMINATE" if stat is None else "OK",
         "design_warnings": ["GL003 4.1 样品数不足10"] if g < 10 else [],
         "warnings": (["组间方差估计为负，Ss截零；不代表绝对均匀"] if raw < 0 else [])
@@ -76,3 +77,4 @@ def analyze(
         "strict": strict,
         "conclusion": conclusion,
     }
+    return HomogeneityResult(**result)

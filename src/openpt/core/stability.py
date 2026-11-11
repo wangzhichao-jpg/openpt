@@ -8,6 +8,7 @@ import numpy as np
 from scipy.stats import t as t_distribution
 
 from ..errors import InputError
+from .models import StabilityResult
 
 
 def _observations(data: Any, pooled_repeats: bool) -> Any:
@@ -29,7 +30,7 @@ def summary_t(
     n2: int,
     alpha: float = 0.05,
     welch: bool = False,
-) -> dict[str, Any]:
+) -> StabilityResult:
     """按 GL003 5.2.2 计算 pooled t，或按 Welch 模型复核。"""
     if (
         n1 < 2
@@ -52,22 +53,24 @@ def summary_t(
     if t is not None and not math.isfinite(t):
         t = None
     critical = float(t_distribution.ppf(1 - alpha / 2, df)) if df else None
-    return {
-        "t": t,
-        "df": df,
-        "p": float(2 * t_distribution.sf(t, df)) if t is not None and df else None,
-        "critical": critical,
-        "pass": t < critical if t is not None and critical else None,
-        "difference": difference,
-        "se": se,
-        "s1": s1,
-        "s2": s2,
-        "mean1": mean1,
-        "mean2": mean2,
-        "n1": n1,
-        "n2": n2,
-        "status": "OK" if t is not None else "INDETERMINATE",
-    }
+    return StabilityResult.from_dict(
+        {
+            "t": t,
+            "df": df,
+            "p": float(2 * t_distribution.sf(t, df)) if t is not None and df else None,
+            "critical": critical,
+            "pass": t < critical if t is not None and critical else None,
+            "difference": difference,
+            "se": se,
+            "s1": s1,
+            "s2": s2,
+            "mean1": mean1,
+            "mean2": mean2,
+            "n1": n1,
+            "n2": n2,
+            "status": "OK" if t is not None else "INDETERMINATE",
+        }
+    )
 
 
 def analyze(
@@ -78,7 +81,7 @@ def analyze(
     method: str = "two_sample",
     reference: float | None = None,
     model: str = "unit_pooled",
-) -> dict[str, Any]:
+) -> StabilityResult:
     """按 GL003 5.2 计算 t 并按 5.3 对比均值差与 0.3σ。"""
     if model not in ("unit_pooled", "repeats_pooled", "repeats_welch"):
         raise InputError("未知稳定性模型")
@@ -126,7 +129,7 @@ def analyze(
             len(y),
             alpha,
             model == "repeats_welch",
-        )
+        ).to_dict()
     result.update(
         {
             "model": model,
@@ -141,4 +144,4 @@ def analyze(
     )
     if len(followup) < 6 or (method == "two_sample" and len(baseline) < 6):
         result["design_warnings"].append("GL003 5.2 建议每组不少于6个观测单元")
-    return result
+    return StabilityResult.from_dict(result)
