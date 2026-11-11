@@ -14,7 +14,9 @@ ROOT = Path(__file__).resolve().parents[1]
 PATTERNS = {
     "本机路径": re.compile(rb"/" + rb"home/|[A-Za-z]:\\Users\\", re.I),
     "私有IPv4": re.compile(
-        rb"(?<!\d)(?:10\.(?:\d{1,3}\.){2}\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})(?!\d)"
+        rb"(?<!\d)(?:10\.(?:\d{1,3}\.){2}\d{1,3}|"
+        rb"192\.168\.\d{1,3}\.\d{1,3}|"
+        rb"172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})(?!\d)"
     ),
     "私钥": re.compile(rb"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
     "访问令牌": re.compile(rb"(?:ghp_|github_pat_|sk-)[A-Za-z0-9_\-]{20,}"),
