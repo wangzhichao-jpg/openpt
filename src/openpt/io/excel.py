@@ -55,12 +55,23 @@ def template(path: str | Path) -> None:
         ("能力评定标准差（sigma_pt）", ""),
         ("算法A停止规则（algorithm_a_rule）", "gl002"),
         ("z 值显示小数位（display_z_decimals）", 2),
+        ("σ 来源（sigma_source）", ""),
+        ("σ 阶段（sigma_stage）", ""),
+        ("实验层级（observation_level）", "unit_means"),
+        ("实验设计（stability_design）", "independent"),
+        ("参考不确定度可忽略（reference_uncertainty_negligible）", True),
+        ("参考值来源（reference_source）", ""),
     ]:
         book["方法配置"].append(config_row)
     for cell, options in [
         ("B4", '"启用,关闭"'),
         ("B5", '"两均值,单均值"'),
         ("B9", '"gl002,absolute,simplified"'),
+        ("B11", '"标准方法精密度,经验值,稳健标准差,其他"'),
+        ("B12", '"temporary,final"'),
+        ("B13", '"unit_means,all_repeats"'),
+        ("B14", '"independent,paired,correlated"'),
+        ("B15", '"启用,关闭"'),
     ]:
         validation = DataValidation(type="list", formula1=options)
         book["方法配置"].add_data_validation(validation)
@@ -113,7 +124,10 @@ def _metadata(book: Any) -> tuple[dict[str, Any], dict[str, Any]]:
         match = re.search(r"（([a-zA-Z_][a-zA-Z_0-9]*)）$", label)
         key = match.group(1) if match else label
         value = row[1].value
-        if key == "strict_homogeneity" and value in ("启用", "关闭"):
+        if key in ("strict_homogeneity", "reference_uncertainty_negligible") and value in (
+            "启用",
+            "关闭",
+        ):
             value = value == "启用"
         if key == "stability_method" and value in ("两均值", "单均值"):
             value = {"两均值": "two_sample", "单均值": "one_sample"}[value]

@@ -17,7 +17,7 @@ def test_chinese_template(tmp_path: Path) -> None:
     template(path)
     book = load_workbook(path)
     assert "填写说明" in book.sheetnames
-    assert len(book["方法配置"].data_validations.dataValidation) == 3
+    assert len(book["方法配置"].data_validations.dataValidation) == 8
     book["项目信息"]["B2"] = "合成项目"
     book["项目信息"]["B3"] = "mg/kg"
     book["方法配置"]["B4"] = "启用"
