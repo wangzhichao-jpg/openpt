@@ -56,14 +56,18 @@ def algorithm_a(
         raise InputError("算法 A 停止规则无效")
     if simplified:
         rule = "simplified"
-    x = float(np.median(a))
-    s = float(MAD_FACTOR * np.median(np.abs(a - x)))
+    with np.errstate(over="ignore", invalid="ignore"):
+        x = float(np.median(a))
+        s = float(MAD_FACTOR * np.median(np.abs(a - x)))
+    if not math.isfinite(x) or not math.isfinite(s):
+        raise InputError("稳健统计初始值数值溢出")
     history = []
     converged = rule == "simplified"
     for i in range(0 if rule == "simplified" else max_iterations):
-        clipped = np.clip(a, x - ALG_A_CLIP * s, x + ALG_A_CLIP * s)
-        nx = float(clipped.mean())
-        ns = float(ALG_A_SD_FACTOR * np.std(clipped, ddof=1))
+        with np.errstate(over="ignore", invalid="ignore"):
+            clipped = np.clip(a, x - ALG_A_CLIP * s, x + ALG_A_CLIP * s)
+            nx = float(clipped.mean())
+            ns = float(ALG_A_SD_FACTOR * np.std(clipped, ddof=1))
         if not math.isfinite(nx) or not math.isfinite(ns):
             raise InputError("数值溢出")
         history.append({"iteration": i + 1, "x": nx, "s": ns})
@@ -80,7 +84,7 @@ def algorithm_a(
     result: dict[str, Any] = {
         "x": x,
         "s": s,
-        "u_x": UNCERTAINTY_FACTOR * s / math.sqrt(len(a)),
+        "u_x": s * (UNCERTAINTY_FACTOR / math.sqrt(len(a))),
         "n": len(a),
         "iterations": len(history),
         "converged": converged,

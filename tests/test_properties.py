@@ -7,6 +7,8 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from openpt.core.homogeneity import analyze
+from openpt.core.robust import algorithm_a
+from openpt.core.stability import analyze as stability
 from openpt.errors import InputError
 
 
@@ -28,6 +30,16 @@ def test_random_balanced_matrices_no_nonfinite(rows: list[tuple[float, float]]) 
     except InputError:
         return
     json.dumps(result.to_dict(), allow_nan=False)
+    try:
+        stable = stability(rows, rows)
+    except InputError:
+        return
+    json.dumps(stable.to_dict(), allow_nan=False)
+    try:
+        robust = algorithm_a([value for row in rows for value in row], max_iterations=20)
+    except InputError:
+        return
+    json.dumps(robust.to_dict(), allow_nan=False)
 
 
 @given(st.floats(allow_nan=False, allow_infinity=False, width=64))
@@ -39,3 +51,10 @@ def test_constant_matrix_no_nonfinite(value: float) -> None:
     except InputError:
         return
     json.dumps(result.to_dict(), allow_nan=False)
+    try:
+        robust = algorithm_a([value, value], max_iterations=5)
+        stable = stability(None, [[value], [value]], method="one_sample", reference=value)
+    except InputError:
+        return
+    json.dumps(robust.to_dict(), allow_nan=False)
+    json.dumps(stable.to_dict(), allow_nan=False)
