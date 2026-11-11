@@ -4,6 +4,8 @@
 import math
 from typing import Any
 
+from ..errors import InputError
+
 
 def zscore(
     value: float,
@@ -21,10 +23,10 @@ def zscore(
         or sigma <= 0
         or not 0 <= satisfactory < unsatisfactory
     ):
-        raise ValueError("z 输入必须有限、标准差为正且阈值有序")
+        raise InputError("z 输入必须有限、标准差为正且阈值有序")
     z = (value - assigned) / sigma
     if not math.isfinite(z):
-        raise ValueError("z 数值溢出")
+        raise InputError("z 数值溢出")
     return {
         "z": z,
         "status": "OK",

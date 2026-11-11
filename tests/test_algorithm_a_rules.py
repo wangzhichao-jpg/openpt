@@ -6,7 +6,7 @@ import pytest
 from openpt.core.robust import algorithm_a
 
 
-def test_gl002_against_optional_library() -> None:
+def test_u10_gl002_against_optional_library() -> None:
     """GL002 A.2：第三有效位及对应数位；合成对称样本均值为 2。"""
     values = [1.0, 2.0, 3.0, 4.0, 0.0]
     local = algorithm_a(values)

@@ -7,6 +7,8 @@ from typing import Any
 
 import numpy as np
 
+from ..errors import InputError
+
 # CNAS-GL002:2018 附录 A.2，式 A.2、A.3、A.6。
 MAD_FACTOR = 1.483
 ALG_A_CLIP = 1.5
@@ -39,18 +41,18 @@ def algorithm_a(
     try:
         a = np.asarray(values, dtype=float)
     except (ValueError, TypeError):
-        raise ValueError("参加者结果必须为有限数值") from None
+        raise InputError("参加者结果必须为有限数值") from None
     if a.ndim != 1 or len(a) < 2 or not np.isfinite(a).all():
-        raise ValueError("至少两个有限参加者结果")
+        raise InputError("至少两个有限参加者结果")
     if (
         not math.isfinite(tolerance)
         or tolerance <= 0
         or not isinstance(max_iterations, int)
         or max_iterations < 1
     ):
-        raise ValueError("无效迭代参数")
+        raise InputError("无效迭代参数")
     if rule not in ("gl002", "absolute", "simplified"):
-        raise ValueError("算法 A 停止规则无效")
+        raise InputError("算法 A 停止规则无效")
     if simplified:
         rule = "simplified"
     x = float(np.median(a))
@@ -62,7 +64,7 @@ def algorithm_a(
         nx = float(clipped.mean())
         ns = float(ALG_A_SD_FACTOR * np.std(clipped, ddof=1))
         if not math.isfinite(nx) or not math.isfinite(ns):
-            raise ValueError("数值溢出")
+            raise InputError("数值溢出")
         history.append({"iteration": i + 1, "x": nx, "s": ns})
         stable = (
             _gl002_stable(x, s, nx, ns) and i > 0

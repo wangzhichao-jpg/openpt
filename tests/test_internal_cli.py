@@ -39,7 +39,7 @@ def _run_case(tmp_path: Path, name: str) -> list[dict[str, str]]:
         return list(csv.DictReader(stream))
 
 
-def test_full_review_b(tmp_path: Path) -> None:
+def test_u09_stability_review(tmp_path: Path) -> None:
     """输入及声称值的原始页码见外部 fixtures/来源说明.md。"""
     rows = _run_case(tmp_path, "mvp2_b.xlsx")
     z = [r for r in rows if r["统计量"].startswith("z:")]
@@ -53,7 +53,16 @@ def test_full_review_b(tmp_path: Path) -> None:
     assert any(r["统计量"] == "s*" and r["推荐一致"] == "False" for r in rows)
 
 
-def test_full_review_a(tmp_path: Path) -> None:
+def test_u11_participant_review(tmp_path: Path) -> None:
+    """内部统计样附表的参与者及报告显示值，来源见仓库外夹具。"""
+    rows = _run_case(tmp_path, "mvp2_b.xlsx")
+    z = [r for r in rows if r["统计量"].startswith("z:")]
+    assert len(z) == 141 and all(r["显示一致"] == "True" for r in z)
+    assert all(r["显示一致"] == "True" for r in rows if r["统计量"] in ("x*", "s*"))
+    assert any(r["统计量"] == "s*" and r["推荐一致"] == "False" for r in rows)
+
+
+def test_u12_participant_review(tmp_path: Path) -> None:
     """输入及声称值的原始页码见外部 fixtures/来源说明.md。"""
     rows = _run_case(tmp_path, "mvp2_a.xlsx")
     assert any("ROUNDING_INTERMEDIATE" in r["差异类型"] for r in rows)

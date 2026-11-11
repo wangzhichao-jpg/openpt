@@ -9,7 +9,7 @@ from typing import Any
 
 from openpyxl import Workbook, load_workbook
 
-from .errors import InputError
+from ..errors import InputError
 
 SHEETS = {
     "项目信息": ["字段", "值"],

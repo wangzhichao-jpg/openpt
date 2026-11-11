@@ -7,6 +7,8 @@ from typing import Any
 import numpy as np
 from scipy.stats import f as f_distribution
 
+from ..errors import InputError
+
 
 def analyze(
     data: Any, sigma: float | None = None, alpha: float = 0.05, strict: bool = False
@@ -15,23 +17,24 @@ def analyze(
     try:
         a = np.asarray(data, dtype=float)
     except (ValueError, TypeError):
-        raise ValueError("均匀性数据须为平衡数值矩阵") from None
+        raise InputError("均匀性数据须为平衡数值矩阵") from None
     if a.ndim != 2 or a.shape[0] < 2 or a.shape[1] < 2 or not np.isfinite(a).all():
-        raise ValueError("至少需要两个单元、每单元两次有限数值")
+        raise InputError("至少需要两个单元、每单元两次有限数值")
     if not 0 < alpha < 1:
-        raise ValueError("alpha 必须在 0 和 1 之间")
+        raise InputError("alpha 必须在 0 和 1 之间")
     if sigma is not None and (not math.isfinite(sigma) or sigma <= 0):
-        raise ValueError("sigma 必须为正有限数")
+        raise InputError("sigma 必须为正有限数")
     g, m = a.shape
-    means = a.mean(axis=1)
-    grand = float(means.mean())
-    ssb = float(m * np.sum((means - grand) ** 2))
-    ssw = float(np.sum((a - means[:, None]) ** 2))
+    with np.errstate(over="ignore", invalid="ignore"):
+        means = a.mean(axis=1)
+        grand = float(means.mean())
+        ssb = float(m * np.sum((means - grand) ** 2))
+        ssw = float(np.sum((a - means[:, None]) ** 2))
     db, dw = g - 1, g * (m - 1)
     msb, msw = ssb / db, ssw / dw
     raw = (msb - msw) / m
     if not all(math.isfinite(v) for v in (ssb, ssw, msb, msw, raw)):
-        raise ValueError("数据范围导致数值溢出")
+        raise InputError("数据范围导致数值溢出")
     ss = math.sqrt(max(0, raw))
     critical = float(f_distribution.ppf(1 - alpha, db, dw))
     stat = msb / msw if msw else None

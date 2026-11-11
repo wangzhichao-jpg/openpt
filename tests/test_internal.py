@@ -90,7 +90,7 @@ def test_participants(fixtures):
     assert mismatches == ["03"]
 
 
-def test_rounded_review(fixtures):
+def test_u08_rounded_review(fixtures):
     c = load(fixtures, "aliased.json")
     x = c["case_a_homogeneity"]["data"]
     y = c["case_a_stability"]["data"]
