@@ -225,6 +225,10 @@ def _review_claim(
     )
     row = _row(name, claim["value"], digits, claim["source"], reproduced, rec, note, types, item)
     if name == "t" and row["显示一致"] is False:
+        if reproduced is not None and abs(
+            Decimal(str(reproduced)) - Decimal(str(claim["value"]))
+        ) < Decimal(1).scaleb(-digits):
+            row["说明"] += "；与声称值相差不足一个显示单位，但严格修约不一致"
         candidate_result = _candidate_models(data, result, claim, digits)
         if candidate_result is True:
             row["差异类型"] = "|".join(

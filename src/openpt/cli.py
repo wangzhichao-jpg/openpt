@@ -116,6 +116,18 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _validate_output_paths(args: argparse.Namespace) -> None:
+    """防止输出文件覆盖输入、映射文件或彼此覆盖。"""
+    outputs = [Path(args.docx).resolve(), Path(args.json).resolve()]
+    protected = {Path(args.input).resolve()}
+    if args.command == "review":
+        outputs.append(Path(args.differences).resolve())
+        if args.mapping:
+            protected.add(Path(args.mapping).resolve())
+    if len(set(outputs)) != len(outputs) or protected.intersection(outputs):
+        raise ValueError("输出路径不得覆盖输入文件、映射文件或其他输出文件")
+
+
 def main(argv: list[str] | None = None) -> int:
     """执行模板、计算或复核命令，返回进程退出码。"""
     args = _parser().parse_args(argv)
@@ -135,6 +147,8 @@ def main(argv: list[str] | None = None) -> int:
             args.differences = args.differences or str(
                 input_path.with_name(input_path.stem + "_差异.csv")
             )
+        _validate_output_paths(args)
+        digest = hashlib.sha256(Path(args.input).read_bytes()).hexdigest()
         data = read_workbook(args.input)
         result = calculate(data)
         differences = None
@@ -152,7 +166,6 @@ def main(argv: list[str] | None = None) -> int:
             json.dumps(result, ensure_ascii=False, indent=2, allow_nan=False) + "\n",
             encoding="utf-8",
         )
-        digest = hashlib.sha256(Path(args.input).read_bytes()).hexdigest()
         make_report(args.docx, data, result, differences, input_sha256=digest)
         return 0
     except (ValueError, TypeError, OSError, KeyError, OverflowError, BadZipFile) as exc:

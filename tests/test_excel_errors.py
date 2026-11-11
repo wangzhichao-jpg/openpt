@@ -7,6 +7,7 @@ import pytest
 from openpyxl import load_workbook
 
 from openpt.cli import calculate, main
+from openpt.errors import InputError
 from openpt.io.excel import read_workbook, template
 
 
@@ -49,6 +50,28 @@ def test_cell_type_and_unit(tmp_path: Path, field: str, value: str) -> None:
     book["均匀性"][field] = value
     book.save(path)
     with pytest.raises(ValueError, match=f"均匀性!{field}"):
+        read_workbook(path)
+
+
+def test_cli_rejects_overwriting_input(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """计算输出不能覆盖原始工作簿。"""
+    path = tmp_path / "data.xlsx"
+    _make(path)
+    before = path.read_bytes()
+    assert main(["run", str(path), "--docx", str(path)]) == 2
+    assert "不得覆盖" in capsys.readouterr().err
+    assert path.read_bytes() == before
+
+
+def test_single_repeat_error_has_cell_location(tmp_path: Path) -> None:
+    """GL003 4.2 无组内自由度时指出原始数据位置。"""
+    path = tmp_path / "single.xlsx"
+    _make(path)
+    book = load_workbook(path)
+    book["均匀性"].delete_rows(5)
+    book["均匀性"].delete_rows(3)
+    book.save(path)
+    with pytest.raises(InputError, match="均匀性!C2"):
         read_workbook(path)
 
 
