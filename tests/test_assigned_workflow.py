@@ -55,6 +55,14 @@ def test_workflow(tmp_path: Path) -> None:
     doc = Document(tmp_path / "input_计算书.docx")
     text = "\n".join(p.text for p in doc.paragraphs)
     assert "指定值与不确定度" in text and "GL002 4.4.1.3" in text
+    entries = {
+        row.cells[0].text: row.cells[1].text
+        for table in doc.tables
+        for row in table.rows
+        if len(row.cells) == 2
+    }
+    assert entries["基础值含均匀性分量"] == "否"
+    assert entries["结果间不相关"] == "是"
 
 
 def test_workbook_expert_consensus(tmp_path: Path) -> None:

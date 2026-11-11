@@ -57,7 +57,9 @@ def _table(doc: Any, headers: list[str], rows: list[list[Any]]) -> None:
         shade.set(qn("w:fill"), "D9EAF7")
         tcpr.append(shade)
     for values in rows:
-        cells = table.add_row().cells
+        row = table.add_row()
+        row._tr.get_or_add_trPr().append(OxmlElement("w:cantSplit"))
+        cells = row.cells
         for index, (cell, value) in enumerate(zip(cells, values, strict=True)):
             if widths:
                 cell.width = Cm(widths[index])
@@ -431,7 +433,20 @@ def _assigned_table(doc: Any, result: dict[str, Any]) -> None:
         ("基础值含稳定性分量", "stab_in_base"),
         ("状态", "status"),
     ]
-    _table(doc, ["项目", "结果"], [[label, _shown(assigned.get(key))] for label, key in labels])
+    boolean_keys = {"independent", "hom_in_base", "stab_in_base"}
+    _table(
+        doc,
+        ["项目", "结果"],
+        [
+            [
+                label,
+                ("是" if assigned[key] else "否")
+                if key in boolean_keys and assigned.get(key) is not None
+                else _shown(assigned.get(key)),
+            ]
+            for label, key in labels
+        ],
+    )
     doc.add_paragraph(assigned.get("formula", ""))
     doc.add_paragraph(
         "扩展方法：u(X)=√(u_base²+Σu分量²)，σ′=√(σ_pt²+Σu分量²)；"
