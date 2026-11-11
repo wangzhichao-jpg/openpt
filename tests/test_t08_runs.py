@@ -16,10 +16,16 @@ def test_run_pack_restore_and_tamper(tmp_path: Path) -> None:
     _a1(source)
     runs = tmp_path / "runs"
     before = source.read_bytes()
-    assert main(["run", str(source), "--runs-dir", str(runs)]) == 0
+    sample_record = tmp_path / "sample.json"
+    sample_record.write_text('{"seed":123}', encoding="utf-8")
+    assert (
+        main(["run", str(source), "--runs-dir", str(runs), "--sample-record", str(sample_record)])
+        == 0
+    )
     run = next(runs.iterdir())
     assert source.read_bytes() == before
     assert (run / "input" / "source.xlsx").read_bytes() == before
+    assert (run / "input" / "sample.json").read_bytes() == sample_record.read_bytes()
     assert verify_directory(run) == []
     assert reproduce(run)[0] == []
     archive = tmp_path / "package.zip"
