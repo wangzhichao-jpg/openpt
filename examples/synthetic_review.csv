@@ -1,7 +1,7 @@
-﻿统计量,声称值,来源,显示小数位,按报告模型复现值,按推荐模型重算值,显示一致,状态,差异类型,评分条目,说明
-t,0.1,虚构示例，非历史报告,2,0.09351412891219282,0.06433340349803006,False,DIFFERENCE,PSEUDO_REPLICATION|VALUE_MISMATCH|NOT_REPRODUCIBLE,均匀性与稳定性评估,技术重复仅用于报告模型复现，须核查伪重复及自由度；报告模型 df=24，推荐模型 df=11；模型=repeats_pooled
-t,0.1,虚构示例，非历史报告,2,0.0662244999617743,0.06433340349803006,False,DIFFERENCE,ROUNDING_INTERMEDIATE|VALUE_MISMATCH|NOT_REPRODUCIBLE,均匀性与稳定性评估,按报告修约中间值重算；报告 s1=3.03，推荐模型 s1=3.0276503540974917
-s1,3.03,虚构示例，非历史报告,3,3.0276503540974917,3.0276503540974917,False,DIFFERENCE,VALUE_MISMATCH,均匀性与稳定性评估,基线标准差不符，原因待底稿确认
-t,0.1,虚构示例，非历史报告,2,0.7032497735701438,0.2929311545598301,False,DIFFERENCE,PSEUDO_REPLICATION|MODEL_SWITCH|VALUE_MISMATCH|NOT_REPRODUCIBLE,均匀性与稳定性评估,技术重复仅用于报告模型复现，须核查伪重复及自由度；报告模型 df=23.97218995140583，推荐模型 df=11；模型=repeats_welch
-z:P1,0.0,虚构示例，非历史报告,1,0.19607843137254902,0.19607843137254902,False,DIFFERENCE,VALUE_MISMATCH,能力统计量计算,原因待底稿确认
-合成标准差,5.1,输入配置,1,5.0990195135927845,5.0990195135927845,True,MATCH,SIGMA_COMPOSITE,均匀性与稳定性评估,合成标准差用途需确认；稳定性报告使用合成标准差
+﻿统计量,声称值,来源,显示小数位,按报告模型复现值,按推荐模型重算值,显示一致,推荐一致,状态,差异类型,评分条目,说明
+t,0.1,虚构示例，非历史报告,2,0.09351412891219282,0.06433340349803006,False,False,DIFFERENCE,PSEUDO_REPLICATION|VALUE_MISMATCH|NOT_REPRODUCIBLE,均匀性与稳定性评估,技术重复仅用于报告模型复现，须核查伪重复及自由度；报告模型 df=24，推荐模型 df=11；模型=repeats_pooled；推荐模型与声称值不一致
+t,0.1,虚构示例，非历史报告,2,0.0662244999617743,0.06433340349803006,False,False,DIFFERENCE,ROUNDING_INTERMEDIATE|VALUE_MISMATCH|NOT_REPRODUCIBLE,均匀性与稳定性评估,按报告修约中间值重算；报告 s1=3.03，推荐模型 s1=3.0276503540974917；推荐模型与声称值不一致
+s1,3.03,虚构示例，非历史报告,3,3.0276503540974917,3.0276503540974917,False,False,DIFFERENCE,VALUE_MISMATCH,均匀性与稳定性评估,基线标准差不符，原因待底稿确认；推荐模型与声称值不一致
+t,0.1,虚构示例，非历史报告,2,0.7032497735701438,0.2929311545598301,False,False,DIFFERENCE,PSEUDO_REPLICATION|MODEL_SWITCH|VALUE_MISMATCH|NOT_REPRODUCIBLE,均匀性与稳定性评估,技术重复仅用于报告模型复现，须核查伪重复及自由度；报告模型 df=23.97218995140583，推荐模型 df=11；模型=repeats_welch；推荐模型与声称值不一致
+z:P1,0.0,虚构示例，非历史报告,1,0.19607843137254902,0.19607843137254902,False,False,DIFFERENCE,VALUE_MISMATCH,能力统计量计算,原因待底稿确认
+合成标准差,5.1,输入配置,1,5.0990195135927845,5.0990195135927845,True,True,MATCH,SIGMA_COMPOSITE,均匀性与稳定性评估,合成标准差用途需确认；稳定性报告使用合成标准差

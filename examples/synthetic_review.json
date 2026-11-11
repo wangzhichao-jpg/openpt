@@ -97,6 +97,7 @@
     "status": "OK",
     "warning": null,
     "simplified": false,
+    "rule": "gl002",
     "tolerance": 1e-10,
     "history": [
       {

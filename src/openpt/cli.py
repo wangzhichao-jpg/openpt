@@ -75,23 +75,38 @@ def calculate(data: dict[str, Any]) -> dict[str, Any]:
 
 def main(argv: list[str] | None = None) -> int:
     """执行模板、计算或复核命令，返回进程退出码。"""
-    parser = argparse.ArgumentParser(prog="openpt")
-    sub = parser.add_subparsers(dest="command", required=True)
-    t = sub.add_parser("template")
-    t.add_argument("output")
+    parser = argparse.ArgumentParser(prog="openpt", description="能力验证统计工作台")
+    parser.add_argument("--version", action="version", version="openpt 0.0.1", help="显示版本")
+    sub = parser.add_subparsers(dest="command", required=True, title="命令")
+    t = sub.add_parser("template", help="生成空白 Excel 模板")
+    t.add_argument("output", help="模板文件路径")
+    demo = sub.add_parser("demo", help="生成公开演示数据及计算结果")
+    demo.add_argument("directory", help="示例输出目录")
     for name in ("run", "review"):
-        p = sub.add_parser(name)
-        p.add_argument("input")
-        p.add_argument("--docx", required=True)
-        p.add_argument("--json", required=True)
+        p = sub.add_parser(name, help="运行计算" if name == "run" else "复核报告")
+        p.add_argument("input", help="输入 Excel 文件")
+        p.add_argument("--docx", help="计算书路径；默认写入输入文件旁")
+        p.add_argument("--json", help="结果 JSON 路径；默认写入输入文件旁")
         if name == "review":
-            p.add_argument("--differences", required=True)
+            p.add_argument("--differences", help="差异 CSV 路径；默认写入输入文件旁")
             p.add_argument("--mapping", help="可选 JSON 评分映射")
     args = parser.parse_args(argv)
     try:
         if args.command == "template":
             template(args.output)
             return 0
+        if args.command == "demo":
+            from .demo import create_demo
+
+            create_demo(Path(args.directory))
+            return 0
+        input_path = Path(args.input)
+        args.docx = args.docx or str(input_path.with_name(input_path.stem + "_计算书.docx"))
+        args.json = args.json or str(input_path.with_name(input_path.stem + "_结果.json"))
+        if args.command == "review":
+            args.differences = args.differences or str(
+                input_path.with_name(input_path.stem + "_差异.csv")
+            )
         data = read_workbook(args.input)
         result = calculate(data)
         differences = None
