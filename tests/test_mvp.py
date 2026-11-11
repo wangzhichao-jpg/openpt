@@ -57,7 +57,7 @@ def test_u3_u4_u5_u6():
 def test_u10():
     # GL002 附录 A.2；对称合成数据的稳健均值解析为2。
     values = [1, 2, 3, 4, 0]
-    a = algorithm_a(values, tolerance=1e-12)
+    a = algorithm_a(values, tolerance=1e-12, rule="absolute")
     assert a["x"] == pytest.approx(2)
     try:
         from pt13528.robust import algorithm_a as external_algorithm_a

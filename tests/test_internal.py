@@ -59,10 +59,15 @@ def test_homogeneity_stability(fixtures):
 def test_participants(fixtures):
     # 仓库外材料给出来源页码；这里仅核对观察值，不包含报告数据。
     b = load(fixtures, "case_b_participants.json")
-    a = algorithm_a([float(r[1]) for r in b])
+    a = algorithm_a([float(r[1]) for r in b], rule="absolute")
     assert len(b) == 141 and round(a["x"], 1) == 88.0 and round(a["s"], 2) == 3.63
+    reference = pytest.importorskip("pt13528.robust")
+    recommended = algorithm_a([float(r[1]) for r in b], rule="gl002")
+    external = reference.algorithm_a([float(r[1]) for r in b], tol="equivalent-figure")
+    assert recommended["iterations"] == external.iterations
+    assert recommended["s"] == pytest.approx(external.scale, abs=1e-12)
     s = load(fixtures, "case_a_participants.json")
-    a = algorithm_a([float(r[1]) for r in s])
+    a = algorithm_a([float(r[1]) for r in s], rule="absolute")
     assert len(s) == 32 and round(a["x"], 2) == 4.99 and round(a["s"], 2) == 0.12
     assert len([zscore(float(r[1]), 88.0, 6.9) for r in b]) == 141
 

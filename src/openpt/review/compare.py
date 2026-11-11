@@ -7,6 +7,7 @@ from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
+from ..core.robust import algorithm_a
 from ..core.stability import analyze as stability
 from ..core.stability import summary_t
 
@@ -66,7 +67,11 @@ def _values(
         value = result.get("均匀性", {}).get(name)
         return value, value, ""
     if name in ("x*", "s*"):
-        value = result.get("算法A", {}).get("x" if name == "x*" else "s")
+        key = "x" if name == "x*" else "s"
+        value = result.get("算法A", {}).get(key)
+        if claim.get("model") == "absolute" and data.get("participants"):
+            alternative = algorithm_a([p["value"] for p in data["participants"]], rule="absolute")
+            return alternative[key], value, "绝对容差作为候选报告模型，原报告停止规则待底稿确认"
         return value, value, ""
     if name == "t":
         return _t_reproduction(data, result, claim)
@@ -103,10 +108,15 @@ def _row(
         )
     except (ValueError, TypeError, InvalidOperation):
         raise ValueError("报告声称值显示小数位须为0至12的整数") from None
-    if match is False:
+    recommended_match = (
+        display(recommended, digits) == display(claim, digits) if recommended is not None else None
+    )
+    if match is False or recommended_match is False:
         categories.append("VALUE_MISMATCH")
         if name.startswith("z:"):
             note = (note + "；原因待底稿确认").lstrip("；")
+        elif recommended_match is False:
+            note = (note + "；推荐模型与声称值不一致").lstrip("；")
     # 缺乏数据时不能断言所有模型均不能复现。
     return {
         "统计量": name,
@@ -116,7 +126,12 @@ def _row(
         "按报告模型复现值": float(model_value) if isinstance(model_value, Decimal) else model_value,
         "按推荐模型重算值": float(recommended) if isinstance(recommended, Decimal) else recommended,
         "显示一致": match,
-        "状态": "NOT_EVALUATED" if match is None else "MATCH" if match else "DIFFERENCE",
+        "推荐一致": recommended_match,
+        "状态": "NOT_EVALUATED"
+        if match is None
+        else "MATCH"
+        if match and recommended_match is not False
+        else "DIFFERENCE",
         "差异类型": "|".join(dict.fromkeys(categories)),
         "评分条目": item,
         "说明": note,
@@ -230,6 +245,7 @@ def write_csv(path: str | Path, rows: list[dict[str, Any]]) -> None:
         "按报告模型复现值",
         "按推荐模型重算值",
         "显示一致",
+        "推荐一致",
         "状态",
         "差异类型",
         "评分条目",

@@ -2,6 +2,7 @@
 """CNAS-GL002:2018 附录 A.2，算法 A。"""
 
 import math
+from decimal import Decimal, localcontext
 from typing import Any
 
 import numpy as np
@@ -10,8 +11,21 @@ import numpy as np
 MAD_FACTOR = 1.483
 ALG_A_CLIP = 1.5
 ALG_A_SD_FACTOR = 1.134
-# 指定值不确定度公式，GL002 附录 A.2 的配套应用。
+# 稳健指定值标准不确定度的约定计算因子。
 UNCERTAINTY_FACTOR = 1.25
+
+
+def _gl002_stable(x: float, s: float, next_x: float, next_s: float) -> bool:
+    """比较 s 的第三位有效数字及 x 相应位，依据 GL002 附录 A.2。"""
+    if next_s == 0:
+        return s == 0 and x == next_x
+    exponent = Decimal(str(next_s)).adjusted() - 2
+    quantum = Decimal(1).scaleb(exponent)
+    with localcontext() as context:
+        context.prec = 1024
+        return Decimal(str(s)).quantize(quantum) == Decimal(str(next_s)).quantize(
+            quantum
+        ) and Decimal(str(x)).quantize(quantum) == Decimal(str(next_x)).quantize(quantum)
 
 
 def algorithm_a(
@@ -19,6 +33,7 @@ def algorithm_a(
     tolerance: float = 1e-10,
     max_iterations: int = 1000,
     simplified: bool = False,
+    rule: str = "gl002",
 ) -> dict[str, Any]:
     """按 GL002 附录 A.2 用中位数及截尾数据计算稳健均值、标准差。"""
     try:
@@ -34,18 +49,27 @@ def algorithm_a(
         or max_iterations < 1
     ):
         raise ValueError("无效迭代参数")
+    if rule not in ("gl002", "absolute", "simplified"):
+        raise ValueError("算法 A 停止规则无效")
+    if simplified:
+        rule = "simplified"
     x = float(np.median(a))
     s = float(MAD_FACTOR * np.median(np.abs(a - x)))
     history = []
-    converged = bool(simplified)
-    for i in range(0 if simplified else max_iterations):
+    converged = rule == "simplified"
+    for i in range(0 if rule == "simplified" else max_iterations):
         clipped = np.clip(a, x - ALG_A_CLIP * s, x + ALG_A_CLIP * s)
         nx = float(clipped.mean())
         ns = float(ALG_A_SD_FACTOR * np.std(clipped, ddof=1))
         if not math.isfinite(nx) or not math.isfinite(ns):
             raise ValueError("数值溢出")
         history.append({"iteration": i + 1, "x": nx, "s": ns})
-        if abs(nx - x) <= tolerance and abs(ns - s) <= tolerance:
+        stable = (
+            _gl002_stable(x, s, nx, ns) and i > 0
+            if rule == "gl002"
+            else abs(nx - x) <= tolerance and abs(ns - s) <= tolerance
+        )
+        if stable:
             x, s = nx, ns
             converged = True
             break
@@ -59,7 +83,8 @@ def algorithm_a(
         "converged": converged,
         "status": "NOT_CONVERGED" if not converged else "INDETERMINATE" if s == 0 else "OK",
         "warning": "稳健尺度为零，需检查重复值与分辨力" if s == 0 else None,
-        "simplified": simplified,
+        "simplified": rule == "simplified",
+        "rule": rule,
         "tolerance": tolerance,
         "history": history,
     }

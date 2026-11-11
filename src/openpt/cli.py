@@ -54,6 +54,7 @@ def calculate(data: dict[str, Any]) -> dict[str, Any]:
             tolerance=float(cfg.get("algorithm_a_tolerance") or 1e-10),
             max_iterations=int(cfg.get("algorithm_a_max_iterations") or 1000),
             simplified=bool(cfg.get("algorithm_a_simplified", False)),
+            rule=str(cfg.get("algorithm_a_rule") or "gl002"),
         )
         sigma_pt = float(cfg["sigma_pt"]) if cfg.get("sigma_pt") not in (None, "") else sigma
         if cfg.get("assigned") not in (None, "") and sigma_pt is not None:

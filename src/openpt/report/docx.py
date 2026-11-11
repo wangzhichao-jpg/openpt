@@ -153,7 +153,8 @@ def _other_results(doc: Any, data: dict[str, Any], result: dict[str, Any], sig: 
             ("收敛", "converged"),
         ]
         _table(doc, ["项目", "结果"], [[label, _shown(a.get(key), sig)] for label, key in names])
-        doc.add_paragraph("停止规则：" + ("简化法" if a.get("simplified") else "绝对容差"))
+        rules = {"gl002": "GL002 第三有效位规则", "absolute": "绝对容差", "simplified": "简化法"}
+        doc.add_paragraph("停止规则：" + rules.get(a.get("rule"), "未提供"))
     else:
         doc.add_paragraph("未提供参加者结果。")
     doc.add_heading("参加者评价", 1)

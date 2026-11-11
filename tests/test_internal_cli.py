@@ -50,6 +50,7 @@ def test_full_review_b(tmp_path: Path) -> None:
     assert "MODEL_SWITCH" in tests[1]["差异类型"]
     assert any("SIGMA_COMPOSITE" in r["差异类型"] and "报告使用合成" in r["说明"] for r in rows)
     assert all(r["显示一致"] == "True" for r in rows if r["统计量"] in ("x*", "s*"))
+    assert any(r["统计量"] == "s*" and r["推荐一致"] == "False" for r in rows)
 
 
 def test_full_review_a(tmp_path: Path) -> None:

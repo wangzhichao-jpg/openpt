@@ -31,7 +31,7 @@ python -m pytest -m "not internal"
 
 ## 配置与边界
 
-方法配置表 `alpha` 默认 0.05；`sigma` 缺省时相应提示未评价；`strict_homogeneity` 默认 FALSE；`stability_method` 默认 `two_sample`，可设 `one_sample` 并提供 `reference`；`assigned` 和 `sigma` 用于 z。稳定性推荐模型使用包装单元均值。算法 A 可设 `algorithm_a_tolerance`、`algorithm_a_max_iterations` 和 `algorithm_a_simplified`。扩展配置未实现；不平衡设计、相关与配对数据不在本原型范围内。
+方法配置表 `alpha` 默认 0.05；`sigma` 缺省时相应提示未评价；`strict_homogeneity` 默认 FALSE；`stability_method` 默认 `two_sample`，可设 `one_sample` 并提供 `reference`；`assigned` 和 `sigma` 用于 z。稳定性推荐模型使用包装单元均值。算法 A 的 `algorithm_a_rule` 默认 `gl002`（第三有效位及对应位），可选 `absolute`（使用 `algorithm_a_tolerance`）或 `simplified`；可配置 `algorithm_a_max_iterations`。扩展配置未实现；不平衡设计、相关与配对数据不在本原型范围内。
 
 DOCX 指定中文宋体、西文 Times New Roman，不附带字体；若系统缺字，请安装有授权的相应字体或在文档编辑器中选择已安装的中文字体后重新导出。不同平台排版需逐页检查。
 
