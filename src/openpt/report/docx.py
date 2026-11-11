@@ -227,7 +227,7 @@ def make_report(
                 _shown(r.get("按报告模型复现值")),
                 _shown(r.get("按推荐模型重算值")),
                 _shown(r.get("显示一致")),
-                str(r.get("说明", ""))
+                (str(r.get("差异类型", "")) + " " + str(r.get("说明", "")))
                 .replace("repeats_pooled", "合并方差模型")
                 .replace("repeats_welch", "非齐方差模型")
                 .replace("df=", "自由度=")

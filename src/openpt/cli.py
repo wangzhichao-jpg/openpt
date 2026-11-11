@@ -40,6 +40,14 @@ def calculate(data: dict[str, Any]) -> dict[str, Any]:
         result["稳定性"] = stability(
             groups.get("基线"), groups["稳定期"], sigma, alpha, method, reference
         )
+        extra = {}
+        for name, observations in groups.items():
+            if name not in ("基线", "稳定期"):
+                extra[name] = stability(
+                    groups.get("基线"), observations, sigma, alpha, method, reference
+                )
+        if extra:
+            result["其他稳定性"] = extra
     if data["participants"]:
         result["算法A"] = algorithm_a(
             [p["value"] for p in data["participants"]],
@@ -47,12 +55,13 @@ def calculate(data: dict[str, Any]) -> dict[str, Any]:
             max_iterations=int(cfg.get("algorithm_a_max_iterations") or 1000),
             simplified=bool(cfg.get("algorithm_a_simplified", False)),
         )
-        if cfg.get("assigned") not in (None, "") and sigma is not None:
+        sigma_pt = float(cfg["sigma_pt"]) if cfg.get("sigma_pt") not in (None, "") else sigma
+        if cfg.get("assigned") not in (None, "") and sigma_pt is not None:
             result["参加者z"] = {
                 p["id"]: zscore(
                     p["value"],
                     float(cfg["assigned"]),
-                    sigma,
+                    sigma_pt,
                     float(cfg.get("z_satisfactory") or 2),
                     float(cfg.get("z_unsatisfactory") or 3),
                 )

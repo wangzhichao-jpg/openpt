@@ -17,7 +17,7 @@ SHEETS = {
     "均匀性": ["单元编号", "重复编号", "值", "单位"],
     "稳定性": ["时间组", "单元编号", "重复编号", "值", "单位"],
     "参加者结果": ["参加者编号", "值", "单位"],
-    "报告声称值": ["统计量", "声称值", "显示小数位", "来源", "报告模型"],
+    "报告声称值": ["统计量", "声称值", "显示小数位", "来源", "报告模型", "时间组"],
 }
 
 
@@ -53,7 +53,10 @@ def read_workbook(path: str | Path) -> dict[str, Any]:
 
     def rows(name: str) -> Iterator[Any]:
         ws = book[name]
-        if [ws.cell(1, i).value for i in range(1, len(SHEETS[name]) + 1)] != SHEETS[name]:
+        headers = [ws.cell(1, i).value for i in range(1, len(SHEETS[name]) + 1)]
+        if name == "报告声称值" and headers[-1] is None:
+            headers[-1] = "时间组"  # 兼容旧模板
+        if headers != SHEETS[name]:
             raise ValueError(f"{name}!1 表头错误")
         for cells in ws.iter_rows(min_row=2, max_col=len(SHEETS[name])):
             if not any(c.value is not None for c in cells):
@@ -129,6 +132,7 @@ def read_workbook(path: str | Path) -> dict[str, Any]:
                 "digits": r[2].value,
                 "source": str(r[3].value),
                 "model": r[4].value,
+                "timegroup": r[5].value,
                 "cell": f"报告声称值!{r[1].coordinate}",
             }
         )
