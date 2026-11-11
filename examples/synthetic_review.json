@@ -1,6 +1,7 @@
 {
   "均匀性": {
     "status": "OK",
+    "design_warnings": [],
     "warnings": [],
     "g": 10,
     "m": 2,
@@ -50,13 +51,13 @@
     "mean2": 105.11666666666667,
     "n1": 10,
     "n2": 3,
-    "status": "DESIGN_WARNING",
+    "status": "OK",
     "model": "unit_pooled",
     "method": "two_sample",
     "threshold": null,
     "mean_difference_pass": null,
     "mean_difference_status": "NOT_EVALUATED",
-    "warnings": [
+    "design_warnings": [
       "GL003 5.2 建议每组不少于6个观测单元"
     ]
   }

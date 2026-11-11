@@ -2,6 +2,7 @@
 """命令行入口。"""
 
 import argparse
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -98,7 +99,8 @@ def main(argv: list[str] | None = None) -> int:
             json.dumps(result, ensure_ascii=False, indent=2, allow_nan=False) + "\n",
             encoding="utf-8",
         )
-        make_report(args.docx, data, result, differences)
+        digest = hashlib.sha256(Path(args.input).read_bytes()).hexdigest()
+        make_report(args.docx, data, result, differences, input_sha256=digest)
         return 0
     except (ValueError, TypeError, OSError, KeyError, OverflowError) as exc:
         print(f"错误：{exc}", file=sys.stderr)
