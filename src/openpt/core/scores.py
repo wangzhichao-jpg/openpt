@@ -5,6 +5,7 @@ import math
 from dataclasses import dataclass, field
 
 from ..errors import InputError
+from .decision import compare
 from .models import ResultMapping
 
 
@@ -94,7 +95,7 @@ def performance_score(
         reference_sigma is not None
         and reference_sigma > 0
         and u_assigned is not None
-        and u_assigned > 0.3 * reference_sigma
+        and compare(u_assigned, 0.3 * reference_sigma) > 0
     ):
         warnings.append("u(X)>0.3σ_pt；可考虑 z′，依据 ISO 13528，待核对条款号；适用性须审查")
 
@@ -148,13 +149,13 @@ def performance_score(
     if statistic in ("D", "D%"):
         return ScoreResult(statistic, score, "OK", None, "差值未配置评价准则", formula, warnings)
     if statistic == "En":
-        classification = "满意" if abs(score) <= en_limit else "不满意"
+        classification = "满意" if compare(abs(score), en_limit) <= 0 else "不满意"
     else:
         classification = (
             "满意"
-            if abs(score) <= satisfactory
+            if compare(abs(score), satisfactory) <= 0
             else "可疑"
-            if abs(score) < unsatisfactory
+            if compare(abs(score), unsatisfactory) < 0
             else "不满意"
         )
     return ScoreResult(statistic, score, "OK", classification, None, formula, warnings)

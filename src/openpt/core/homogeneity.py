@@ -8,6 +8,7 @@ import numpy as np
 from scipy.stats import f as f_distribution
 
 from ..errors import InputError
+from .decision import compare
 from .models import HomogeneityResult
 
 
@@ -77,9 +78,9 @@ def analyze(
     stat = msb / msw if msw else None
     if stat is not None and not math.isfinite(stat):
         stat = None
-    fpass = stat < critical if stat is not None else None
+    fpass = compare(stat, critical) < 0 if stat is not None else None
     threshold = 0.3 * sigma if sigma is not None else None
-    sspass = ss <= threshold if threshold is not None else None
+    sspass = compare(ss, threshold) <= 0 if threshold is not None else None
     conclusion = (
         (fpass and sspass if sspass is not None else (False if fpass is False else None))
         if strict

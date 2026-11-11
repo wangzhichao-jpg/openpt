@@ -4,6 +4,7 @@
 import math
 
 from ..errors import InputError
+from .decision import compare
 from .models import ZScoreResult
 
 
@@ -28,6 +29,10 @@ def zscore(
     if not math.isfinite(z):
         raise InputError("z 数值溢出")
     classification = (
-        "满意" if abs(z) <= satisfactory else "可疑" if abs(z) < unsatisfactory else "不满意"
+        "满意"
+        if compare(abs(z), satisfactory) <= 0
+        else "可疑"
+        if compare(abs(z), unsatisfactory) < 0
+        else "不满意"
     )
     return ZScoreResult(z=z, status="OK", classification=classification)

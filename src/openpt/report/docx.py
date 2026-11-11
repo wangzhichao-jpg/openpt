@@ -232,7 +232,7 @@ def _homogeneity_conclusion(
     if h["F"] is None:
         doc.add_paragraph("按 GL003 4.2：未评价，组内均方为零或数值超出范围，F 无法计算。")
     else:
-        relation = "<" if h["F"] < h["F_critical"] else "≥"
+        relation = "<" if h["F_pass"] else "≥"
         judgement = (
             "样品间无显著性差异，按 F 检验判定均匀"
             if h["F_pass"]
@@ -241,7 +241,7 @@ def _homogeneity_conclusion(
         doc.add_paragraph(
             f"按 GL003 4.2：F={_shown(h['F'], sig)} {relation} "
             f"F{alpha:g}({h['df_between']},{h['df_within']})={_shown(h['F_critical'], sig)}，"
-            f"{judgement}；按未修约值比较。"
+            f"{judgement}；按未修约值及相对容差 1e-12 比较。"
         )
     if h["threshold"] is None:
         doc.add_paragraph(f"并列提示：Ss={_shown(h['Ss'], places=ss_places)}；未评价：未提供 σ。")
@@ -532,6 +532,10 @@ def _project_methods(doc: Any, data: dict[str, Any], cfg: dict[str, Any]) -> Non
     doc.add_heading("项目信息", 1)
     _table(doc, ["项目", "内容"], [[k, _shown(v)] for k, v in data.get("info", {}).items()])
     doc.add_heading("方法与配置", 1)
+    doc.add_paragraph(
+        "判据比较采用相对容差 1e-12，容差内按相等处理；原始计算值未修约。"
+        "严格小于的判据在相等时不通过，接近边界的结果应人工复核。"
+    )
     method = (
         "单均值 t 检验：CNAS-GL003:2018 5.2.1"
         if cfg.get("stability_method") == "one_sample"

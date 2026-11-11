@@ -8,6 +8,7 @@ import numpy as np
 from scipy.stats import t as t_distribution
 
 from ..errors import InputError
+from .decision import compare
 from .models import StabilityResult
 
 
@@ -70,7 +71,7 @@ def summary_t(
         df=df,
         p=float(2 * t_distribution.sf(t, df)) if t is not None and df else None,
         critical=critical,
-        passed=t < critical if t is not None and critical else None,
+        passed=compare(t, critical) < 0 if t is not None and critical else None,
         difference=difference,
         se=se,
         s1=s1,
@@ -104,7 +105,7 @@ def _one_sample(y: Any, reference: float | None, alpha: float) -> dict[str, Any]
         df=df,
         p=float(2 * t_distribution.sf(t, df)) if t is not None else None,
         critical=crit,
-        passed=t < crit if t is not None else None,
+        passed=compare(t, crit) < 0 if t is not None else None,
         difference=diff,
         se=se,
         s1=sd,
@@ -175,7 +176,7 @@ def analyze(
             "reference_source": reference_source,
             "observation_level": "unit_means" if model == "unit_pooled" else "all_repeats",
             "threshold": 0.3 * sigma if sigma is not None else None,
-            "mean_difference_pass": result["difference"] <= 0.3 * sigma
+            "mean_difference_pass": compare(result["difference"], 0.3 * sigma) <= 0
             if sigma is not None
             else None,
             "mean_difference_status": "OK" if sigma is not None else "NOT_EVALUATED",
