@@ -252,6 +252,13 @@ def _parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True, title="命令")
     t = sub.add_parser("template", help="生成空白 Excel 模板")
     t.add_argument("output", help="模板文件路径")
+    validate = sub.add_parser("validate", help="只读检查测量表并输出 JSON 问题清单")
+    validate.add_argument("input", help="XLSX 或 CSV 文件")
+    validate.add_argument("--columns", help="标准字段到原始列名的 JSON 映射")
+    validate.add_argument(
+        "--encoding", default="utf-8-sig", help="CSV 编码，默认 UTF-8（兼容 BOM）"
+    )
+    validate.add_argument("--sheet", default="均匀性", help="CSV 测量表类型")
     demo = sub.add_parser("demo", help="生成公开演示数据及计算结果")
     demo.add_argument("directory", help="示例输出目录")
     batch = sub.add_parser("review-batch", help="批量复核并输出 XLSX 差异总表")
@@ -305,6 +312,21 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "template":
             template(args.output)
             return 0
+        if args.command == "validate":
+            from .io.validation import inspect_input
+
+            columns = (
+                json.loads(Path(args.columns).read_text(encoding="utf-8")) if args.columns else {}
+            )
+            if not isinstance(columns, dict):
+                raise ValueError("列映射必须为 JSON 对象")
+            issues = inspect_input(
+                args.input, columns, encoding=args.encoding, csv_sheet=args.sheet
+            )
+            print(
+                json.dumps([issue.to_dict() for issue in issues], ensure_ascii=False, default=str)
+            )
+            return 1 if issues else 0
         if args.command == "demo":
             from .demo import create_demo
 
