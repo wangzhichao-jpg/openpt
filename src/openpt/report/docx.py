@@ -335,6 +335,13 @@ def _other_results(
     else:
         doc.add_paragraph("未提供稳定性数据。")
     _robust_results(doc, result, sig, mean_places)
+    niqr = result.get("中位数NIQR")
+    if niqr:
+        doc.add_paragraph(
+            "GL002 附录 A.4：线性插值 type 7，NIQR=0.7413×(Q3-Q1)；"
+            f"中位数={_shown(niqr['median'], sig)}，Q1={_shown(niqr['q1'], sig)}，"
+            f"Q3={_shown(niqr['q3'], sig)}，NIQR={_shown(niqr['niqr'], sig)}。"
+        )
     _participant_table(doc, data, result, z_places)
 
 

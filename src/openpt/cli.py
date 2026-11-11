@@ -10,7 +10,7 @@ from typing import Any
 from zipfile import BadZipFile
 
 from .core.homogeneity import analyze as homogeneity
-from .core.robust import algorithm_a
+from .core.robust import algorithm_a, median_niqr
 from .core.stability import analyze as stability
 from .core.zscore import zscore
 from .io.excel import read_workbook, template
@@ -38,6 +38,7 @@ def _participant_results(data: dict[str, Any], sigma: float | None) -> dict[str,
             rule=str(_option(cfg, "algorithm_a_rule", "gl002")),
         ).to_dict()
     }
+    result["中位数NIQR"] = median_niqr(values).to_dict()
     # 绝对容差对照独立于选定停止规则，供附录和敏感性提示使用。
     result["算法A_收敛对照"] = algorithm_a(
         values, rule="absolute", tolerance=1e-12, max_iterations=10000
