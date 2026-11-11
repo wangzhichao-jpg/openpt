@@ -3,6 +3,7 @@
 
 import hashlib
 import json
+import math
 from pathlib import Path
 
 from docx import Document
@@ -25,15 +26,19 @@ def test_formats_decisions_and_security(tmp_path: Path) -> None:
     root = next(runs.iterdir())
     result_bytes = (root / "result.json").read_bytes()
     result = json.loads(result_bytes)
-    number = result["均匀性"]["F"]
     doc = Document(root / "report.docx")
-    assert any(str(number) in p.text for p in doc.paragraphs)
+    appendix = next(p.text for p in doc.paragraphs if p.text.startswith("全精度结果："))
+    doc_result = json.loads(appendix.removeprefix("全精度结果："))
+    assert doc_result == result
     html = (root / "report.html").read_text(encoding="utf-8")
-    assert str(number) in html
     assert "<script>" not in html and "&lt;script&gt;" in html
     workbook = load_workbook(root / "report.xlsx", data_only=False)
     values = list(workbook["全精度数值"].values)
-    assert next(row[1] for row in values if row[0] == "结果.均匀性.F") == number
+    for key in ("F", "F_critical", "mean", "MS_within", "Ss"):
+        number = result["均匀性"][key]
+        row = next(row for row in values if row[0] == f"结果.均匀性.{key}")
+        assert math.isclose(row[1], number, rel_tol=1e-15, abs_tol=0)
+        assert float(row[3]) == number and str(number) in html
     assert (
         main(
             [
