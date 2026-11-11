@@ -6,11 +6,14 @@ build-backend = "setuptools.build_meta"
 name = "openpt"
 version = "0.0.1"
 description = "能力验证统计工作台原型，不可用于正式评价"
-requires-python = ">=3.12"
-dependencies = ["numpy==2.5.4", "scipy==1.18.1", "openpyxl==3.1.5", "python-docx==1.2.0"]
+requires-python = ">=3.10,<3.14"
+license = {text = "Apache-2.0"}
+classifiers = ["License :: OSI Approved :: Apache Software License", "Programming Language :: Python :: 3"]
+dependencies = ["numpy>=1.26.4,<3", "scipy>=1.11.4,<2", "openpyxl>=3.1.5,<4", "python-docx>=1.2.0,<2"]
 
 [project.optional-dependencies]
-test = ["pytest==8.4.2", "pytest-cov==6.3.0", "pt13528==0.1.11"]
+test = ["pytest>=8,<9", "pytest-cov>=6,<8"]
+crosscheck = ["pt13528==0.1.11"]
 
 [project.scripts]
 openpt = "openpt.cli:main"
@@ -24,3 +27,7 @@ openpt = ["config/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = ["internal: 需要仓库外内部材料"]
+
+[tool.ruff.lint]
+select = ["E9", "F63", "F7", "F82"]

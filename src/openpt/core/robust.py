@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """CNAS-GL002:2018 附录 A.2，算法 A。"""
 import math
 import numpy as np
@@ -14,4 +15,4 @@ def algorithm_a(values, tolerance=1e-10, max_iterations=1000, simplified=False):
         history.append({'iteration':i+1,'x':nx,'s':ns})
         if abs(nx-x)<=tolerance and abs(ns-s)<=tolerance: x,s=nx,ns; converged=True; break
         x,s=nx,ns
-    return {'x':x,'s':s,'u_x':1.25*s/math.sqrt(len(a)),'n':len(a),'iterations':len(history),'converged':converged,'status':'OK' if converged else 'NOT_CONVERGED','simplified':simplified,'tolerance':tolerance,'history':history}
+    return {'x':x,'s':s,'u_x':1.25*s/math.sqrt(len(a)),'n':len(a),'iterations':len(history),'converged':converged,'status':'NOT_CONVERGED' if not converged else 'INDETERMINATE' if s == 0 else 'OK','warning':'稳健尺度为零，需检查重复值与分辨力' if s == 0 else None,'simplified':simplified,'tolerance':tolerance,'history':history}

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """GL002 4.4、4.5：已知指定值和评价标准差的 z。"""
 import math
 

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """CNAS-GL003:2018 4.2 和 4.3，平衡单因子设计。"""
 import math
 import numpy as np

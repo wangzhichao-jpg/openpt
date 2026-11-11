@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """计算书：全部结果以统一 JSON 数值为基础。"""
 import json
 from docx import Document
@@ -5,7 +6,7 @@ from docx.shared import Pt
 from docx.oxml.ns import qn
 
 def make_report(path, data, result, differences=None):
-    doc=Document(); style=doc.styles['Normal']; style.font.name='Noto Sans CJK SC'; style._element.rPr.rFonts.set(qn('w:eastAsia'),'Noto Sans CJK SC'); style.font.size=Pt(9)
+    doc=Document(); style=doc.styles['Normal']; style.font.name='Times New Roman'; style._element.rPr.rFonts.set(qn('w:eastAsia'),'宋体'); style.font.size=Pt(9)
     doc.add_heading('能力验证计算书（原型）',0)
     doc.add_paragraph('仅供人工复核，不替代统计负责人和正式评价。方法：CNAS-GL003:2018 4.2、4.3、5.2、5.3；CNAS-GL002:2018 附录A.2。程序版本 0.0.1。')
     doc.add_heading('项目信息与配置',1)

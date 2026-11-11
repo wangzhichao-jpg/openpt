@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """固定模板及来源定位。"""
 from pathlib import Path
 from collections import defaultdict

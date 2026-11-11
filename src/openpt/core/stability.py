@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """GL003 5.2/5.3；重复值模型仅供复核。"""
 import math
 import numpy as np

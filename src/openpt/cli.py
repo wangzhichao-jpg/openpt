@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """命令行入口。"""
 import argparse
 import json
@@ -7,6 +8,7 @@ from .io.excel import template, read_workbook
 from .core.homogeneity import analyze as homogeneity
 from .core.stability import analyze as stability
 from .core.robust import algorithm_a
+from .core.zscore import zscore
 from .report.docx import make_report
 
 def calculate(data):
@@ -22,7 +24,10 @@ def calculate(data):
         if '稳定期' not in groups or (method=='two_sample' and '基线' not in groups): raise ValueError('稳定性须指定基线及稳定期组')
         raw=cfg.get('reference'); reference=float(raw) if raw not in (None,'') else None
         result['稳定性']=stability(groups.get('基线'),groups['稳定期'],sigma,alpha,method,reference)
-    if data['participants']: result['算法A']=algorithm_a([p['value'] for p in data['participants']])
+    if data['participants']:
+        result['算法A']=algorithm_a([p['value'] for p in data['participants']], tolerance=float(cfg.get('algorithm_a_tolerance') or 1e-10), max_iterations=int(cfg.get('algorithm_a_max_iterations') or 1000), simplified=bool(cfg.get('algorithm_a_simplified', False)))
+        if cfg.get('assigned') not in (None, '') and sigma is not None:
+            result['参加者z']={p['id']:zscore(p['value'],float(cfg['assigned']),sigma, float(cfg.get('z_satisfactory') or 2), float(cfg.get('z_unsatisfactory') or 3)) for p in data['participants']}
     if not result: raise ValueError('没有可计算的数据')
     return result
 
