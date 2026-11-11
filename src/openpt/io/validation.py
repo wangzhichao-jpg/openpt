@@ -3,6 +3,7 @@
 
 import csv
 import math
+import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -171,6 +172,72 @@ def _check_numeric_table(
     return issues
 
 
+def _check_numeric_config(
+    sheet: str, rows: list[list[Any]], mapping: dict[str, Any], formulas: set[str]
+) -> list[Issue]:
+    """检查方法及定值配置中明确要求为数值的字段。"""
+    if not rows:
+        return []
+    positions = _positions(rows[0], sheet, mapping)
+    known = {
+        "alpha",
+        "sigma",
+        "reference",
+        "assigned",
+        "sigma_pt",
+        "algorithm_a_tolerance",
+        "algorithm_a_max_iterations",
+        "display_z_decimals",
+        "display_sig_digits",
+        "display_mean_decimals",
+        "display_ss_decimals",
+        "z_satisfactory",
+        "z_unsatisfactory",
+        "en_limit",
+        "algorithm_s_tolerance",
+        "algorithm_s_max_iterations",
+        "mean1",
+        "mean2",
+        "s1",
+        "s2",
+        "n1",
+        "n2",
+        "sigma_composite",
+        "sigma_ss",
+        "sigma_composite_digits",
+        "reported_stability_sigma",
+        "value",
+        "uncertainty",
+        "sigma_temporary",
+        "sigma_final",
+        "u_hom",
+        "u_stab",
+        "U_assigned",
+        "k_assigned",
+    }
+    issues = []
+    for number, row in enumerate(rows[1:], 2):
+        key_col, value_col = positions["字段"], positions["值"]
+        key = row[key_col] if key_col < len(row) else None
+        value = row[value_col] if value_col < len(row) else None
+        match = re.search(r"（([a-zA-Z_][a-zA-Z_0-9]*)）$", str(key))
+        field = match.group(1) if match else str(key)
+        cell = f"{get_column_letter(value_col + 1)}{number}"
+        if field not in known or value in (None, "") or cell in formulas:
+            continue
+        try:
+            valid = (
+                not isinstance(value, bool)
+                and isinstance(value, (int, float))
+                and math.isfinite(value)
+            )
+        except OverflowError:
+            valid = False
+        if not valid:
+            issues.append(Issue("NON_NUMERIC", sheet, cell, value, "配置值必须为有限数"))
+    return issues
+
+
 def inspect_input(
     path: str | Path,
     mapping: dict[str, Any] | None = None,
@@ -236,13 +303,16 @@ def inspect_input(
                                 )
                             )
         for sheet in sorted(set(book.sheetnames) - set(MEASUREMENT_SHEETS) - {"填写说明"}):
-            if sheet in ("报告声称值", "算法S"):
+            if sheet in ("报告声称值", "算法S", "方法配置", "指定值与不确定度"):
                 cells = list(book[sheet].iter_rows())
                 rows = [[cell.value for cell in row] for row in cells]
                 formulas = {
                     cell.coordinate for row in cells for cell in row if cell.data_type == "f"
                 }
-                issues.extend(_check_numeric_table(sheet, rows, mapping, formulas))
+                if sheet in ("报告声称值", "算法S"):
+                    issues.extend(_check_numeric_table(sheet, rows, mapping, formulas))
+                else:
+                    issues.extend(_check_numeric_config(sheet, rows, mapping, formulas))
             for row in book[sheet].iter_rows():
                 for cell in row:
                     if cell.data_type != "f":

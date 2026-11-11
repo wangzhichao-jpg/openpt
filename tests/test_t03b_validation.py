@@ -82,6 +82,7 @@ def test_non_measurement_issues(tmp_path: Path) -> None:
     config = book.create_sheet("方法配置")
     config.append(["字段", "值"])
     config.append(["alpha", "=1/20"])
+    config.append(["sigma", "非数值"])
     book.save(path)
     issues = inspect_input(path)
     assert any(
@@ -90,6 +91,9 @@ def test_non_measurement_issues(tmp_path: Path) -> None:
     assert any(
         i.category == "FORMULA_NO_CACHE" and i.sheet == "方法配置" and i.original == "=1/20"
         for i in issues
+    )
+    assert any(
+        i.category == "NON_NUMERIC" and i.cell == "B3" and i.original == "非数值" for i in issues
     )
 
 
