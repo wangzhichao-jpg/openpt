@@ -379,7 +379,11 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "reproduce":
             from .runs import reproduce
 
-            audit_differences, warnings = reproduce(Path(args.directory))
+            try:
+                audit_differences, warnings = reproduce(Path(args.directory))
+            except (ValueError, TypeError, OSError, KeyError, OverflowError, BadZipFile):
+                print("不可重现：清单、配置或输入无法读取或无效")
+                return 1
             for item in warnings:
                 print(f"环境版本不同：{item}")
             print("不可重现" if audit_differences else "可重现")

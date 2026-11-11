@@ -26,19 +26,45 @@ def _safe_name(name: str) -> bool:
         and "\x00" not in name
         and not name.startswith("/")
         and all(part not in ("", ".", "..") for part in parts)
+        and all(not part.endswith((".", " ")) for part in parts)
+        and all(not any(ord(ch) < 32 or ch in '<>"|?*' for ch in part) for part in parts)
+        and all(
+            part.split(".", 1)[0].upper()
+            not in (
+                "CON",
+                "PRN",
+                "AUX",
+                "NUL",
+                *(f"COM{i}" for i in range(1, 10)),
+                *(f"LPT{i}" for i in range(1, 10)),
+            )
+            for part in parts
+        )
         and str(PurePosixPath(name)) == name
     )
+
+
+def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    """拒绝 JSON 对象重复键，避免不同解析器对清单解释不一致。"""
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise InputError("JSON 对象包含重复键")
+        result[key] = value
+    return result
 
 
 def _manifest(raw: bytes) -> dict[str, str]:
     """读取清单中的相对文件名和 SHA-256，不信任清单内容。"""
     try:
-        data: Any = json.loads(raw.decode("utf-8"))
+        data: Any = json.loads(raw.decode("utf-8"), object_pairs_hook=_unique_object)
     except (UnicodeDecodeError, ValueError) as exc:
         raise InputError("manifest.json 无法解析") from exc
     if not isinstance(data, dict) or not isinstance(data.get("files"), dict):
         raise InputError("manifest.json 缺少 files 对象")
     files = data["files"]
+    if len(files) != len({str(name).casefold() for name in files}):
+        raise InputError("manifest.json 含大小写冲突路径")
     for name, digest in files.items():
         if (
             not isinstance(name, str)
@@ -64,7 +90,7 @@ def verify_zip(path: str | Path) -> list[str]:
     with ZipFile(path, "r") as zipfile:
         entries = zipfile.infolist()
         names = [item.filename for item in entries]
-        if len(names) != len(set(names)):
+        if len(names) != len({name.casefold() for name in names}):
             raise InputError("审计包包含重复路径")
         total = 0
         for item in entries:
