@@ -43,7 +43,7 @@ def test_reference_convergence_at_small_scale() -> None:
     normal = algorithm_s(values, 1)
     small = algorithm_s([x * 1e-16 for x in values], 1)
     assert small.reference_converged and small.reference_iterations > 2
-    assert small.reference_w == pytest.approx(normal.reference_w * 1e-16, rel=1e-10)
+    assert small.reference_w == pytest.approx(normal.reference_w * 1e-16, rel=1e-10, abs=0.0)
     assert "STOP_RULE_SENSITIVITY" in small.warnings
 
 
