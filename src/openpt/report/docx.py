@@ -619,6 +619,31 @@ def _difference_table(doc: Any, differences: list[dict[str, Any]]) -> None:
     doc.add_paragraph(f"共 {matches} 项；完整逐项比较见差异清单。")
 
 
+def _unevaluated(result: Any, path: str = "结果") -> list[tuple[str, str, str]]:
+    """递归收集未评价或须设计审核的状态及已登记原因。"""
+    rows: list[tuple[str, str, str]] = []
+    if isinstance(result, dict):
+        for key, value in result.items():
+            current = f"{path}.{key}"
+            if (key == "status" or key.endswith("_status")) and value in (
+                "NOT_EVALUATED",
+                "DESIGN_REVIEW",
+                "UNASSESSED",
+            ):
+                reason = (
+                    result.get("reason") or result.get("design_warnings") or result.get("warnings")
+                )
+                if isinstance(reason, list):
+                    reason = "；".join(map(str, reason))
+                rows.append((current, str(value), str(reason or "结果未记录具体原因，需人工核查")))
+            elif isinstance(value, (dict, list)):
+                rows.extend(_unevaluated(value, current))
+    elif isinstance(result, list):
+        for index, value in enumerate(result):
+            rows.extend(_unevaluated(value, f"{path}[{index}]"))
+    return rows
+
+
 def make_report(
     path: str | Path,
     data: dict[str, Any],
@@ -663,7 +688,14 @@ def make_report(
     _other_results(doc, data, result, sig, mean_places, z_places)
     if differences is not None:
         _difference_table(doc, differences)
+    doc.add_heading("未评价事项", 1)
+    unevaluated = _unevaluated(result)
+    if unevaluated:
+        _table(doc, ["条目", "状态", "原因"], [list(row) for row in unevaluated])
+    else:
+        doc.add_paragraph("结果中未发现上述未评价状态；未输入或未计算的事项仍需人工检查。")
     doc.add_heading("人工复核", 1)
+    doc.add_paragraph("待人工复核；软件不自动放行。")
     doc.add_paragraph("计算人：________________    日期：____________")
     doc.add_paragraph("复核人：________________    日期：____________")
     doc.add_page_break()
