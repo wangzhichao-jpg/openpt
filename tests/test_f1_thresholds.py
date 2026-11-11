@@ -34,7 +34,7 @@ def test_en_and_composite_score_decimal_grid() -> None:
     count = 0
     for tenth in range(1, 200):
         reference = Decimal(tenth) / 10
-        for scale in map(Decimal, ("0.01", "0.02", "0.1")):
+        for scale in map(Decimal, ("0.01", "0.02", "0.04", "0.1")):
             a, b, denominator = 3 * scale, 4 * scale, 5 * scale
             for sign in (-1, 1):
                 for swap in (False, True):
@@ -66,7 +66,18 @@ def test_en_and_composite_score_decimal_grid() -> None:
                         )
                         assert zp.classification == expected and ze.classification == expected
                     count += 1
-    assert count == 2388
+    assert count == 3184
+    r = performance_score(
+        "En",
+        0.8,
+        0.6,
+        U_participant=0.16,
+        U_assigned=0.12,
+        k_participant=2,
+        k_assigned=2,
+        independent=True,
+    )
+    assert r.classification == "满意" and r.value == pytest.approx(1)
 
 
 def test_one_display_unit_around_boundaries() -> None:
