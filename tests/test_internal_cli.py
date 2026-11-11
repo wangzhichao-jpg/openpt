@@ -118,6 +118,8 @@ def test_u12_participant_review(tmp_path: Path) -> None:
         r["统计量"] == "z:03"
         and "VALUE_MISMATCH" in r["差异类型"]
         and r["状态"] == "DIFFERENCE"
+        and r["按报告显示值"] == "0.8"
+        and "报告为 0.7" in r["说明"]
         and "待底稿确认" in r["说明"]
         for r in rows
     )

@@ -103,22 +103,22 @@ def _row(
     try:
         if not 0 <= digits <= 12:
             raise ValueError("显示位数超出范围")
-        match = (
-            display(model_value, digits) == display(claim, digits)
-            if model_value is not None
-            else None
-        )
-        recommended_match = (
-            display(recommended, digits) == display(claim, digits)
-            if recommended is not None
-            else None
-        )
+        shown_claim = display(claim, digits)
+        shown_model = display(model_value, digits)
+        shown_recommended = display(recommended, digits)
+        match = shown_model == shown_claim if model_value is not None else None
+        recommended_match = shown_recommended == shown_claim if recommended is not None else None
     except (ValueError, TypeError, InvalidOperation):
         raise ValueError("报告数值或显示小数位无效") from None
     # 对只有一个可计算模型的量，显示不一致才构成数值差异；多模型量在调用处判定。
     if match is False and name not in ("t", "x*", "s*"):
         categories.append("VALUE_MISMATCH")
-        note = (note + "；原因待底稿确认").lstrip("；")
+        if name.startswith("z:"):
+            note = (
+                note + f"；按显示位数重算为 {shown_model}，报告为 {shown_claim}；原因待底稿确认"
+            ).lstrip("；")
+        else:
+            note = (note + "；原因待底稿确认").lstrip("；")
     if match is None:
         note = (note + "；未评价：缺少输入或所选模型无法计算").lstrip("；")
     status = (
@@ -137,6 +137,8 @@ def _row(
         "显示小数位": digits,
         "按报告模型复现值": float(model_value) if isinstance(model_value, Decimal) else model_value,
         "按推荐模型重算值": float(recommended) if isinstance(recommended, Decimal) else recommended,
+        "按报告显示值": str(shown_model) if shown_model is not None else None,
+        "按推荐显示值": str(shown_recommended) if shown_recommended is not None else None,
         "显示一致": match,
         "推荐一致": recommended_match,
         "状态": status,
@@ -390,6 +392,8 @@ def write_csv(path: str | Path, rows: list[dict[str, Any]]) -> None:
         "显示小数位",
         "按报告模型复现值",
         "按推荐模型重算值",
+        "按报告显示值",
+        "按推荐显示值",
         "显示一致",
         "推荐一致",
         "状态",
