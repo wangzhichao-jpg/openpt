@@ -189,6 +189,18 @@ def create_run(args: Any, root: Path) -> tuple[Path, Any, Any, Any, str]:
             "display_mean_decimals": None,
             "display_ss_decimals": 3,
             "display_z_decimals": 2,
+            "assigned": None,
+            "sigma_pt": None,
+            "mean1": None,
+            "mean2": None,
+            "s1": None,
+            "s2": None,
+            "n1": None,
+            "n2": None,
+            "sigma_composite": None,
+            "sigma_ss": None,
+            "sigma_composite_digits": 1,
+            "reported_stability_sigma": None,
             **{k: v for k, v in data["config"].items() if v not in (None, "")},
         }
         assigned_defaults = {
@@ -207,6 +219,11 @@ def create_run(args: Any, root: Path) -> tuple[Path, Any, Any, Any, str]:
             "stab_mapping": "none",
             "hom_in_base": False,
             "stab_in_base": False,
+            "known_components": None,
+            "expert_values": None,
+            "U_assigned": None,
+            "k_assigned": None,
+            "independent": None,
         }
         config = {
             "command": args.command,

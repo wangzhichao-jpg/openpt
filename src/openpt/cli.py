@@ -89,7 +89,7 @@ def _assigned_results(data: dict[str, Any]) -> dict[str, Any]:
     )
     options = {key: a[key] for key in keys if key in a}
     for key in ("known_components", "expert_values"):
-        if key in a:
+        if a.get(key) not in (None, ""):
             if not isinstance(a[key], str):
                 raise InputError(f"{key} 须为逗号分隔的数值列表")
             try:

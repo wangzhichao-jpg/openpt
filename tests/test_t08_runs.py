@@ -30,6 +30,11 @@ def test_run_pack_restore_and_tamper(tmp_path: Path) -> None:
     assert source.read_bytes() == before
     assert (run / "input" / "source.xlsx").read_bytes() == before
     assert (run / "input" / "sample.json").read_bytes() == sample_record.read_bytes()
+    saved_config = json.loads((run / "config.json").read_text(encoding="utf-8"))
+    assert saved_config["expanded_config"]["sigma_pt"] is None
+    assert saved_config["expanded_config"]["alpha"] == 0.05
+    assert saved_config["expanded_assigned_config"]["hom_mapping"] == "none"
+    assert "known_components" in saved_config["expanded_assigned_config"]
     assert verify_directory(run) == []
     assert reproduce(run)[0] == []
     archive = tmp_path / "package.zip"
