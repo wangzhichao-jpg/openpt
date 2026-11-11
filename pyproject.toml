@@ -30,5 +30,9 @@ openpt = ["config/*.json"]
 testpaths = ["tests"]
 markers = ["internal: 需要仓库外内部材料"]
 
+[tool.ruff]
+line-length = 100
 [tool.ruff.lint]
-select = ["E9", "F63", "F7", "F82"]
+# 中文标点及乘号用于自然语言说明，不是 ASCII 运算符。
+allowed-confusables = ["：", "，", "；", "（", "）", "×", "σ"]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
