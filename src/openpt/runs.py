@@ -113,7 +113,7 @@ def _calculate_snapshot(root: Path, config: dict[str, Any]) -> tuple[Any, Any, A
         unit=config["unit"],
         project=config["project"],
     )
-    data["config"] = config["original_config"]
+    data["config"] = config["expanded_config"]
     result = calculate(data, review_mode=config["command"] == "review")
     mapping_path = root / "input" / "mapping.json"
     mapping = _mapping(mapping_path) if mapping_path.exists() else None
