@@ -1,6 +1,7 @@
 {
   "均匀性": {
     "status": "OK",
+    "design_status": "OK",
     "design_warnings": [],
     "warnings": [],
     "g": 10,
@@ -58,8 +59,9 @@
     "threshold": 1.5,
     "mean_difference_pass": true,
     "mean_difference_status": "OK",
+    "design_status": "DESIGN_WARNING",
     "design_warnings": [
-      "GL003 5.2 建议每组不少于6个观测单元"
+      "GL003 5.2.2 注：n1、n2 均≥6；当前基线 10 个、稳定期 3 个包装单元"
     ]
   },
   "其他稳定性": {
@@ -84,8 +86,9 @@
       "threshold": 1.5,
       "mean_difference_pass": true,
       "mean_difference_status": "OK",
+      "design_status": "DESIGN_WARNING",
       "design_warnings": [
-        "GL003 5.2 建议每组不少于6个观测单元"
+        "GL003 5.2.2 注：n1、n2 均≥6；当前基线 10 个、稳定期 3 个包装单元"
       ]
     }
   },
@@ -101,6 +104,31 @@
     "simplified": false,
     "rule": "gl002",
     "tolerance": 1e-10,
+    "history": [
+      {
+        "iteration": 1,
+        "x": 105.5,
+        "s": 0.8018590898655449
+      },
+      {
+        "iteration": 2,
+        "x": 105.5,
+        "s": 0.8018590898655449
+      }
+    ]
+  },
+  "算法A_收敛对照": {
+    "x": 105.5,
+    "s": 0.8018590898655449,
+    "u_x": 0.7087499999999999,
+    "n": 2,
+    "iterations": 2,
+    "converged": true,
+    "status": "OK",
+    "warning": null,
+    "simplified": false,
+    "rule": "absolute",
+    "tolerance": 1e-12,
     "history": [
       {
         "iteration": 1,

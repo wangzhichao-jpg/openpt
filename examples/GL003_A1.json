@@ -1,6 +1,7 @@
 {
   "均匀性": {
     "status": "OK",
+    "design_status": "OK",
     "design_warnings": [],
     "warnings": [],
     "g": 10,
