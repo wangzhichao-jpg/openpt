@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""阶段性 R ANOVA 对照；本脚本尚未覆盖施工单要求的完整范围。"""
+"""汇总 R 独立对照；对差异和无法直接比较的边界如实报告。"""
 
 import csv
 import json
@@ -24,7 +24,7 @@ HERE = Path(__file__).resolve().parent
 
 
 def main() -> int:
-    """输出已有 ANOVA 对照，不将未覆盖部分视为通过。"""
+    """汇总数值对照，不将未覆盖部分或理论零值差异视为通过。"""
     rscript = shutil.which("Rscript")
     if not rscript:
         raise SystemExit("找不到 Rscript；没有执行对照")
@@ -100,7 +100,7 @@ def main() -> int:
     (HERE / "crosscheck_report.json").write_text(
         json.dumps(
             {
-                "scope": "阶段性 R 对照；未完成施工单",
+                "scope": "R 独立对照；理论零值差异及未覆盖接口保留",
                 "rows": rows,
                 "statistics": statistics_rows,
                 "b1_and_examples": b1_rows,
@@ -117,9 +117,9 @@ def main() -> int:
         encoding="utf-8",
     )
     lines = [
-        "# R 独立对照（阶段性，未完成）",
+        "# R 独立对照报告",
         "",
-        "ANOVA 仅包含 GL003 A.1/A.2、负方差和不平衡合成例；其他统计量见下节。",
+        "固定 ANOVA 含 GL003 A.1/A.2、负方差和不平衡合成例；其他公开、随机与退化输入见下节。",
         "",
         "负方差例组间均方理论上为零；R 线性模型运算产生约 1e-31 的舍入残差，"
         "严格相对误差因与零比较为 1，按施工单如实记为差异，不采用绝对容差掩盖。",
