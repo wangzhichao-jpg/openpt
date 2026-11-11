@@ -13,6 +13,7 @@ from pathlib import Path
 
 import run_metr_crosscheck
 import run_r_b1
+import run_r_degenerate
 import run_r_examples
 import run_r_random_stats
 import run_r_statistics
@@ -66,6 +67,7 @@ def main() -> int:
     statistics_status = run_r_statistics.main()
     b1_status = run_r_b1.main()
     examples_status = run_r_examples.main()
+    degenerate_status = run_r_degenerate.main()
     random_run = subprocess.run(
         [sys.executable, str(HERE / "run_r_random.py")],
         capture_output=True,
@@ -90,6 +92,7 @@ def main() -> int:
     statistics_rows = json.loads((HERE / "statistics_report.json").read_text(encoding="utf-8"))
     b1_rows = json.loads((HERE / "b1_report.json").read_text(encoding="utf-8"))
     examples_rows = json.loads((HERE / "examples_report.json").read_text(encoding="utf-8"))
+    degenerate = json.loads((HERE / "degenerate_report.json").read_text(encoding="utf-8"))
     random_stats_rows = json.loads(
         (HERE / "random_statistics_report.json").read_text(encoding="utf-8")
     )
@@ -102,6 +105,7 @@ def main() -> int:
                 "statistics": statistics_rows,
                 "b1_and_examples": b1_rows,
                 "examples": examples_rows,
+                "degenerate": degenerate,
                 "random_anova": random_report,
                 "random_statistics": random_stats_rows,
                 "metRology": metrology,
@@ -131,6 +135,7 @@ def main() -> int:
     statistics_report = (HERE / "statistics_report.md").read_text(encoding="utf-8")
     b1_text = (HERE / "b1_report.md").read_text(encoding="utf-8")
     examples_text = (HERE / "examples_report.md").read_text(encoding="utf-8")
+    degenerate_text = (HERE / "degenerate_report.md").read_text(encoding="utf-8")
     random_text = (HERE / "random_anova_report.md").read_text(encoding="utf-8")
     random_stats_text = (HERE / "random_statistics_report.md").read_text(encoding="utf-8")
     (HERE / "crosscheck_report.md").write_text(
@@ -141,6 +146,8 @@ def main() -> int:
         + b1_text
         + "\n"
         + examples_text
+        + "\n"
+        + degenerate_text
         + "\n"
         + random_text
         + "\n"
@@ -155,6 +162,7 @@ def main() -> int:
         and statistics_status
         == b1_status
         == examples_status
+        == degenerate_status
         == random_status
         == random_stats_status
         == 0

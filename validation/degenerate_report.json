@@ -1,0 +1,16 @@
+{
+  "case": "全部相同",
+  "openpt_status": "INDETERMINATE",
+  "openpt_F": null,
+  "openpt_p": null,
+  "r_values": {
+    "MS_between": 8.70649861526057e-30,
+    "MS_within": 8.70649861526058e-30,
+    "F": 1.0,
+    "p": 0.495390219907834,
+    "n0": 2.0,
+    "Ss": 0.0
+  },
+  "r_warning": "Warning message:\nIn anova.lm(aov(value ~ group, data = d)) :\n  ANOVA F-tests on an essentially perfect fit are unreliable",
+  "status": "差异：R 近零舍入残差产生 F，openpt 标记不可判定"
+}

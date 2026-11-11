@@ -218,6 +218,16 @@ B1 的 S、D 由 A/B 原值生成。算法 A 使用相同 GL002 停止规则并�
 | trace_run/input/source.xlsx | P1 | z | 0.19607843137254904 | 0.19607843137254899 | 2.83e-16 | 通过 |
 | trace_run/input/source.xlsx | P2 | z | 0 | 0 | 0 | 通过 |
 
+# 全部相同数据的退化 ANOVA
+
+10 个样品每个两次均为 10。理论组间及组内均方均为零，F 为 0/0；openpt 将其标记不可判定。R `aov` 线性模型可能因舍入给出非零极小均方和有限 F，其自身同时警告近乎完美拟合时 F 检验不可靠。该差异须保留，不能用 R 的数值当作可判定结果。
+
+- openpt：状态 `INDETERMINATE`，F=None，p=None。
+- R：MS_between=8.7064986152605705e-30，MS_within=8.7064986152605803e-30，F=1，p=0.495390219907834。
+- R 原始警告：`Warning message:
+In anova.lm(aov(value ~ group, data = d)) :
+  ANOVA F-tests on an essentially perfect fit are unreliable`。
+
 # 固定种子随机 ANOVA 对照
 
 Hypothesis 6.170.15，种子 20261112，PYTHONHASHSEED=0；200 组，输入见 random_anova_input.csv。仅测试 ANOVA，不代表其他统计量或真实试验设计已验证。
