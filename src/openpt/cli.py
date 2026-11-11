@@ -128,8 +128,25 @@ def _validate_output_paths(args: argparse.Namespace) -> None:
         raise ValueError("输出路径不得覆盖输入文件、映射文件或其他输出文件")
 
 
+def _configure_console() -> None:
+    """控制台不支持中文时替换字符，重定向输出采用 UTF-8。"""
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            if stream.isatty():
+                reconfigure(errors="replace")
+            else:
+                reconfigure(encoding="utf-8", errors="replace")
+        except (OSError, ValueError):
+            # 嵌入式或测试捕获流可能不支持重新配置。
+            continue
+
+
 def main(argv: list[str] | None = None) -> int:
     """执行模板、计算或复核命令，返回进程退出码。"""
+    _configure_console()
     args = _parser().parse_args(argv)
     try:
         if args.command == "template":

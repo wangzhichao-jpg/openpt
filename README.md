@@ -10,6 +10,10 @@ Windows（Python 3.10～3.13）：
 py -m pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -e ".[test]"
 ```
 
+若 Python 的 `Scripts` 目录不在 PATH，使用 `py -m openpt demo 演示目录`、
+`py -m openpt run input.xlsx` 等命令。可选 Wine 测试及其局限见
+[Windows 兼容性测试](docs/Windows兼容性测试.md)。
+
 Linux/macOS：
 
 ```sh

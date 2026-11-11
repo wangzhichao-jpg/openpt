@@ -14,7 +14,7 @@ from openpt.core.zscore import zscore
 from openpt.io.excel import read_workbook, template
 
 ROOT = Path(__file__).resolve().parents[1]
-PUBLIC = json.loads((ROOT / "tests/fixtures_public/gl003_cases.json").read_text())
+PUBLIC = json.loads((ROOT / "tests/fixtures_public/gl003_cases.json").read_text(encoding="utf-8"))
 
 
 def test_u1_u2():
@@ -94,7 +94,10 @@ def test_u13_and_u4_docx(tmp_path):
         )
         == 0
     )
-    assert round(json.loads((tmp_path / "r.json").read_text())["均匀性"]["F"], 2) == 1.17
+    assert (
+        round(json.loads((tmp_path / "r.json").read_text(encoding="utf-8"))["均匀性"]["F"], 2)
+        == 1.17
+    )
     fill(x, [[10, 10]] * 10)
     assert (
         main(
@@ -109,7 +112,7 @@ def test_u13_and_u4_docx(tmp_path):
         )
         == 0
     )
-    assert json.loads((tmp_path / "zero.json").read_text())["均匀性"]["F"] is None
+    assert json.loads((tmp_path / "zero.json").read_text(encoding="utf-8"))["均匀性"]["F"] is None
 
 
 def test_input_validation(tmp_path):
