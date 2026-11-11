@@ -8,7 +8,7 @@ from typing import Any
 import numpy as np
 
 from ..errors import InputError
-from .models import AlgorithmAResult, MedianIqrResult
+from .models import AlgorithmAResult, AlgorithmSResult, MedianIqrResult
 
 # CNAS-GL002:2018 附录 A.2，式 A.2、A.3、A.6。
 MAD_FACTOR = 1.483
@@ -18,6 +18,19 @@ ALG_A_SD_FACTOR = 1.134
 UNCERTAINTY_FACTOR = 1.25
 # CNAS-GL002:2018 附录 A.4，式 A.13。
 NIQR_FACTOR = 0.7413
+# GL002 附录 A.3 表 A.1，依次为自由度 1 至 10 的 (η, ξ)。
+ALGORITHM_S_FACTORS = (
+    (1.645, 1.097),
+    (1.517, 1.054),
+    (1.444, 1.039),
+    (1.395, 1.032),
+    (1.359, 1.027),
+    (1.332, 1.024),
+    (1.310, 1.021),
+    (1.292, 1.019),
+    (1.277, 1.018),
+    (1.264, 1.017),
+)
 
 
 def _gl002_stable(x: float, s: float, next_x: float, next_s: float) -> bool:
@@ -105,6 +118,55 @@ def algorithm_a(
         "history": history,
     }
     return AlgorithmAResult(**result)
+
+
+def algorithm_s(values: Any, df: int, max_iterations: int = 1000) -> AlgorithmSResult:
+    """GL002 附录 A.3 式 A.7—A.10：截尾后均方根乘 ξ，第三有效位收敛。"""
+    try:
+        data = np.asarray(values, dtype=float)
+    except (ValueError, TypeError):
+        raise InputError("算法 S 数据必须为有限数") from None
+    if data.ndim != 1 or len(data) < 2 or not np.isfinite(data).all() or (data < 0).any():
+        raise InputError("算法 S 需要至少两个非负有限标准差或极差")
+    if isinstance(df, bool) or not isinstance(df, int) or not 1 <= df <= 10:
+        raise InputError("算法 S 自由度必须为 1 至 10")
+    if (
+        isinstance(max_iterations, bool)
+        or not isinstance(max_iterations, int)
+        or max_iterations < 1
+    ):
+        raise InputError("算法 S 最大迭代次数无效")
+    eta, xi = ALGORITHM_S_FACTORS[df - 1]
+    with np.errstate(over="ignore", invalid="ignore"):
+        w = float(np.median(data))
+    if not math.isfinite(w):
+        raise InputError("算法 S 初始值溢出")
+    history: list[dict[str, Any]] = []
+    converged = False
+    for i in range(max_iterations):
+        limit = eta * w
+        if not math.isfinite(limit):
+            raise InputError("算法 S 截断值溢出")
+        clipped = np.minimum(data, limit)
+        new_w = xi * (math.hypot(*clipped) / math.sqrt(len(data)))
+        if not math.isfinite(new_w):
+            raise InputError("算法 S 结果溢出")
+        history.append({"iteration": i + 1, "w": new_w, "limit": limit})
+        stable = _gl002_stable(0, w, 0, new_w)
+        w = new_w
+        if stable and i > 0:
+            converged = True
+            break
+    return AlgorithmSResult(
+        w,
+        df,
+        eta,
+        xi,
+        len(history),
+        converged,
+        "NOT_CONVERGED" if not converged else "INDETERMINATE" if w == 0 else "OK",
+        history,
+    )
 
 
 def median_niqr(values: Any) -> MedianIqrResult:

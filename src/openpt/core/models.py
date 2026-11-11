@@ -79,6 +79,20 @@ class AlgorithmAResult(ResultMapping):
 
 
 @dataclass
+class AlgorithmSResult(ResultMapping):
+    """GL002 附录 A.3 稳健联合标准差或极差。"""
+
+    w: float
+    df: int
+    eta: float
+    xi: float
+    iterations: int
+    converged: bool
+    status: str
+    history: list[dict[str, Any]]
+
+
+@dataclass
 class MedianIqrResult(ResultMapping):
     """GL002 附录 A.4 的中位数及标准化四分位距。"""
 
