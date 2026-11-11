@@ -40,7 +40,7 @@ def test_batch_cli(tmp_path: Path) -> None:
     assert ws.auto_filter.ref and ws.max_row > 2
     states = [row[0].value for row in list(ws.rows)[1:]]
     assert states == sorted(states, key={"DIFFERENCE": 0, "NOTE": 1, "MATCH": 2}.get)
-    assert {row[2].value for row in list(ws.rows)[1:]} == {str(first), str(second)}
+    assert {row[2].value for row in list(ws.rows)[1:]} == {first.name, second.name}
 
 
 def test_xlsx_text_formula_is_not_executed(tmp_path: Path) -> None:

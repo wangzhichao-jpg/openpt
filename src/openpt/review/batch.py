@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """多工作簿复核及可筛选差异总表。"""
 
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -11,17 +12,39 @@ from ..io.excel import read_workbook
 from .compare import review
 
 
+def _file_labels(paths: list[str | Path]) -> list[str]:
+    """仅保留文件名；同名输入按顺序编号，并避开已有文件名。"""
+    names = [Path(path).name for path in paths]
+    counts = Counter(name.casefold() for name in names)
+    reserved = set(counts)
+    used: set[str] = set()
+    labels = []
+    for name in names:
+        if counts[name.casefold()] == 1:
+            label = name
+        else:
+            stem, suffix = Path(name).stem, Path(name).suffix
+            number = 1
+            label = f"{stem} ({number}){suffix}"
+            while label.casefold() in reserved or label.casefold() in used:
+                number += 1
+                label = f"{stem} ({number}){suffix}"
+        used.add(label.casefold())
+        labels.append(label)
+    return labels
+
+
 def batch_review(
     paths: list[str | Path], mapping: dict[str, Any] | None = None
 ) -> list[dict[str, Any]]:
-    """逐个输入重算、复核，按差异等级分组且保留项目和文件来源。"""
+    """逐个输入重算、复核；仅记录文件名，不暴露输入目录。"""
     if not paths:
         raise ValueError("至少提供一个输入工作簿")
     rows = []
-    for path in paths:
+    for path, label in zip(paths, _file_labels(paths), strict=True):
         data = read_workbook(path)
         for row in review(data, calculate(data, review_mode=True), mapping):
-            rows.append({"项目": data["info"]["项目名称"], "输入文件": str(path), **row})
+            rows.append({"项目": data["info"]["项目名称"], "输入文件": label, **row})
     priority = {"DIFFERENCE": 0, "NOTE": 1, "MATCH": 2}
     return sorted(rows, key=lambda row: priority[row["状态"]])
 
