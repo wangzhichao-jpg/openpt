@@ -1,0 +1,572 @@
+[
+  {
+    "case": "A1",
+    "statistic": "F",
+    "openpt": 1.167718536979458,
+    "pt13528": 1.1677185369794583,
+    "r": 1.16771853697946,
+    "relative_pt": 1.9015250498582894e-16,
+    "relative_r": 1.7113725448724577e-15,
+    "pass": true
+  },
+  {
+    "case": "A1",
+    "statistic": "Ss",
+    "openpt": 1.8616599522409474,
+    "pt13528": 1.8616599522409485,
+    "r": 1.86165995224094,
+    "relative_pt": 5.963618776290162e-16,
+    "relative_r": 3.935988392351509e-15,
+    "pass": true
+  },
+  {
+    "case": "A1",
+    "statistic": "t_pooled",
+    "openpt": 2.775324351032245,
+    "pt13528": 2.775324351032245,
+    "r": 2.77532435103224,
+    "relative_pt": 0.0,
+    "relative_r": 1.7601478928161261e-15,
+    "pass": true
+  },
+  {
+    "case": "A1",
+    "statistic": "df_pooled",
+    "openpt": 2,
+    "pt13528": 2.0,
+    "r": 2.0,
+    "relative_pt": 0.0,
+    "relative_r": 0.0,
+    "pass": true
+  },
+  {
+    "case": "A1",
+    "statistic": "p_pooled",
+    "openpt": 0.10900843332700522,
+    "pt13528": 0.10900843332700522,
+    "r": 0.109008433327005,
+    "relative_pt": 0.0,
+    "relative_r": 2.03694886852413e-15,
+    "pass": true
+  },
+  {
+    "case": "A1",
+    "statistic": "t_welch",
+    "openpt": 2.775324351032245,
+    "pt13528": 2.775324351032245,
+    "r": 2.77532435103224,
+    "relative_pt": 0.0,
+    "relative_r": 1.7601478928161261e-15,
+    "pass": true
+  },
+  {
+    "case": "A1",
+    "statistic": "df_welch",
+    "openpt": 1.0126544520314555,
+    "pt13528": 1.0126544520314555,
+    "r": 1.01265445203146,
+    "relative_pt": 0.0,
+    "relative_r": 4.3853972987447664e-15,
+    "pass": true
+  },
+  {
+    "case": "A1",
+    "statistic": "p_welch",
+    "openpt": 0.21764451384628816,
+    "pt13528": 0.21764451384628816,
+    "r": 0.217644513846288,
+    "relative_pt": 0.0,
+    "relative_r": 7.651626533135957e-16,
+    "pass": true
+  },
+  {
+    "case": "A1",
+    "statistic": "A_x",
+    "openpt": 250.7822549775968,
+    "pt13528": 250.78225497759684,
+    "r": 250.782254977597,
+    "relative_pt": 1.1333221895202676e-16,
+    "relative_r": 7.933255326641867e-16,
+    "pass": true
+  },
+  {
+    "case": "A1",
+    "statistic": "A_s",
+    "openpt": 5.672725173190743,
+    "pt13528": 5.672725173190742,
+    "r": 5.67272517319074,
+    "relative_pt": 1.5656997167739587e-16,
+    "relative_r": 6.262798867095835e-16,
+    "pass": true
+  },
+  {
+    "case": "A1",
+    "statistic": "A_iterations",
+    "openpt": 9,
+    "pt13528": 9,
+    "r": 9.0,
+    "relative_pt": 0.0,
+    "relative_r": 0.0,
+    "pass": true
+  },
+  {
+    "case": "A1",
+    "statistic": "S_w",
+    "openpt": 6.69602635914328,
+    "pt13528": 6.696026359143281,
+    "r": 6.69602635914328,
+    "relative_pt": 1.326426110147157e-16,
+    "relative_r": 0.0,
+    "pass": true
+  },
+  {
+    "case": "A1",
+    "statistic": "S_iterations",
+    "openpt": 8,
+    "pt13528": 8,
+    "r": 8.0,
+    "relative_pt": 0.0,
+    "relative_r": 0.0,
+    "pass": true
+  },
+  {
+    "case": "A1",
+    "statistic": "median",
+    "openpt": 251.75,
+    "pt13528": 251.75,
+    "r": 251.75,
+    "relative_pt": 0.0,
+    "relative_r": 0.0,
+    "pass": true
+  },
+  {
+    "case": "A1",
+    "statistic": "niqr",
+    "openpt": 4.596059999999992,
+    "pt13528": 4.596059999999992,
+    "r": 4.59605999999999,
+    "relative_pt": 0.0,
+    "relative_r": 3.8649557216403916e-16,
+    "pass": true
+  },
+  {
+    "case": "A1",
+    "statistic": "z",
+    "openpt": 10.208333333333334,
+    "pt13528": 10.208333333333334,
+    "r": 10.2083333333333,
+    "relative_pt": 0.0,
+    "relative_r": 3.306198852108221e-15,
+    "pass": true
+  },
+  {
+    "case": "A1",
+    "statistic": "zprime",
+    "openpt": 10.069437972453136,
+    "pt13528": 10.069437972453136,
+    "r": 10.0694379724531,
+    "relative_pt": 0.0,
+    "relative_r": 3.52821447286296e-15,
+    "pass": true
+  },
+  {
+    "case": "A1",
+    "statistic": "zeta",
+    "openpt": 27.39183272437242,
+    "pt13528": 27.39183272437242,
+    "r": 27.3918327243724,
+    "relative_pt": 0.0,
+    "relative_r": 7.781984610995535e-16,
+    "pass": true
+  },
+  {
+    "case": "A1",
+    "statistic": "En",
+    "openpt": 13.69591636218621,
+    "pt13528": 13.69591636218621,
+    "r": 13.6959163621862,
+    "relative_pt": 0.0,
+    "relative_r": 7.781984610995535e-16,
+    "pass": true
+  },
+  {
+    "case": "A2",
+    "statistic": "F",
+    "openpt": 3.7767470624613484,
+    "pt13528": 3.7767470624613484,
+    "r": 3.77674706246136,
+    "relative_pt": 0.0,
+    "relative_r": 3.0572127985125717e-15,
+    "pass": true
+  },
+  {
+    "case": "A2",
+    "statistic": "Ss",
+    "openpt": 0.2916125490919051,
+    "pt13528": 0.2916125490919051,
+    "r": 0.291612549091906,
+    "relative_pt": 0.0,
+    "relative_r": 3.0457482795783343e-15,
+    "pass": true
+  },
+  {
+    "case": "A2",
+    "statistic": "t_pooled",
+    "openpt": 12.72792206135788,
+    "pt13528": 12.72792206135788,
+    "r": 12.7279220613579,
+    "relative_pt": 0.0,
+    "relative_r": 1.5352015151574636e-15,
+    "pass": true
+  },
+  {
+    "case": "A2",
+    "statistic": "df_pooled",
+    "openpt": 2,
+    "pt13528": 2.0,
+    "r": 2.0,
+    "relative_pt": 0.0,
+    "relative_r": 0.0,
+    "pass": true
+  },
+  {
+    "case": "A2",
+    "statistic": "p_pooled",
+    "openpt": 0.0061162653263810785,
+    "pt13528": 0.0061162653263810785,
+    "r": 0.00611626532638108,
+    "relative_pt": 0.0,
+    "relative_r": 2.836246276783453e-16,
+    "pass": true
+  },
+  {
+    "case": "A2",
+    "statistic": "t_welch",
+    "openpt": 12.72792206135788,
+    "pt13528": 12.72792206135788,
+    "r": 12.7279220613579,
+    "relative_pt": 0.0,
+    "relative_r": 1.5352015151574636e-15,
+    "pass": true
+  },
+  {
+    "case": "A2",
+    "statistic": "df_welch",
+    "openpt": 2.0,
+    "pt13528": 2.0,
+    "r": 2.0,
+    "relative_pt": 0.0,
+    "relative_r": 0.0,
+    "pass": true
+  },
+  {
+    "case": "A2",
+    "statistic": "p_welch",
+    "openpt": 0.0061162653263810785,
+    "pt13528": 0.0061162653263810785,
+    "r": 0.00611626532638108,
+    "relative_pt": 0.0,
+    "relative_r": 2.836246276783453e-16,
+    "pass": true
+  },
+  {
+    "case": "A2",
+    "statistic": "A_x",
+    "openpt": 10.009413767018396,
+    "pt13528": 10.009413767018396,
+    "r": 10.0094137670184,
+    "relative_pt": 0.0,
+    "relative_r": 3.549372382333618e-16,
+    "pass": true
+  },
+  {
+    "case": "A2",
+    "statistic": "A_s",
+    "openpt": 0.40331587594280227,
+    "pt13528": 0.4033158759428021,
+    "r": 0.403315875942802,
+    "relative_pt": 4.1291073232483176e-16,
+    "relative_r": 6.881845538747196e-16,
+    "pass": true
+  },
+  {
+    "case": "A2",
+    "statistic": "A_iterations",
+    "openpt": 4,
+    "pt13528": 4,
+    "r": 4.0,
+    "relative_pt": 0.0,
+    "relative_r": 0.0,
+    "pass": true
+  },
+  {
+    "case": "A2",
+    "statistic": "S_w",
+    "openpt": 0.2714936486365749,
+    "pt13528": 0.2714936486365748,
+    "r": 0.271493648636575,
+    "relative_pt": 2.0446574536837807e-16,
+    "relative_r": 4.08931490736756e-16,
+    "pass": true
+  },
+  {
+    "case": "A2",
+    "statistic": "S_iterations",
+    "openpt": 3,
+    "pt13528": 3,
+    "r": 3.0,
+    "relative_pt": 0.0,
+    "relative_r": 0.0,
+    "pass": true
+  },
+  {
+    "case": "A2",
+    "statistic": "median",
+    "openpt": 10.0,
+    "pt13528": 10.0,
+    "r": 10.0,
+    "relative_pt": 0.0,
+    "relative_r": 0.0,
+    "pass": true
+  },
+  {
+    "case": "A2",
+    "statistic": "niqr",
+    "openpt": 0.3521174999999997,
+    "pt13528": 0.3521174999999997,
+    "r": 0.3521175,
+    "relative_pt": 0.0,
+    "relative_r": 9.45897058190936e-16,
+    "pass": true
+  },
+  {
+    "case": "A2",
+    "statistic": "z",
+    "openpt": 0.7499999999999989,
+    "pt13528": 0.7499999999999989,
+    "r": 0.749999999999999,
+    "relative_pt": 0.0,
+    "relative_r": 1.4802973661668773e-16,
+    "pass": true
+  },
+  {
+    "case": "A2",
+    "statistic": "zprime",
+    "openpt": 0.7397954428741067,
+    "pt13528": 0.7397954428741067,
+    "r": 0.739795442874107,
+    "relative_pt": 0.0,
+    "relative_r": 4.502148676309511e-16,
+    "pass": true
+  },
+  {
+    "case": "A2",
+    "statistic": "zeta",
+    "openpt": 2.0124611797498075,
+    "pt13528": 2.0124611797498075,
+    "r": 2.01246117974981,
+    "relative_pt": 0.0,
+    "relative_r": 1.3240182150652127e-15,
+    "pass": true
+  },
+  {
+    "case": "A2",
+    "statistic": "En",
+    "openpt": 1.0062305898749038,
+    "pt13528": 1.0062305898749038,
+    "r": 1.0062305898749,
+    "relative_pt": 0.0,
+    "relative_r": 3.751384942684774e-15,
+    "pass": true
+  },
+  {
+    "case": "负方差",
+    "statistic": "F",
+    "openpt": 0.0,
+    "pt13528": 0.0,
+    "r": 7.19637071484602e-32,
+    "relative_pt": 0,
+    "relative_r": 1.0,
+    "pass": false
+  },
+  {
+    "case": "负方差",
+    "statistic": "Ss",
+    "openpt": 0.0,
+    "pt13528": 0.0,
+    "r": 0.0,
+    "relative_pt": 0,
+    "relative_r": 0,
+    "pass": true
+  },
+  {
+    "case": "负方差",
+    "statistic": "t_pooled",
+    "openpt": 0.0,
+    "pt13528": 0.0,
+    "r": 0.0,
+    "relative_pt": 0,
+    "relative_r": 0,
+    "pass": true
+  },
+  {
+    "case": "负方差",
+    "statistic": "df_pooled",
+    "openpt": 2,
+    "pt13528": 2.0,
+    "r": 2.0,
+    "relative_pt": 0.0,
+    "relative_r": 0.0,
+    "pass": true
+  },
+  {
+    "case": "负方差",
+    "statistic": "p_pooled",
+    "openpt": 1.0,
+    "pt13528": 1.0,
+    "r": 1.0,
+    "relative_pt": 0.0,
+    "relative_r": 0.0,
+    "pass": true
+  },
+  {
+    "case": "负方差",
+    "statistic": "t_welch",
+    "openpt": 0.0,
+    "pt13528": 0.0,
+    "r": 0.0,
+    "relative_pt": 0,
+    "relative_r": 0,
+    "pass": true
+  },
+  {
+    "case": "负方差",
+    "statistic": "df_welch",
+    "openpt": 2.0,
+    "pt13528": 2.0,
+    "r": 2.0,
+    "relative_pt": 0.0,
+    "relative_r": 0.0,
+    "pass": true
+  },
+  {
+    "case": "负方差",
+    "statistic": "p_welch",
+    "openpt": 1.0,
+    "pt13528": 1.0,
+    "r": 1.0,
+    "relative_pt": 0.0,
+    "relative_r": 0.0,
+    "pass": true
+  },
+  {
+    "case": "负方差",
+    "statistic": "A_x",
+    "openpt": 10.0,
+    "pt13528": 10.0,
+    "r": 10.0,
+    "relative_pt": 0.0,
+    "relative_r": 0.0,
+    "pass": true
+  },
+  {
+    "case": "负方差",
+    "statistic": "A_s",
+    "openpt": 1.1634594512645644,
+    "pt13528": 1.1634594512645644,
+    "r": 1.16345945126456,
+    "relative_pt": 0.0,
+    "relative_r": 3.816971956928812e-15,
+    "pass": true
+  },
+  {
+    "case": "负方差",
+    "statistic": "A_iterations",
+    "openpt": 2,
+    "pt13528": 2,
+    "r": 2.0,
+    "relative_pt": 0.0,
+    "relative_r": 0.0,
+    "pass": true
+  },
+  {
+    "case": "负方差",
+    "statistic": "S_w",
+    "openpt": 1.5513922779232852,
+    "pt13528": 1.5513922779232854,
+    "r": 1.55139227792329,
+    "relative_pt": 1.4312602175786463e-16,
+    "relative_r": 3.148772478673012e-15,
+    "pass": true
+  },
+  {
+    "case": "负方差",
+    "statistic": "S_iterations",
+    "openpt": 2,
+    "pt13528": 2,
+    "r": 2.0,
+    "relative_pt": 0.0,
+    "relative_r": 0.0,
+    "pass": true
+  },
+  {
+    "case": "负方差",
+    "statistic": "median",
+    "openpt": 10.0,
+    "pt13528": 10.0,
+    "r": 10.0,
+    "relative_pt": 0.0,
+    "relative_r": 0.0,
+    "pass": true
+  },
+  {
+    "case": "负方差",
+    "statistic": "niqr",
+    "openpt": 1.4826,
+    "pt13528": 1.4826,
+    "r": 1.4826,
+    "relative_pt": 0.0,
+    "relative_r": 0.0,
+    "pass": true
+  },
+  {
+    "case": "负方差",
+    "statistic": "z",
+    "openpt": 0.0,
+    "pt13528": 0.0,
+    "r": 0.0,
+    "relative_pt": 0,
+    "relative_r": 0,
+    "pass": true
+  },
+  {
+    "case": "负方差",
+    "statistic": "zprime",
+    "openpt": 0.0,
+    "pt13528": 0.0,
+    "r": 0.0,
+    "relative_pt": 0,
+    "relative_r": 0,
+    "pass": true
+  },
+  {
+    "case": "负方差",
+    "statistic": "zeta",
+    "openpt": 0.0,
+    "pt13528": 0.0,
+    "r": 0.0,
+    "relative_pt": 0,
+    "relative_r": 0,
+    "pass": true
+  },
+  {
+    "case": "负方差",
+    "statistic": "En",
+    "openpt": 0.0,
+    "pt13528": 0.0,
+    "r": 0.0,
+    "relative_pt": 0,
+    "relative_r": 0,
+    "pass": true
+  }
+]
