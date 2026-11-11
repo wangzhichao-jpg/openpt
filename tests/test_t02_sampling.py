@@ -38,6 +38,16 @@ def test_strata_reproducible_and_independent_repeats(tmp_path: Path) -> None:
         sample(3, 2, 4, {"层": [1, 1, 3]})
 
 
+def test_outputs_are_byte_reproducible(tmp_path: Path) -> None:
+    """固定算法和版本下，三种抽样输出逐字节重现。"""
+    first = tmp_path / "first"
+    second = tmp_path / "second"
+    write_sample(first, sample(50, 12, 42))
+    write_sample(second, sample(50, 12, 42))
+    for name in ("sample.json", "sample.csv", "sample.xlsx"):
+        assert (first / name).read_bytes() == (second / name).read_bytes()
+
+
 def test_spreadsheet_formula_injection(tmp_path: Path) -> None:
     """用户提供的层名在 XLSX 和 CSV 中不作为公式执行。"""
     output = tmp_path / "safe"

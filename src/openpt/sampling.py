@@ -2,12 +2,16 @@
 """GL003 4.1 随机抽样及重复测试次序。"""
 
 import csv
+import io
 import json
+from datetime import datetime
 from pathlib import Path
 from typing import Any
+from zipfile import ZIP_DEFLATED, ZipFile
 
 import numpy as np
 from openpyxl import Workbook
+from openpyxl.writer.excel import ExcelWriter
 
 from .errors import InputError
 
@@ -109,4 +113,18 @@ def write_sample(directory: str | Path, record: dict[str, Any]) -> None:
         for cell in sheet[sheet.max_row]:
             if isinstance(cell.value, str):
                 cell.data_type = "s"
-    book.save(target / "sample.xlsx")
+    # 固定工作簿与 ZIP 时间，使同版本和相同输入产生逐字节一致的输出。
+    book.properties.created = datetime(2000, 1, 1)
+    book.properties.modified = datetime(2000, 1, 1)
+    buffer = io.BytesIO()
+    with ZipFile(buffer, "w", ZIP_DEFLATED) as archive:
+        ExcelWriter(book, archive).write_data()
+    buffer.seek(0)
+    with (
+        ZipFile(buffer, "r") as source,
+        ZipFile(target / "sample.xlsx", "x", ZIP_DEFLATED) as output,
+    ):
+        for entry in source.infolist():
+            content = source.read(entry.filename)
+            entry.date_time = (2000, 1, 1, 0, 0, 0)
+            output.writestr(entry, content)
