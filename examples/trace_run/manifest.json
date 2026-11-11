@@ -1,0 +1,18 @@
+{
+  "files": {
+    "config.json": "2eb594b338cd1c501d7194a5a44c632382e974dc705ba014ce6ac3d19335bddd",
+    "decisions.jsonl": "f7e166aee901ded7c4a77501b4e2e0e2db453a4cb2206cc668cada59c31e13e4",
+    "differences.csv": "4ce21f91eed52d8917385df49f02cd55f7782f9fa60feffc12bed58a92c9ac0e",
+    "environment.json": "8365e90026bae54801200b910f863f6e7ecafb1ef0f61ba67997992395f97104",
+    "input/sample.json": "a806934e3fd38974642b37fa20278d50d4da23456abb25c1bf31ac296f419a31",
+    "input/source.xlsx": "8bd69fa3030ca6fba3acd3270018d5d685c2d0aa2acf8ffc5428ec233338390b",
+    "log.txt": "7a7c337e6d6a3ee56a1e492f316e3aada464c7e254a06a3f2f415eddeef68441",
+    "report.docx": "c06c4058c48e6baa6ad7db42d103f4cfeb8cf4d8d414f1f9b912f4935f156135",
+    "report.html": "afb4affe543e645f069cee6e73aeb094c6d5534dd2d8b3fd059811c60c14536d",
+    "report.xlsx": "52d242a82873f45dccf518a5e0838eb421b12d247e81018146c8e88e993c6cd2",
+    "report_rev_0001.docx": "a154455b90c5f226f153b509313de954218d3dc7314ca5cd26f8edd002a42baf",
+    "report_rev_0001.html": "2c5a8b764a21edc9571c5a39bdc641a397d9c474d9c25508cbf521587959fb28",
+    "report_rev_0001.xlsx": "77475912b086d67e5fb63b01b05a849a4318b697c94c0fe2c320186bd8de43d8",
+    "result.json": "fb92ab7546b3cf327d4416c27c34d72f878bca39056f885da6813b795a4ce2c7"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "openpt": "0.1.0.dev1",
+  "python": "3.12.3",
+  "dependencies": {
+    "numpy": "2.5.4",
+    "scipy": "1.18.1",
+    "openpyxl": "3.1.5",
+    "python-docx": "1.2.0"
+  },
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.39",
+  "git_commit": "a439d994f0969e74a34e9e4c2fc7f33fd2115535"
+}

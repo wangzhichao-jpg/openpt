@@ -1,0 +1,184 @@
+{
+  "均匀性": {
+    "status": "OK",
+    "design_status": "OK",
+    "design_warnings": [],
+    "warnings": [],
+    "g": 10,
+    "m": 2,
+    "counts": [
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2
+    ],
+    "n0": 2.0,
+    "means": [
+      100.5,
+      101.5,
+      102.5,
+      103.5,
+      104.5,
+      105.5,
+      106.5,
+      107.5,
+      108.5,
+      109.5
+    ],
+    "mean": 105.0,
+    "SS_between": 165.0,
+    "SS_within": 5.0,
+    "df_between": 9,
+    "df_within": 10,
+    "MS_between": 18.333333333333332,
+    "MS_within": 0.5,
+    "F": 36.666666666666664,
+    "F_critical": 3.020382947021374,
+    "p": 1.7246757431041793e-06,
+    "variance_raw": 8.916666666666666,
+    "Ss": 2.9860788111948193,
+    "sigma": 5.0,
+    "threshold": 1.5,
+    "F_pass": false,
+    "Ss_pass": false,
+    "Ss_status": "OK",
+    "strict": false,
+    "conclusion": false,
+    "sigma_source": null,
+    "sigma_stage": null
+  },
+  "稳定性": {
+    "t": 0.06433340349803005,
+    "df": 11,
+    "p": 0.9498589932196957,
+    "critical": 2.200985160091639,
+    "pass": true,
+    "difference": 0.11666666666667425,
+    "se": 1.8134695247430317,
+    "s1": 3.0276503540974917,
+    "s2": 0.7005949852327858,
+    "mean1": 105.0,
+    "mean2": 105.11666666666667,
+    "n1": 10,
+    "n2": 3,
+    "status": "OK",
+    "reference": null,
+    "reference_source": null,
+    "observation_level": "unit_means",
+    "model": "unit_pooled",
+    "method": "two_sample",
+    "threshold": 1.5,
+    "mean_difference_pass": true,
+    "mean_difference_status": "OK",
+    "design_status": "DESIGN_WARNING",
+    "design_warnings": [
+      "GL003 5.2.2 注：n1、n2 均≥6；当前基线 10 个、稳定期 3 个包装单元"
+    ]
+  },
+  "其他稳定性": {
+    "后期": {
+      "t": 0.2929311545598301,
+      "df": 11,
+      "p": 0.7750268139502777,
+      "critical": 2.200985160091639,
+      "pass": true,
+      "difference": 0.5333333333333456,
+      "se": 1.8206780843599695,
+      "s1": 3.0276503540974917,
+      "s2": 0.9073771725877515,
+      "mean1": 105.0,
+      "mean2": 104.46666666666665,
+      "n1": 10,
+      "n2": 3,
+      "status": "OK",
+      "reference": null,
+      "reference_source": null,
+      "observation_level": "unit_means",
+      "model": "unit_pooled",
+      "method": "two_sample",
+      "threshold": 1.5,
+      "mean_difference_pass": true,
+      "mean_difference_status": "OK",
+      "design_status": "DESIGN_WARNING",
+      "design_warnings": [
+        "GL003 5.2.2 注：n1、n2 均≥6；当前基线 10 个、后期 3 个包装单元"
+      ]
+    }
+  },
+  "算法A": {
+    "x": 105.5,
+    "s": 0.8018590898655449,
+    "u_x": 0.7087499999999999,
+    "n": 2,
+    "iterations": 2,
+    "converged": true,
+    "status": "OK",
+    "warning": null,
+    "simplified": false,
+    "rule": "gl002",
+    "tolerance": 1e-10,
+    "history": [
+      {
+        "iteration": 1,
+        "x": 105.5,
+        "s": 0.8018590898655449
+      },
+      {
+        "iteration": 2,
+        "x": 105.5,
+        "s": 0.8018590898655449
+      }
+    ]
+  },
+  "中位数NIQR": {
+    "median": 105.5,
+    "q1": 105.25,
+    "q3": 105.75,
+    "iqr": 0.5,
+    "niqr": 0.37065,
+    "status": "OK"
+  },
+  "算法A_收敛对照": {
+    "x": 105.5,
+    "s": 0.8018590898655449,
+    "u_x": 0.7087499999999999,
+    "n": 2,
+    "iterations": 2,
+    "converged": true,
+    "status": "OK",
+    "warning": null,
+    "simplified": false,
+    "rule": "absolute",
+    "tolerance": 1e-12,
+    "history": [
+      {
+        "iteration": 1,
+        "x": 105.5,
+        "s": 0.8018590898655449
+      },
+      {
+        "iteration": 2,
+        "x": 105.5,
+        "s": 0.8018590898655449
+      }
+    ]
+  },
+  "参加者z": {
+    "P1": {
+      "z": 0.19607843137254904,
+      "status": "OK",
+      "classification": "满意"
+    },
+    "P2": {
+      "z": 0.0,
+      "status": "OK",
+      "classification": "满意"
+    }
+  }
+}
