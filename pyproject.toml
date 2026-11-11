@@ -28,7 +28,7 @@ openpt = ["config/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-markers = ["internal: 需要仓库外内部材料"]
+markers = ["internal: 需要仓库外内部材料", "r: 需要 Rscript 独立对照环境"]
 
 [tool.ruff]
 line-length = 100

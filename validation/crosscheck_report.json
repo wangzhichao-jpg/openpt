@@ -1,0 +1,197 @@
+{
+  "scope": "部分 ANOVA；未完成施工单",
+  "rows": [
+    {
+      "case": "A1",
+      "statistic": "MS_between",
+      "openpt": 48.26005555555555,
+      "r": 48.2600555555555,
+      "relative_error": 1.0306244145523228e-15,
+      "pass": true
+    },
+    {
+      "case": "A1",
+      "statistic": "MS_within",
+      "openpt": 41.32850000000002,
+      "r": 41.3285,
+      "relative_error": 5.157768143727209e-16,
+      "pass": true
+    },
+    {
+      "case": "A1",
+      "statistic": "F",
+      "openpt": 1.167718536979458,
+      "r": 1.16771853697946,
+      "relative_error": 1.7113725448724577e-15,
+      "pass": true
+    },
+    {
+      "case": "A1",
+      "statistic": "p",
+      "openpt": 0.40354534348704724,
+      "r": 0.403545343487049,
+      "relative_error": 4.401876686398338e-15,
+      "pass": true
+    },
+    {
+      "case": "A1",
+      "statistic": "n0",
+      "openpt": 2.0,
+      "r": 2.0,
+      "relative_error": 0.0,
+      "pass": true
+    },
+    {
+      "case": "A1",
+      "statistic": "Ss",
+      "openpt": 1.8616599522409474,
+      "r": 1.86165995224094,
+      "relative_error": 3.935988392351509e-15,
+      "pass": true
+    },
+    {
+      "case": "A2",
+      "statistic": "MS_between",
+      "openpt": 0.2313257575757575,
+      "r": 0.231325757575758,
+      "relative_error": 2.1597264667671257e-15,
+      "pass": true
+    },
+    {
+      "case": "A2",
+      "statistic": "MS_within",
+      "openpt": 0.06124999999999997,
+      "r": 0.06125,
+      "relative_error": 4.531522549490435e-16,
+      "pass": true
+    },
+    {
+      "case": "A2",
+      "statistic": "F",
+      "openpt": 3.7767470624613484,
+      "r": 3.77674706246136,
+      "relative_error": 3.0572127985125717e-15,
+      "pass": true
+    },
+    {
+      "case": "A2",
+      "statistic": "p",
+      "openpt": 0.01546773615554528,
+      "r": 0.0154677361555451,
+      "relative_error": 1.1663713402359101e-14,
+      "pass": true
+    },
+    {
+      "case": "A2",
+      "statistic": "n0",
+      "openpt": 2.0,
+      "r": 2.0,
+      "relative_error": 0.0,
+      "pass": true
+    },
+    {
+      "case": "A2",
+      "statistic": "Ss",
+      "openpt": 0.2916125490919051,
+      "r": 0.291612549091906,
+      "relative_error": 3.0457482795783343e-15,
+      "pass": true
+    },
+    {
+      "case": "负方差",
+      "statistic": "MS_between",
+      "openpt": 0.0,
+      "r": 1.4392741429692e-31,
+      "relative_error": 1.0,
+      "pass": false
+    },
+    {
+      "case": "负方差",
+      "statistic": "MS_within",
+      "openpt": 2.0,
+      "r": 2.0,
+      "relative_error": 0.0,
+      "pass": true
+    },
+    {
+      "case": "负方差",
+      "statistic": "F",
+      "openpt": 0.0,
+      "r": 7.19637071484602e-32,
+      "relative_error": 1.0,
+      "pass": false
+    },
+    {
+      "case": "负方差",
+      "statistic": "p",
+      "openpt": 1.0,
+      "r": 1.0,
+      "relative_error": 0.0,
+      "pass": true
+    },
+    {
+      "case": "负方差",
+      "statistic": "n0",
+      "openpt": 2.0,
+      "r": 2.0,
+      "relative_error": 0.0,
+      "pass": true
+    },
+    {
+      "case": "负方差",
+      "statistic": "Ss",
+      "openpt": 0.0,
+      "r": 0.0,
+      "relative_error": 0.0,
+      "pass": true
+    },
+    {
+      "case": "不平衡合成",
+      "statistic": "MS_between",
+      "openpt": 4.8,
+      "r": 4.8,
+      "relative_error": 0.0,
+      "pass": true
+    },
+    {
+      "case": "不平衡合成",
+      "statistic": "MS_within",
+      "openpt": 3.3333333333333335,
+      "r": 3.33333333333333,
+      "relative_error": 1.0658141036401502e-15,
+      "pass": true
+    },
+    {
+      "case": "不平衡合成",
+      "statistic": "F",
+      "openpt": 1.44,
+      "r": 1.44,
+      "relative_error": 0.0,
+      "pass": true
+    },
+    {
+      "case": "不平衡合成",
+      "statistic": "p",
+      "openpt": 0.31626211469810517,
+      "r": 0.316262114698105,
+      "relative_error": 5.265678244539078e-16,
+      "pass": true
+    },
+    {
+      "case": "不平衡合成",
+      "statistic": "n0",
+      "openpt": 2.4,
+      "r": 2.4,
+      "relative_error": 0.0,
+      "pass": true
+    },
+    {
+      "case": "不平衡合成",
+      "statistic": "Ss",
+      "openpt": 0.7817359599705715,
+      "r": 0.781735959970572,
+      "relative_error": 5.680808259949819e-16,
+      "pass": true
+    }
+  ]
+}
