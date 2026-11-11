@@ -37,6 +37,8 @@ def _positions(headers: list[Any], sheet: str, mapping: dict[str, Any]) -> dict[
     if not isinstance(aliases, dict):
         raise InputError(f"{sheet} 的列映射必须是对象")
     required = SHEETS[sheet]
+    if sheet == "报告声称值" and len(headers) >= 6 and headers[5] is None:
+        headers = [*headers[:5], "时间组", *headers[6:]]
     allowed = set(required) | (set(PARTICIPANT_OPTIONAL) if sheet == "参加者结果" else set())
     if set(aliases) - allowed:
         raise InputError(f"{sheet} 的列映射包含未知标准字段")
@@ -134,6 +136,41 @@ def _check_rows(
     return issues
 
 
+def _check_numeric_table(
+    sheet: str, rows: list[list[Any]], mapping: dict[str, Any], formulas: set[str]
+) -> list[Issue]:
+    """检查声称值与算法 S 的必填项和数值原文。"""
+    if not rows:
+        return []
+    header = rows[0] + [None] * max(0, len(SHEETS[sheet]) - len(rows[0]))
+    positions = _positions(header, sheet, mapping)
+    required = ("统计量", "声称值", "来源") if sheet == "报告声称值" else tuple(SHEETS[sheet])
+    numeric = ("声称值", "显示小数位") if sheet == "报告声称值" else tuple(SHEETS[sheet])
+    issues = []
+    for number, row in enumerate(rows[1:], 2):
+        if not any(value not in (None, "") for value in row):
+            continue
+        for field in dict.fromkeys((*required, *numeric)):
+            column = positions[field]
+            value = row[column] if column < len(row) else None
+            cell = f"{get_column_letter(column + 1)}{number}"
+            if value in (None, ""):
+                if field in required:
+                    issues.append(Issue("MISSING", sheet, cell, value, "必填值缺失"))
+            elif field in numeric and cell not in formulas:
+                try:
+                    valid = (
+                        not isinstance(value, bool)
+                        and isinstance(value, (int, float))
+                        and math.isfinite(value)
+                    )
+                except OverflowError:
+                    valid = False
+                if not valid:
+                    issues.append(Issue("NON_NUMERIC", sheet, cell, value, "数值必须为有限数"))
+    return issues
+
+
 def inspect_input(
     path: str | Path,
     mapping: dict[str, Any] | None = None,
@@ -198,6 +235,22 @@ def inspect_input(
                                     "单位与项目或其他测量表不一致",
                                 )
                             )
+        for sheet in sorted(set(book.sheetnames) - set(MEASUREMENT_SHEETS) - {"填写说明"}):
+            if sheet in ("报告声称值", "算法S"):
+                cells = list(book[sheet].iter_rows())
+                rows = [[cell.value for cell in row] for row in cells]
+                formulas = {
+                    cell.coordinate for row in cells for cell in row if cell.data_type == "f"
+                }
+                issues.extend(_check_numeric_table(sheet, rows, mapping, formulas))
+            for row in book[sheet].iter_rows():
+                for cell in row:
+                    if cell.data_type != "f":
+                        continue
+                    cached = values[sheet][cell.coordinate].value
+                    category = "FORMULA_NO_CACHE" if cached is None else "FORMULA"
+                    message = "公式没有缓存值" if cached is None else "现有计算器不接受公式"
+                    issues.append(Issue(category, sheet, cell.coordinate, cell.value, message))
         return issues
     finally:
         book.close()

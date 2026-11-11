@@ -70,6 +70,29 @@ def test_cross_sheet_units(tmp_path: Path) -> None:
     ]
 
 
+def test_non_measurement_issues(tmp_path: Path) -> None:
+    """声称值和其他表的公式问题也保留原始位置和值。"""
+    path = tmp_path / "input.xlsx"
+    book = Workbook()
+    book.active.title = "均匀性"
+    book.active.append(["单元编号", "重复编号", "值", "单位"])
+    claims = book.create_sheet("报告声称值")
+    claims.append(["统计量", "声称值", "显示小数位", "来源", "报告模型", "时间组"])
+    claims.append(["F", "错误", 2, "报告", "", ""])
+    config = book.create_sheet("方法配置")
+    config.append(["字段", "值"])
+    config.append(["alpha", "=1/20"])
+    book.save(path)
+    issues = inspect_input(path)
+    assert any(
+        i.category == "NON_NUMERIC" and i.cell == "B2" and i.original == "错误" for i in issues
+    )
+    assert any(
+        i.category == "FORMULA_NO_CACHE" and i.sheet == "方法配置" and i.original == "=1/20"
+        for i in issues
+    )
+
+
 @given(text=st.text(alphabet="abcdefghijklmnopqrstuvwxyz", min_size=1, max_size=20))
 def test_numeric_strings_rejected_as_xlsx_values(text: str) -> None:
     """XLSX 文字不视作数值，原始字符串保持不变。"""
