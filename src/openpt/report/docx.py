@@ -154,6 +154,14 @@ def _raw_tables(doc: Any, data: dict[str, Any]) -> None:
         doc.add_paragraph("数据来源：" + "、".join(_source_ranges(sources)))
     else:
         doc.add_paragraph("未提供原始测量值。")
+    numeric_sources = data.get("numeric_sources", {})
+    if numeric_sources:
+        doc.add_paragraph("数值单元格追溯（未经修约）：")
+        _table(
+            doc,
+            ["工作表!单元格", "原始数值"],
+            [[location, str(value)] for location, value in numeric_sources.items()],
+        )
 
 
 def _homogeneity(

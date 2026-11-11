@@ -333,7 +333,10 @@ def _review_claim(
     item = _mapping_item(
         mapping, name, "homogeneity" if name in ("F", "Ss", "t") else "performance"
     )
-    row = _row(name, claim["value"], digits, claim["source"], reproduced, rec, note, types, item)
+    source = claim["source"]
+    if claim.get("cell"):
+        source = f"{source}；输入单元格：{claim['cell']}"
+    row = _row(name, claim["value"], digits, source, reproduced, rec, note, types, item)
     _adjudicate_models(data, result, claim, row, digits)
     rows = [row]
     if name == "t" and model == "displayed_summary" and data["config"].get("s1") is not None:

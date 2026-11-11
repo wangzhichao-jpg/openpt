@@ -151,6 +151,14 @@ def create_run(args: Any, root: Path) -> tuple[Path, Any, Any, Any, str]:
             if value:
                 _snapshot(Path(value), input_dir / filename_optional)
         columns = _mapping(input_dir / "columns.json" if args.columns else None)
+        from .io.validation import inspect_input
+
+        issues = inspect_input(target, columns, encoding=args.encoding, csv_sheet=args.csv_sheet)
+        if issues:
+            raise InputError(
+                "输入校验问题："
+                + json.dumps([issue.to_dict() for issue in issues], ensure_ascii=False, default=str)
+            )
         data = read_workbook(
             target,
             columns,

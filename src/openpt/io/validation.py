@@ -158,6 +158,12 @@ def inspect_input(
     values = load_workbook(source, data_only=True, read_only=True)
     try:
         issues: list[Issue] = []
+        project_unit: Any = None
+        if "项目信息" in book.sheetnames:
+            for row in book["项目信息"].iter_rows(min_row=2, values_only=True):
+                if len(row) >= 2 and row[0] == "单位" and row[1] not in (None, ""):
+                    project_unit = row[1]
+                    break
         if not set(MEASUREMENT_SHEETS).intersection(book.sheetnames):
             raise InputError("缺少可检查的测量工作表")
         for sheet in MEASUREMENT_SHEETS:
@@ -168,6 +174,29 @@ def inspect_input(
             formulas = {cell.coordinate for row in cells for cell in row if cell.data_type == "f"}
             cached = [list(row) for row in values[sheet].iter_rows(values_only=True)]
             issues.extend(_check_rows(sheet, rows, cached, mapping, formulas=formulas))
+            if rows:
+                position = _positions(rows[0], sheet, mapping)["单位"]
+                for index, row in enumerate(rows[1:], 2):
+                    value = row[position] if position < len(row) else None
+                    if value in (None, ""):
+                        continue
+                    if project_unit is None:
+                        project_unit = value
+                    elif value != project_unit:
+                        cell = f"{get_column_letter(position + 1)}{index}"
+                        if not any(
+                            i.category == "UNIT_MISMATCH" and i.sheet == sheet and i.cell == cell
+                            for i in issues
+                        ):
+                            issues.append(
+                                Issue(
+                                    "UNIT_MISMATCH",
+                                    sheet,
+                                    cell,
+                                    value,
+                                    "单位与项目或其他测量表不一致",
+                                )
+                            )
         return issues
     finally:
         book.close()

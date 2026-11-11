@@ -28,6 +28,7 @@ def test_mapped_workbook_and_sources(tmp_path: Path) -> None:
     data = read_workbook(path, mapping)
     assert data["sources"] == ["均匀性!A2", "均匀性!A3", "均匀性!A4", "均匀性!A5"]
     assert data["homogeneity"] == [[1.1, 1.2], [2.1, 2.2]]
+    assert data["numeric_sources"]["均匀性!A2"] == 1.1
     columns = tmp_path / "columns.json"
     columns.write_text(json.dumps(mapping, ensure_ascii=False), encoding="utf-8")
     original = path.read_bytes()

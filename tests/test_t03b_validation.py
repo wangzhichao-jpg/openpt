@@ -52,6 +52,24 @@ def test_csv_encoding_and_cli(tmp_path: Path, capsys: pytest.CaptureFixture[str]
     assert capsys.readouterr().out.strip() == "[]"
 
 
+def test_cross_sheet_units(tmp_path: Path) -> None:
+    """不同工作表的单位不一致仍被定位。"""
+    path = tmp_path / "input.xlsx"
+    book = Workbook()
+    first = book.active
+    first.title = "均匀性"
+    first.append(["单元编号", "重复编号", "值", "单位"])
+    first.append(["A", 1, 1.0, "mg"])
+    second = book.create_sheet("参加者结果")
+    second.append(["参加者编号", "值", "单位"])
+    second.append(["P1", 1.0, "g"])
+    book.save(path)
+    issues = inspect_input(path)
+    assert [(i.category, i.sheet, i.cell, i.original) for i in issues] == [
+        ("UNIT_MISMATCH", "参加者结果", "C2", "g")
+    ]
+
+
 @given(text=st.text(alphabet="abcdefghijklmnopqrstuvwxyz", min_size=1, max_size=20))
 def test_numeric_strings_rejected_as_xlsx_values(text: str) -> None:
     """XLSX 文字不视作数值，原始字符串保持不变。"""

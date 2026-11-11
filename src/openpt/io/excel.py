@@ -427,8 +427,17 @@ def read_workbook(
                 raise InputError(f"算法S!{row[1].coordinate}: 自由度须为相同的整数")
             s_values.append(value)
             s_df = int(df)
+    numeric_sources = {
+        f"{ws.title}!{cell.coordinate}": cell.value
+        for ws in book.worksheets
+        if ws.title != "填写说明"
+        for row in ws.iter_rows(min_row=2)
+        for cell in row
+        if isinstance(cell.value, (int, float)) and not isinstance(cell.value, bool)
+    }
     return {
         "info": info,
+        "numeric_sources": numeric_sources,
         "batches": _batches(book),
         "assigned_config": assigned,
         "algorithm_s_values": s_values,
