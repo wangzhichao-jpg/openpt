@@ -114,6 +114,8 @@ def _calculate_snapshot(root: Path, config: dict[str, Any]) -> tuple[Any, Any, A
         project=config["project"],
     )
     data["config"] = config["expanded_config"]
+    if "expanded_assigned_config" in config:
+        data["assigned_config"] = config["expanded_assigned_config"]
     result = calculate(data, review_mode=config["command"] == "review")
     mapping_path = root / "input" / "mapping.json"
     mapping = _mapping(mapping_path) if mapping_path.exists() else None
@@ -189,6 +191,23 @@ def create_run(args: Any, root: Path) -> tuple[Path, Any, Any, Any, str]:
             "display_z_decimals": 2,
             **{k: v for k, v in data["config"].items() if v not in (None, "")},
         }
+        assigned_defaults = {
+            "method": None,
+            "value": None,
+            "uncertainty": None,
+            "source": "",
+            "uncertainty_source": "",
+            "consensus_method": "robust_mean",
+            "sigma_temporary": None,
+            "sigma_final": None,
+            "sigma_procedure": "",
+            "u_hom": 0.0,
+            "u_stab": 0.0,
+            "hom_mapping": "none",
+            "stab_mapping": "none",
+            "hom_in_base": False,
+            "stab_in_base": False,
+        }
         config = {
             "command": args.command,
             "input_file": filename,
@@ -200,15 +219,8 @@ def create_run(args: Any, root: Path) -> tuple[Path, Any, Any, Any, str]:
             "expanded_config": expanded,
             "column_mapping": columns,
             "assigned_config": data.get("assigned_config", {}),
-            "assigned_defaults": {
-                "consensus_method": "robust_mean",
-                "u_hom": 0.0,
-                "u_stab": 0.0,
-                "hom_mapping": "none",
-                "stab_mapping": "none",
-                "hom_in_base": False,
-                "stab_in_base": False,
-            },
+            "assigned_defaults": assigned_defaults,
+            "expanded_assigned_config": {**assigned_defaults, **data.get("assigned_config", {})},
         }
         _json(directory / "config.json", config)
         _json(directory / "environment.json", environment())

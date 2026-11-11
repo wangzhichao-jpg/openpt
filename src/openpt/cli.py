@@ -465,7 +465,10 @@ def main(argv: list[str] | None = None) -> int:
         )
         make_report(args.docx, data, result, differences, input_sha256=digest)
         return 0
-    except (ValueError, TypeError, OSError, KeyError, OverflowError, BadZipFile) as exc:
+    except OSError as exc:
+        print(f"错误：文件操作失败（{exc.strerror or '系统错误'}）", file=sys.stderr)
+        return 2
+    except (ValueError, TypeError, KeyError, OverflowError, BadZipFile) as exc:
         print(f"错误：{exc}", file=sys.stderr)
         return 2
 
