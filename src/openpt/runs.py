@@ -199,6 +199,16 @@ def create_run(args: Any, root: Path) -> tuple[Path, Any, Any, Any, str]:
             "original_config": data["config"],
             "expanded_config": expanded,
             "column_mapping": columns,
+            "assigned_config": data.get("assigned_config", {}),
+            "assigned_defaults": {
+                "consensus_method": "robust_mean",
+                "u_hom": 0.0,
+                "u_stab": 0.0,
+                "hom_mapping": "none",
+                "stab_mapping": "none",
+                "hom_in_base": False,
+                "stab_in_base": False,
+            },
         }
         _json(directory / "config.json", config)
         _json(directory / "environment.json", environment())
