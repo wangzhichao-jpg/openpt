@@ -51,7 +51,7 @@ def decide(
                 previous = [json.loads(line) for line in stream if line.strip()]
         if any(record.get("result_sha256") != result_hash for record in previous):
             raise InputError("既有决定所依据的结果哈希不一致")
-        record = {
+        record: dict[str, Any] = {
             "time": datetime.now(timezone.utc).isoformat(),
             "item": item,
             "decision": decision,
