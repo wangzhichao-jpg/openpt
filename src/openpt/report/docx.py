@@ -253,7 +253,7 @@ def _homogeneity_conclusion(
             "未评价：F 或 Ss 判据无法计算" if h["conclusion"] is None else _shown(h["conclusion"])
         )
         doc.add_paragraph("严格配置综合结论：" + conclusion + "。")
-    stage = {"temporary": "临时值", "final": "最终值"}.get(h.get("sigma_stage"), "未登记")
+    stage = {"temporary": "临时值", "final": "最终值"}.get(str(h.get("sigma_stage")), "未登记")
     doc.add_paragraph(
         f"σ 阶段：{stage}；来源：{h.get('sigma_source') or '未登记'}；"
         f"用途判据状态：{h['Ss_status']}。"
@@ -266,6 +266,14 @@ def _homogeneity_conclusion(
 def _stability_table(doc: Any, name: str, s: dict[str, Any], sig: int) -> None:
     """显示一个时点的稳定性检验。"""
     doc.add_paragraph(name)
+    if s.get("status") == "DESIGN_REVIEW":
+        doc.add_paragraph("DESIGN_REVIEW：需要经批准的模型，不给出稳定性结论。")
+        for warning in s.get("design_warnings", []):
+            doc.add_paragraph("设计提示：" + warning)
+        return
+    if s.get("reference_source"):
+        doc.add_paragraph("参考值来源：" + str(s["reference_source"]))
+    doc.add_paragraph("实验层级：" + str(s.get("observation_level", "unit_means")))
     names = [
         ("均值差", "difference"),
         ("t 值", "t"),

@@ -31,6 +31,8 @@ def _t_reproduction(
         result.get("稳定性", {}) if name == "稳定期" else result.get("其他稳定性", {}).get(name, {})
     )
     recommended = selected.get("t")
+    if selected.get("status") == "DESIGN_REVIEW":
+        return None, None, "实验设计需审核，不计算候选模型"
     if model in ("repeats_pooled", "repeats_welch"):
         report_result = stability(groups.get("基线"), groups[name], model=model)
         detail = (

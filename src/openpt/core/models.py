@@ -118,6 +118,8 @@ class StabilityResult(ResultMapping):
     n2: int | None = None
     status: str = "NOT_EVALUATED"
     reference: float | None = None
+    reference_source: str | None = None
+    observation_level: str = "unit_means"
     model: str | None = None
     method: str | None = None
     threshold: float | None = None

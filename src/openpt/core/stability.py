@@ -135,8 +135,25 @@ def analyze(
     reference: float | None = None,
     model: str = "unit_pooled",
     group_name: str = "稳定期",
+    design: str = "independent",
+    reference_uncertainty_negligible: bool = True,
+    reference_source: str | None = None,
 ) -> StabilityResult:
     """按 GL003 5.2 计算 t 并按 5.3 对比均值差与 0.3σ。"""
+    if design not in ("independent", "paired", "correlated"):
+        raise InputError("未知实验设计")
+    if not isinstance(reference_uncertainty_negligible, bool):
+        raise InputError("参考值不确定度选项必须是布尔值")
+    if design != "independent" or not reference_uncertainty_negligible:
+        return StabilityResult(
+            status="DESIGN_REVIEW",
+            design_status="DESIGN_REVIEW",
+            design_warnings=["配对或相关设计、不可忽略的参考值不确定度需采用经批准模型；不作结论"],
+            method=method,
+            model=model,
+            reference=reference,
+            reference_source=reference_source,
+        )
     if model not in ("unit_pooled", "repeats_pooled", "repeats_welch"):
         raise InputError("未知稳定性模型")
     if method not in ("one_sample", "two_sample"):
@@ -155,6 +172,8 @@ def analyze(
         {
             "model": model,
             "method": method,
+            "reference_source": reference_source,
+            "observation_level": "unit_means" if model == "unit_pooled" else "all_repeats",
             "threshold": 0.3 * sigma if sigma is not None else None,
             "mean_difference_pass": result["difference"] <= 0.3 * sigma
             if sigma is not None

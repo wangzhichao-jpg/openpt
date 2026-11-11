@@ -85,8 +85,26 @@ def calculate(data: dict[str, Any]) -> dict[str, Any]:
             raise ValueError("稳定性须指定基线及稳定期组")
         raw = cfg.get("reference")
         reference = float(raw) if raw not in (None, "") else None
+        level = _option(cfg, "observation_level", "unit_means")
+        if level not in ("unit_means", "all_repeats"):
+            raise ValueError("未知实验层级")
+        if level == "all_repeats":
+            raise ValueError("全部重复值仅供复核模型使用，不可用于常规结论")
+        design_options = {
+            "design": _option(cfg, "stability_design", "independent"),
+            "reference_uncertainty_negligible": _option(
+                cfg, "reference_uncertainty_negligible", True
+            ),
+            "reference_source": _option(cfg, "reference_source", None),
+        }
         result["稳定性"] = stability(
-            groups.get("基线"), groups["稳定期"], sigma, alpha, method, reference
+            groups.get("基线"),
+            groups["稳定期"],
+            sigma,
+            alpha,
+            method,
+            reference,
+            **design_options,
         ).to_dict()
         extra = {}
         for name, observations in groups.items():
@@ -99,6 +117,7 @@ def calculate(data: dict[str, Any]) -> dict[str, Any]:
                     method,
                     reference,
                     group_name=name,
+                    **design_options,
                 ).to_dict()
         if extra:
             result["其他稳定性"] = extra
