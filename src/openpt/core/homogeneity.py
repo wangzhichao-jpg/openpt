@@ -12,7 +12,7 @@ from .models import HomogeneityResult
 
 
 def _anova(data: Any) -> dict[str, Any]:
-    """GL003 4.2；扩展方法：随机效应 ANOVA 有效重复数 n₀。"""
+    """GL003 4.2；扩展方法（Searle 等，页码待核）：n₀=(N-Σnᵢ²/N)/(g-1)。"""
     try:
         groups = [np.asarray(row, dtype=float) for row in data]
     except (ValueError, TypeError):
@@ -37,7 +37,7 @@ def _anova(data: Any) -> dict[str, Any]:
         raise InputError("数据范围导致数值溢出")
     return {
         "g": g,
-        "m": counts[0],
+        "m": counts[0] if len(set(counts)) == 1 else None,
         "counts": counts,
         "n0": n0,
         "means": means,

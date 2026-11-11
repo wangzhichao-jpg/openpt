@@ -33,7 +33,7 @@ class HomogeneityResult(ResultMapping):
     design_warnings: list[str]
     warnings: list[str]
     g: int
-    m: int
+    m: int | None
     counts: list[int]
     n0: float
     means: list[float]

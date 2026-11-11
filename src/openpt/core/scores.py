@@ -27,6 +27,7 @@ def performance_score(
     assigned: float,
     *,
     sigma: float | None = None,
+    sigma_pt_reference: float | None = None,
     u_assigned: float | None = None,
     u_participant: float | None = None,
     U_assigned: float | None = None,
@@ -67,6 +68,7 @@ def performance_score(
         raise InputError("评价阈值无效")
     for name, optional_number in (
         ("σ_pt", sigma),
+        ("原始σ_pt", sigma_pt_reference),
         ("u(X)", u_assigned),
         ("u(x)", u_participant),
         ("U(X)", U_assigned),
@@ -81,11 +83,19 @@ def performance_score(
             or optional_number < 0
         ):
             raise InputError(f"{name}必须为非负有限数")
-    if independent not in (None, True, False) or not isinstance(assigned_from_participants, bool):
+    if (independent is not None and not isinstance(independent, bool)) or not isinstance(
+        assigned_from_participants, bool
+    ):
         raise InputError("相关性配置无效")
     formula = formulas[statistic]
     warnings = []
-    if sigma is not None and sigma > 0 and u_assigned is not None and u_assigned > 0.3 * sigma:
+    reference_sigma = sigma_pt_reference if sigma_pt_reference is not None else sigma
+    if (
+        reference_sigma is not None
+        and reference_sigma > 0
+        and u_assigned is not None
+        and u_assigned > 0.3 * reference_sigma
+    ):
         warnings.append("u(X)>0.3σ_pt；可考虑 z′，依据 ISO 13528，待核对条款号；适用性须审查")
 
     def absent(reason: str, status: str = "NOT_EVALUATED") -> ScoreResult:
@@ -103,6 +113,8 @@ def performance_score(
         U_assigned is None or U_participant is None or k_assigned is None or k_participant is None
     ):
         return absent("En 需要双方扩展不确定度 U 及包含因子 k")
+    if statistic in ("zeta", "En") and assigned_from_participants:
+        return absent("参加者结果参与定值，相关性需经批准模型处理", "DESIGN_REVIEW")
     if statistic in ("zeta", "En") and independent is not True:
         return absent(
             "须确认参加者结果与指定值不相关",

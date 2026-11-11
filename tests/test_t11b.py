@@ -42,6 +42,12 @@ def test_z_boundaries(value: float, expected: str) -> None:
     assert performance_score("z", value, 0, sigma=1).classification == expected
 
 
+def test_original_sigma_for_uncertainty_warning() -> None:
+    """σ′ 已合成时仍按原 σ_pt 检查 0.3 倍阈值。"""
+    r = performance_score("z", 1, 0, sigma=6, sigma_pt_reference=5, u_assigned=1.6)
+    assert r.warnings
+
+
 def test_prerequisites() -> None:
     """缺前提不评价，相关或非 k=2 模型转审核。"""
     assert performance_score("D%", 1, 0).status == "NOT_EVALUATED"

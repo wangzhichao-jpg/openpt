@@ -9,8 +9,11 @@ from pathlib import Path
 from typing import Any
 from zipfile import BadZipFile
 
+from . import __version__
+from .core.assigned import assign_value
 from .core.homogeneity import analyze as homogeneity
-from .core.robust import algorithm_a, median_niqr
+from .core.robust import algorithm_a, algorithm_s, median_niqr
+from .core.scores import performance_score
 from .core.stability import analyze as stability
 from .core.zscore import zscore
 from .io.excel import read_workbook, template
@@ -29,22 +32,28 @@ def _participant_results(data: dict[str, Any], sigma: float | None) -> dict[str,
     if not isinstance(simplified, bool):
         raise ValueError("algorithm_a_simplified 必须是布尔值")
     values = [p["value"] for p in data["participants"]]
-    result = {
-        "算法A": algorithm_a(
+    result: dict[str, Any] = {}
+    if len(values) >= 2:
+        result["算法A"] = algorithm_a(
             values,
             tolerance=float(_option(cfg, "algorithm_a_tolerance", 1e-10)),
             max_iterations=int(_option(cfg, "algorithm_a_max_iterations", 1000)),
             simplified=simplified,
             rule=str(_option(cfg, "algorithm_a_rule", "gl002")),
         ).to_dict()
-    }
-    result["中位数NIQR"] = median_niqr(values).to_dict()
-    # 绝对容差对照独立于选定停止规则，供附录和敏感性提示使用。
-    result["算法A_收敛对照"] = algorithm_a(
-        values, rule="absolute", tolerance=1e-12, max_iterations=10000
-    ).to_dict()
+        result["中位数NIQR"] = median_niqr(values).to_dict()
+        # 绝对容差对照独立于选定停止规则，供附录和敏感性提示使用。
+        result["算法A_收敛对照"] = algorithm_a(
+            values, rule="absolute", tolerance=1e-12, max_iterations=10000
+        ).to_dict()
+    else:
+        result["稳健统计状态"] = "NOT_EVALUATED：至少需要两个参加者结果"
     sigma_pt = float(cfg["sigma_pt"]) if cfg.get("sigma_pt") not in (None, "") else sigma
-    if cfg.get("assigned") not in (None, "") and sigma_pt is not None:
+    if (
+        cfg.get("assigned") not in (None, "")
+        and sigma_pt is not None
+        and not data.get("assigned_config", {}).get("method")
+    ):
         result["参加者z"] = {
             p["id"]: zscore(
                 p["value"],
@@ -55,6 +64,77 @@ def _participant_results(data: dict[str, Any], sigma: float | None) -> dict[str,
             ).to_dict()
             for p in data["participants"]
         }
+    return result
+
+
+def _assigned_results(data: dict[str, Any]) -> dict[str, Any]:
+    """执行指定值建模和 GL002 4.4.1.3 选定统计量。"""
+    a = data.get("assigned_config", {})
+    keys = (
+        "value",
+        "uncertainty",
+        "source",
+        "uncertainty_source",
+        "consensus_method",
+        "sigma_temporary",
+        "sigma_final",
+        "sigma_procedure",
+        "u_hom",
+        "u_stab",
+        "hom_mapping",
+        "stab_mapping",
+        "hom_in_base",
+        "stab_in_base",
+    )
+    options = {key: a[key] for key in keys if key in a}
+    assigned = assign_value(
+        a["method"], participants=[p["value"] for p in data["participants"]], **options
+    )
+    result: dict[str, Any] = {"指定值与不确定度": assigned.to_dict()}
+    kind = _option(data["config"], "score_type", "z")
+    if kind not in ("z", "zprime", "zeta", "En", "D", "D%", "all"):
+        raise ValueError("未知统计量类型")
+    kinds = ("D", "D%", "z", "zprime", "zeta", "En") if kind == "all" else (kind,)
+    participant_scores: dict[str, Any] = {}
+    for participant in data["participants"]:
+        scores = {}
+        for name in kinds:
+            if assigned.status != "OK" or assigned.value is None:
+                scores[name] = {
+                    "statistic": name,
+                    "value": None,
+                    "status": assigned.status,
+                    "classification": None,
+                    "reason": "指定值或分量映射未通过审核",
+                    "formula": "GL002 4.4.1.3",
+                    "warnings": assigned.warnings,
+                }
+            else:
+                score_result = performance_score(
+                    name,
+                    participant["value"],
+                    assigned.value,
+                    sigma=assigned.sigma_prime,
+                    sigma_pt_reference=assigned.sigma_final
+                    if assigned.sigma_final is not None
+                    else assigned.sigma_temporary,
+                    u_assigned=assigned.u,
+                    u_participant=participant.get("u"),
+                    U_assigned=a.get("U_assigned"),
+                    U_participant=participant.get("U"),
+                    k_assigned=a.get("k_assigned"),
+                    k_participant=participant.get("k"),
+                    independent=a.get("independent"),
+                    assigned_from_participants=assigned.method == "participant_consensus",
+                    satisfactory=float(_option(data["config"], "z_satisfactory", 2)),
+                    unsatisfactory=float(_option(data["config"], "z_unsatisfactory", 3)),
+                    en_limit=float(_option(data["config"], "en_limit", 1)),
+                )
+                if assigned.sigma_final is None and assigned.sigma_temporary is not None:
+                    score_result.warnings.append("能力评定标准差为临时值，评价仅供暂时参考")
+                scores[name] = score_result.to_dict()
+        participant_scores[participant["id"]] = scores
+    result["参加者统计量"] = participant_scores
     return result
 
 
@@ -124,6 +204,10 @@ def calculate(data: dict[str, Any]) -> dict[str, Any]:
             result["其他稳定性"] = extra
     if data["participants"]:
         result.update(_participant_results(data, sigma))
+    if data.get("assigned_config", {}).get("method"):
+        result.update(_assigned_results(data))
+    if data.get("algorithm_s_values"):
+        result["算法S"] = algorithm_s(data["algorithm_s_values"], data["algorithm_s_df"]).to_dict()
     if not result:
         raise ValueError("没有可计算的数据")
     return result
@@ -132,7 +216,9 @@ def calculate(data: dict[str, Any]) -> dict[str, Any]:
 def _parser() -> argparse.ArgumentParser:
     """创建带中文说明的命令行参数。"""
     parser = argparse.ArgumentParser(prog="openpt", description="能力验证统计工作台")
-    parser.add_argument("--version", action="version", version="openpt 0.0.1", help="显示版本")
+    parser.add_argument(
+        "--version", action="version", version=f"openpt {__version__}", help="显示版本"
+    )
     sub = parser.add_subparsers(dest="command", required=True, title="命令")
     t = sub.add_parser("template", help="生成空白 Excel 模板")
     t.add_argument("output", help="模板文件路径")

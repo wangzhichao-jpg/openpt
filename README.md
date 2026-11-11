@@ -1,6 +1,6 @@
-# OpenPT 0.0.1
+# OpenPT 0.1.0.dev1
 
-能力验证统计工作台原型，提供单因子 ANOVA、Ss、稳定性 t 检验、算法 A、中位数与 NIQR、z、Excel 模板、复核差异表与 DOCX。计算结果供具备资质的人员复核使用；方法依据为 CNAS-GL003:2018、CNAS-GL002:2018，用户可配置。**当前尚未通过全部验收，不得用于正式评价或直接发布。**
+能力验证统计工作台原型，提供单因子 ANOVA、Ss、稳定性 t 检验、算法 A 和 S、中位数与 NIQR、指定值及不确定度、D、D%、z、z′、ζ、En、Excel 模板、复核差异表与 DOCX。计算结果供具备资质的人员复核使用；方法依据为 CNAS-GL003:2018、CNAS-GL002:2018，用户可配置。**当前尚未通过全部验收，不得用于正式评价或直接发布。**
 
 ## 安装
 
@@ -28,6 +28,7 @@ python -m pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -e '.[test]'
 openpt template input.xlsx
 openpt run input.xlsx
 openpt review input.xlsx --mapping examples/mapping.json
+openpt review-batch input1.xlsx input2.xlsx --output differences.xlsx --mapping examples/mapping.json
 openpt demo demo-output
 openpt --version
 python -m pytest -m "not internal"
@@ -41,7 +42,15 @@ python -m pytest -m "not internal"
 
 ## 配置与边界
 
-方法配置表 `alpha` 默认 0.05；`sigma` 缺省时相应提示未评价；`strict_homogeneity` 默认 FALSE；`stability_method` 默认 `two_sample`，可设 `one_sample` 并提供 `reference`；`assigned` 和 `sigma_pt` 用于 z；未提供 `sigma_pt` 时回退到 `sigma`。稳定性推荐模型使用包装单元均值。算法 A 的 `algorithm_a_rule` 默认 `gl002`（第三有效位及对应位），可选 `absolute`（使用 `algorithm_a_tolerance`）或 `simplified`；可配置 `algorithm_a_max_iterations`。程序另算绝对容差收敛对照并放入计算书附录，显示位数不同时提示停止规则敏感。DOCX 参加者 z 值默认保留两位小数，配置 `display_z_decimals` 可设 0～12 位；CSV 和 JSON 不按此设置截断。不平衡均匀性方法及分位数定义见 ADR-002。相关和配对稳定性设计必须在模板中显式声明，程序将阻断结论；参考值不确定度不可忽略时亦须显式声明并阻断。程序不能自动判定设计独立性。全部重复值仅用于复核，常规运行不接受。指定值和不确定度模型、更多比分数及扩展配置均尚未实现。
+方法配置表 `alpha` 默认 0.05；`sigma` 缺省时相应提示未评价；`strict_homogeneity` 默认 FALSE；`stability_method` 默认 `two_sample`，可设 `one_sample` 并提供 `reference`；`assigned` 和 `sigma_pt` 用于 z；未提供 `sigma_pt` 时回退到 `sigma`。稳定性推荐模型使用包装单元均值。算法 A 的 `algorithm_a_rule` 默认 `gl002`（第三有效位及对应位），可选 `absolute`（使用 `algorithm_a_tolerance`）或 `simplified`；可配置 `algorithm_a_max_iterations`。程序另算绝对容差收敛对照并放入计算书附录，显示位数不同时提示停止规则敏感。DOCX 参加者 z 值默认保留两位小数，配置 `display_z_decimals` 可设 0～12 位；CSV 和 JSON 不按此设置截断。不平衡均匀性方法及分位数定义见 ADR-002。相关和配对稳定性设计必须在模板中显式声明，程序将阻断结论；参考值不确定度不可忽略时亦须显式声明并阻断。程序不能自动判定设计独立性。全部重复值仅用于复核，常规运行不接受。GL003 之外的扩展配置尚未实现。
+
+### 指定值和能力统计量
+
+在“指定值与不确定度”表登记方法：`known`、`certified`、`reference`、`expert_consensus`、`participant_consensus`。前四类应输入已评定的值、标准不确定度及各自来源；参加者公议值选择 `robust_mean` 或 `median`，使用扩展方法 u(X)=1.25s*/√p。该公式对中位数法的适用性须专家批准，ISO 13528 条款号待核对。临时和最终 σ_pt 及确定程序分开登记，最终值优先；没有最终值时计算结果提示临时值。`hom_mapping`、`stab_mapping` 可为 `none`、`assigned`、`sigma_prime`；`both` 和重复计入会触发 `DESIGN_REVIEW` 并阻止参加者评价。基础 u(X) 已含某分量时须如实设置相应 `*_in_base`。程序假定已选分量独立，无法识别未登记的重复计入。
+
+方法配置的 `score_type` 可选 `D`、`D%`、`z`、`zprime`、`zeta`、`En` 或 `all`。参加者表中的 u(x)、U(x)、k 用于 ζ 和 En；指定值表需登记 `U_assigned`、`k_assigned` 及结果间 `independent`。En 按 GL002 使用 k=2；ζ 和 En 仅适用于不相关结果。缺少前提时不作评价。指定值由参加者公议时 z′ 转设计审核。D 和 D% 没有默认满意度判据。`examples/assigned_value_scores.xlsx`、`.json`、`.docx` 均为虚构数据。
+
+“算法S”表填写至少两个标准差或极差和统一自由度 1～10，可获得 GL002 A.3 算法 S 结果及迭代历史。复核声称值支持 `NIQR`、`u(X)`、`zprime:参加者编号`、`zeta:参加者编号`、`En:参加者编号`；映射 JSON 可将统计量键映射到多个条目字符串组成的数组。批量输出按 `DIFFERENCE`、`NOTE`、`MATCH` 排序并支持筛选。
 
 DOCX 指定中文宋体、西文 Times New Roman，不附带字体；若系统缺字，请安装有授权的相应字体或在文档编辑器中选择已安装的中文字体后重新导出。不同平台排版需逐页检查。
 

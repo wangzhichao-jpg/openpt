@@ -23,6 +23,7 @@ class AssignedResult(ResultMapping):
     u: float | None
     source: str
     uncertainty_source: str
+    base_u: float
     consensus_method: str | None
     sigma_temporary: float | None
     sigma_final: float | None
@@ -32,6 +33,8 @@ class AssignedResult(ResultMapping):
     u_stab: float
     hom_mapping: str
     stab_mapping: str
+    hom_in_base: bool
+    stab_in_base: bool
     status: str
     warnings: list[str]
     formula: str
@@ -141,6 +144,7 @@ def assign_value(
         u if not duplicate and not warnings else None,
         source,
         uncertainty_source,
+        base_u,
         consensus_method if method == "participant_consensus" else None,
         temporary,
         final,
@@ -150,6 +154,8 @@ def assign_value(
         us,
         hom_mapping,
         stab_mapping,
+        hom_in_base,
+        stab_in_base,
         "DESIGN_REVIEW" if duplicate else "NOT_EVALUATED" if warnings else "OK",
         warnings,
         formula,

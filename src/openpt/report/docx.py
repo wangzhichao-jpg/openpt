@@ -15,6 +15,8 @@ from docx.oxml.ns import qn
 from docx.shared import Cm, Pt
 from openpyxl.utils.cell import column_index_from_string, coordinate_from_string, get_column_letter
 
+from .. import __version__
+
 
 def _shown(value: Any, digits: int = 4, places: int | None = None) -> str:
     """输出指定精度，空值和布尔值使用中文。"""
@@ -211,7 +213,7 @@ def _homogeneity(
         doc.add_paragraph(
             "扩展方法：不平衡随机效应单因子 ANOVA；n₀=(N-Σnᵢ²/N)/(g-1)，"
             "Ss²=max(0,(MS组间-MS组内)/n₀)。出处：Searle 等，Variance Components，"
-            "1992，单因子随机效应模型；GL003 4.3 仅给出平衡设计。"
+            "1992，单因子随机效应模型，出处页码待专家核对；GL003 4.3 仅给出平衡设计。"
             f" 本例 n₀={_shown(h['n0'])}。"
         )
     _homogeneity_conclusion(doc, h, sig, ss_places, alpha)
@@ -274,6 +276,7 @@ def _stability_table(doc: Any, name: str, s: dict[str, Any], sig: int) -> None:
     if s.get("reference_source"):
         doc.add_paragraph("参考值来源：" + str(s["reference_source"]))
     doc.add_paragraph("实验层级：" + str(s.get("observation_level", "unit_means")))
+    doc.add_paragraph("按用户登记的独立设计计算；独立性未由软件自动验证。")
     names = [
         ("均值差", "difference"),
         ("t 值", "t"),
@@ -335,6 +338,13 @@ def _other_results(
     else:
         doc.add_paragraph("未提供稳定性数据。")
     _robust_results(doc, result, sig, mean_places)
+    algorithm_s_result = result.get("算法S")
+    if algorithm_s_result:
+        doc.add_paragraph(
+            "GL002 附录 A.3 式 A.7—A.10：w*=ξ·√[Σmin(wᵢ,ηw*)²/p]；"
+            f"w*={_shown(algorithm_s_result['w'], sig)}，"
+            f"自由度={algorithm_s_result['df']}，状态={algorithm_s_result['status']}。"
+        )
     niqr = result.get("中位数NIQR")
     if niqr:
         doc.add_paragraph(
@@ -342,6 +352,7 @@ def _other_results(
             f"中位数={_shown(niqr['median'], sig)}，Q1={_shown(niqr['q1'], sig)}，"
             f"Q3={_shown(niqr['q3'], sig)}，NIQR={_shown(niqr['niqr'], sig)}。"
         )
+    _assigned_table(doc, result)
     _participant_table(doc, data, result, z_places)
 
 
@@ -380,7 +391,39 @@ def _robust_results(doc: Any, result: dict[str, Any], sig: int, mean_places: int
                 "两者在显示位数下不同，不据此认定报告错误。"
             )
     else:
-        doc.add_paragraph("未提供参加者结果。")
+        doc.add_paragraph(str(result.get("稳健统计状态", "未提供参加者结果。")))
+
+
+def _assigned_table(doc: Any, result: dict[str, Any]) -> None:
+    """展示 GL002 4.3 定值与扩展方法的不确定度及映射。"""
+    assigned = result.get("指定值与不确定度")
+    if not assigned:
+        return
+    doc.add_heading("指定值与不确定度", 1)
+    labels = [
+        ("定值方法", "method"),
+        ("指定值", "value"),
+        ("标准不确定度 u(X)", "u"),
+        ("基础标准不确定度", "base_u"),
+        ("指定值来源", "source"),
+        ("不确定度来源", "uncertainty_source"),
+        ("临时 σ_pt", "sigma_temporary"),
+        ("最终 σ_pt", "sigma_final"),
+        ("σ_pt 确定程序", "sigma_procedure"),
+        ("评价标准差 σ′", "sigma_prime"),
+        ("u_hom", "u_hom"),
+        ("均匀性分量映射", "hom_mapping"),
+        ("基础值含均匀性分量", "hom_in_base"),
+        ("u_stab", "u_stab"),
+        ("稳定性分量映射", "stab_mapping"),
+        ("基础值含稳定性分量", "stab_in_base"),
+        ("状态", "status"),
+    ]
+    _table(doc, ["项目", "结果"], [[label, _shown(assigned.get(key))] for label, key in labels])
+    doc.add_paragraph(assigned.get("formula", ""))
+    doc.add_paragraph("扩展方法：独立分量平方和开方；σ′ 分量映射须经批准，ISO 13528 待核对条款号。")
+    for warning in assigned.get("warnings", []):
+        doc.add_paragraph("设计提示：" + warning)
 
 
 def _participant_table(
@@ -388,6 +431,34 @@ def _participant_table(
 ) -> None:
     """按参加者显示 z、评价及原始数据来源。"""
     doc.add_heading("参加者评价", 1)
+    new_scores = result.get("参加者统计量")
+    if new_scores is not None:
+        rows = []
+        formulas: set[str] = set()
+        warnings: set[str] = set()
+        for participant in data["participants"]:
+            for name, score in new_scores.get(participant["id"], {}).items():
+                rows.append(
+                    [
+                        participant["id"],
+                        name,
+                        _shown(score.get("value"), places=z_places),
+                        score.get("status"),
+                        score.get("classification") or "未评价",
+                        score.get("reason") or "—",
+                    ]
+                )
+                formulas.add(score.get("formula", ""))
+                warnings.update(score.get("warnings", []))
+        if rows:
+            _table(doc, ["参加者", "统计量", "值", "状态", "评价", "原因"], rows)
+        else:
+            doc.add_paragraph("未提供参加者结果。")
+        for formula in sorted(formulas):
+            doc.add_paragraph(formula)
+        for warning in sorted(warnings):
+            doc.add_paragraph("提示：" + warning)
+        return
     scores = result.get("参加者z", {})
     if scores:
         _table(
@@ -539,7 +610,7 @@ def make_report(
     doc.add_paragraph("复核人：________________    日期：____________")
     doc.add_page_break()
     doc.add_heading("附录：全精度记录", 1)
-    doc.add_paragraph("软件版本：0.0.1")
+    doc.add_paragraph("软件版本：" + __version__)
     doc.add_paragraph("输入文件 SHA-256：" + (input_sha256 or "未提供"))
     doc.add_paragraph("生成时间（UTC）：" + datetime.now(timezone.utc).isoformat())
     doc.add_paragraph("配置原文：" + json.dumps(cfg, ensure_ascii=False, allow_nan=False))
