@@ -1,3 +1,8 @@
 include THIRD_PARTY_LICENSES.md
-prune tests
+recursive-include tests *.py *.json
+exclude tests/test_internal.py
+exclude tests/test_internal_cli.py
+include examples/GL003_A1.xlsx
+include examples/synthetic_review.xlsx
+include docs/计算书截图.png
 prune tools
