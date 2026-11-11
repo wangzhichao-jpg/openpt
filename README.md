@@ -48,15 +48,17 @@ python -m pytest -m "not internal"
 
 `openpt validate input.xlsx [--columns columns.json]` 只读检查已有的均匀性、稳定性和参加者测量表，输出 JSON 问题列表。列映射 JSON 格式示例：`{"均匀性": {"单元编号": "样品", "值": "读数"}}`，即标准字段映射到原表头；未列出的字段使用标准表头。CSV 用 `openpt validate input.csv --sheet 均匀性 --encoding utf-8-sig` 检查；GBK 文件须显式指定 `--encoding gbk`。有问题返回码为 1，输入错误返回码为 2。
 
-这是独立的预检查，不会修改输入、不会创建快照。`run`/`review` 也支持 `--columns columns.json`，或用 `--unit mg --encoding utf-8-sig --csv-sheet 均匀性` 导入单测量表 CSV。CSV 的工作表名是所选类型，列号和行号对应原文件；项目名称可通过 `--project` 指定。检查范围限上述测量表，同表单位按首个非空单位比较，不等于完整的跨表测量对象单位检查，也不检查其他工作表或补全缺失工作表。公式即使有缓存，现有计算器仍不接受；快照及映射记录尚未接入。
+这是独立的预检查，不会修改输入、不会创建快照。`run`/`review` 也支持 `--columns columns.json`，或用 `--unit mg --encoding utf-8-sig --csv-sheet 均匀性` 导入单测量表 CSV。CSV 的工作表名是所选类型，列号和行号对应原文件；项目名称可通过 `--project` 指定。检查范围限上述测量表，同表单位按首个非空单位比较，不等于完整的跨表测量对象单位检查，也不检查其他工作表或补全缺失工作表。公式即使有缓存，现有计算器仍不接受；原始输入和列映射会保存到运行快照。
 
 ## 随机抽样
 
 `openpt sample --units 100 --pick 20 --seed 42 --output sample-output` 创建新目录，输出 JSON、CSV 和 XLSX；默认每单元生成两次重复的随机检测顺序。可通过 `--strata strata.json` 指定完整分层，例如 `{"层A": [1, 2], "层B": [3, 4]}`（须覆盖 1 至总体数且不得重复）。抽样数不足 10 时提示 `DESIGN_WARNING`；重复测试实际独立取样仍须由人员保证。JSON 保留完整映射和种子，因此盲码不构成身份保密措施；CSV 的危险开头层名会加单引号防公式注入，原始层名保存在 JSON。抽样记录暂不能作为自动运行快照输入，算法细节见 ADR-003。
 
-## 实验性审计包检查
+## 阶段性可追溯工作流
 
-`openpt pack 运行目录 -o 新文件.zip` 和 `openpt verify 新文件.zip` 可检查手工准备的清单，清单格式为 `{"files": {"相对文件名": "小写 SHA-256"}}`；清单本身不列入 `files`。检查覆盖全部普通文件并拒绝路径穿越、符号链接、重复路径和额外文件；不会解压或执行包内代码，也不会覆盖已存在的 ZIP。该功能**尚未与 run/review 的运行目录相连**，也不提供恢复重现功能。清单本身没有数字签名，攻击者同时修改清单与内容时无法验证真实性；应通过可信渠道独立保存 ZIP 哈希或使用外部签名。
+`openpt run input.xlsx --runs-dir runs` 或 `openpt review input.xlsx --runs-dir runs` 会创建新的运行目录，保存原始输入字节、配置、环境、结果、DOCX、日志及哈希清单；默认运行目录根为当前目录的 `runs/`。`--sample-record sample-output/sample.json` 可附带抽样记录。为兼容旧接口，计算书和 JSON 同时仍写入输入文件旁或指定输出位置，普通输出不能写进已有运行目录。
+
+`openpt reproduce 运行目录` 首先核验清单，再重新计算并逐字段比较；环境不同会警告。`openpt pack 运行目录 -o 新文件.zip` 打包，`openpt verify 新文件.zip` 检查清单；不解压或执行包内代码，也不覆盖已有 ZIP。清单格式为 `{"files": {"相对文件名": "小写 SHA-256"}}`，清单本身不列入 `files`。清单没有数字签名，攻击者同时修改清单与内容时无法验证真实性；应通过可信渠道独立保存 ZIP 哈希或使用外部签名。人工决定和三格式计算书尚在施工。
 
 ## 配置与边界
 

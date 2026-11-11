@@ -2,8 +2,8 @@
 """命令行入口。"""
 
 import argparse
-import hashlib
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -17,7 +17,7 @@ from .core.scores import performance_score
 from .core.stability import analyze as stability
 from .core.zscore import zscore
 from .errors import InputError
-from .io.excel import read_workbook, template
+from .io.excel import template
 from .report.docx import make_report
 
 
@@ -258,6 +258,8 @@ def _parser() -> argparse.ArgumentParser:
     sampling.add_argument("--seed", type=int, required=True, help="非负随机种子")
     sampling.add_argument("--strata", help="分层 JSON 文件")
     sampling.add_argument("--output", default="sample-output", help="新的输出目录")
+    reproduction = sub.add_parser("reproduce", help="校验快照并重新计算")
+    reproduction.add_argument("directory", help="已有运行目录")
     pack = sub.add_parser("pack", help="按 manifest.json 打包已有运行目录")
     pack.add_argument("directory", help="运行目录")
     pack.add_argument("-o", "--output", required=True, help="新的 ZIP 文件")
@@ -284,6 +286,10 @@ def _parser() -> argparse.ArgumentParser:
         p.add_argument("--csv-sheet", default="均匀性", help="CSV 对应的测量表")
         p.add_argument("--unit", help="CSV 测量单位，须明确提供")
         p.add_argument("--project", default="CSV 输入", help="CSV 项目名称")
+        p.add_argument(
+            "--runs-dir", default=os.environ.get("OPENPT_RUNS_DIR", "runs"), help="运行记录根目录"
+        )
+        p.add_argument("--sample-record", help="可选抽样记录文件，原样保存")
         p.add_argument("--docx", help="计算书路径；默认写入输入文件旁")
         p.add_argument("--json", help="结果 JSON 路径；默认写入输入文件旁")
         if name == "review":
@@ -292,18 +298,31 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _deny_run_write(path: str | Path) -> None:
+    """拒绝将普通输出写入任何已有运行目录。"""
+    target = Path(path).resolve()
+    if any((parent / "manifest.json").is_file() for parent in (target, *target.parents)):
+        raise ValueError("不得修改已有运行目录")
+
+
 def _validate_output_paths(args: argparse.Namespace) -> None:
     """防止输出文件覆盖输入、映射文件或彼此覆盖。"""
     outputs = [Path(args.docx).resolve(), Path(args.json).resolve()]
     protected = {Path(args.input).resolve()}
     if args.columns:
         protected.add(Path(args.columns).resolve())
+    if args.sample_record:
+        protected.add(Path(args.sample_record).resolve())
     if args.command == "review":
         outputs.append(Path(args.differences).resolve())
         if args.mapping:
             protected.add(Path(args.mapping).resolve())
     if len(set(outputs)) != len(outputs) or protected.intersection(outputs):
         raise ValueError("输出路径不得覆盖输入文件、映射文件或其他输出文件")
+    if any(path.is_relative_to(Path(args.runs_dir).resolve()) for path in outputs):
+        raise ValueError("常规输出不得写入运行记录根目录")
+    for path in outputs:
+        _deny_run_write(path)
 
 
 def _configure_console() -> None:
@@ -328,6 +347,7 @@ def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
         if args.command == "template":
+            _deny_run_write(args.output)
             template(args.output)
             return 0
         if args.command == "sample":
@@ -339,13 +359,25 @@ def main(argv: list[str] | None = None) -> int:
             if strata is not None and not isinstance(strata, dict):
                 raise ValueError("分层必须是 JSON 对象")
             record = sample(args.units, args.pick, args.seed, strata)
+            _deny_run_write(args.output)
             write_sample(args.output, record)
             for warning in record["warnings"]:
                 print(warning)
             return 0
+        if args.command == "reproduce":
+            from .runs import reproduce
+
+            audit_differences, warnings = reproduce(Path(args.directory))
+            for item in warnings:
+                print(f"环境版本不同：{item}")
+            print("不可重现" if audit_differences else "可重现")
+            for difference in audit_differences:
+                print(difference)
+            return 1 if audit_differences else 0
         if args.command == "pack":
             from .audit import pack_directory
 
+            _deny_run_write(args.output)
             pack_directory(args.directory, args.output)
             return 0
         if args.command == "verify":
@@ -386,6 +418,7 @@ def main(argv: list[str] | None = None) -> int:
                 protected.add(Path(args.mapping).resolve())
             if Path(args.output).resolve() in protected:
                 raise ValueError("输出路径不得覆盖输入或映射")
+            _deny_run_write(args.output)
             mapping = (
                 json.loads(Path(args.mapping).read_text(encoding="utf-8")) if args.mapping else None
             )
@@ -401,30 +434,15 @@ def main(argv: list[str] | None = None) -> int:
                 input_path.with_name(input_path.stem + "_差异.csv")
             )
         _validate_output_paths(args)
-        digest = hashlib.sha256(Path(args.input).read_bytes()).hexdigest()
-        columns = json.loads(Path(args.columns).read_text(encoding="utf-8")) if args.columns else {}
-        if not isinstance(columns, dict):
-            raise ValueError("列映射必须是 JSON 对象")
-        data = read_workbook(
-            args.input,
-            columns,
-            encoding=args.encoding,
-            csv_sheet=args.csv_sheet,
-            unit=args.unit,
-            project=args.project,
-        )
-        result = calculate(data, review_mode=args.command == "review")
-        differences = None
-        if args.command == "review":
-            from .review.compare import review, write_csv
+        from .runs import create_run
 
-            mapping = (
-                json.loads(Path(args.mapping).read_text(encoding="utf-8")) if args.mapping else None
-            )
-            if mapping is not None and not isinstance(mapping, dict):
-                raise ValueError("评分映射必须是 JSON 对象")
-            differences = review(data, result, mapping)
+        _deny_run_write(args.runs_dir)
+        directory, data, result, differences, digest = create_run(args, Path(args.runs_dir))
+        if differences is not None:
+            from .review.compare import write_csv
+
             write_csv(args.differences, differences)
+        print(f"运行记录：{directory.name}")
         Path(args.json).write_text(
             json.dumps(result, ensure_ascii=False, indent=2, allow_nan=False) + "\n",
             encoding="utf-8",
