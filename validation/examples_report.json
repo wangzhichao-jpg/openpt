@@ -1,0 +1,524 @@
+[
+  {
+    "case": "GL003_A1.xlsx",
+    "group": "均匀性",
+    "statistic": "MS_between",
+    "openpt": 48.26005555555555,
+    "r": 48.2600555555555,
+    "relative_error": 1.0306244145523228e-15,
+    "pass": true
+  },
+  {
+    "case": "GL003_A1.xlsx",
+    "group": "均匀性",
+    "statistic": "MS_within",
+    "openpt": 41.32850000000002,
+    "r": 41.3285,
+    "relative_error": 5.157768143727209e-16,
+    "pass": true
+  },
+  {
+    "case": "GL003_A1.xlsx",
+    "group": "均匀性",
+    "statistic": "F",
+    "openpt": 1.167718536979458,
+    "r": 1.16771853697946,
+    "relative_error": 1.7113725448724577e-15,
+    "pass": true
+  },
+  {
+    "case": "GL003_A1.xlsx",
+    "group": "均匀性",
+    "statistic": "p",
+    "openpt": 0.40354534348704724,
+    "r": 0.403545343487049,
+    "relative_error": 4.401876686398338e-15,
+    "pass": true
+  },
+  {
+    "case": "GL003_A1.xlsx",
+    "group": "均匀性",
+    "statistic": "n0",
+    "openpt": 2.0,
+    "r": 2.0,
+    "relative_error": 0.0,
+    "pass": true
+  },
+  {
+    "case": "GL003_A1.xlsx",
+    "group": "均匀性",
+    "statistic": "Ss",
+    "openpt": 1.8616599522409474,
+    "r": 1.86165995224094,
+    "relative_error": 3.935988392351509e-15,
+    "pass": true
+  },
+  {
+    "case": "assigned_value_scores.xlsx",
+    "group": "P1",
+    "statistic": "z",
+    "openpt": -0.2,
+    "r": -0.2,
+    "relative_error": 0.0,
+    "pass": true
+  },
+  {
+    "case": "assigned_value_scores.xlsx",
+    "group": "P1",
+    "statistic": "zprime",
+    "openpt": -0.19596545041740512,
+    "r": -0.195965450417405,
+    "relative_error": 5.665401846398887e-16,
+    "pass": true
+  },
+  {
+    "case": "assigned_value_scores.xlsx",
+    "group": "P1",
+    "statistic": "zeta",
+    "openpt": -0.5513178464199713,
+    "r": -0.551317846419971,
+    "relative_error": 6.041286520114393e-16,
+    "pass": true
+  },
+  {
+    "case": "assigned_value_scores.xlsx",
+    "group": "P1",
+    "statistic": "En",
+    "openpt": -0.27565892320998564,
+    "r": -0.275658923209986,
+    "relative_error": 1.2082573040228772e-15,
+    "pass": true
+  },
+  {
+    "case": "assigned_value_scores.xlsx",
+    "group": "P2",
+    "statistic": "z",
+    "openpt": 0.2,
+    "r": 0.2,
+    "relative_error": 0.0,
+    "pass": true
+  },
+  {
+    "case": "assigned_value_scores.xlsx",
+    "group": "P2",
+    "statistic": "zprime",
+    "openpt": 0.19596545041740512,
+    "r": 0.195965450417405,
+    "relative_error": 5.665401846398887e-16,
+    "pass": true
+  },
+  {
+    "case": "assigned_value_scores.xlsx",
+    "group": "P2",
+    "statistic": "zeta",
+    "openpt": 0.5513178464199713,
+    "r": 0.551317846419971,
+    "relative_error": 6.041286520114393e-16,
+    "pass": true
+  },
+  {
+    "case": "assigned_value_scores.xlsx",
+    "group": "P2",
+    "statistic": "En",
+    "openpt": 0.27565892320998564,
+    "r": 0.275658923209986,
+    "relative_error": 1.2082573040228772e-15,
+    "pass": true
+  },
+  {
+    "case": "assigned_value_scores.xlsx",
+    "group": "P3",
+    "statistic": "z",
+    "openpt": 0.6,
+    "r": 0.6,
+    "relative_error": 0.0,
+    "pass": true
+  },
+  {
+    "case": "assigned_value_scores.xlsx",
+    "group": "P3",
+    "statistic": "zprime",
+    "openpt": 0.5878963512522153,
+    "r": 0.587896351252215,
+    "relative_error": 5.665401846398887e-16,
+    "pass": true
+  },
+  {
+    "case": "assigned_value_scores.xlsx",
+    "group": "P3",
+    "statistic": "zeta",
+    "openpt": 1.6539535392599138,
+    "r": 1.65395353925991,
+    "relative_error": 2.2822637964876594e-15,
+    "pass": true
+  },
+  {
+    "case": "assigned_value_scores.xlsx",
+    "group": "P3",
+    "statistic": "En",
+    "openpt": 0.8269767696299569,
+    "r": 0.826976769629957,
+    "relative_error": 1.342508115580976e-16,
+    "pass": true
+  },
+  {
+    "case": "synthetic_review.xlsx",
+    "group": "均匀性",
+    "statistic": "MS_between",
+    "openpt": 18.333333333333332,
+    "r": 18.3333333333334,
+    "relative_error": 3.681903267120506e-15,
+    "pass": true
+  },
+  {
+    "case": "synthetic_review.xlsx",
+    "group": "均匀性",
+    "statistic": "MS_within",
+    "openpt": 0.5,
+    "r": 0.500000000000005,
+    "relative_error": 9.99200722162631e-15,
+    "pass": true
+  },
+  {
+    "case": "synthetic_review.xlsx",
+    "group": "均匀性",
+    "statistic": "F",
+    "openpt": 36.666666666666664,
+    "r": 36.6666666666664,
+    "relative_error": 7.170022151761012e-15,
+    "pass": true
+  },
+  {
+    "case": "synthetic_review.xlsx",
+    "group": "均匀性",
+    "statistic": "p",
+    "openpt": 1.7246757431041793e-06,
+    "r": 1.72467574310425e-06,
+    "relative_error": 4.100901365286894e-14,
+    "pass": true
+  },
+  {
+    "case": "synthetic_review.xlsx",
+    "group": "均匀性",
+    "statistic": "n0",
+    "openpt": 2.0,
+    "r": 2.0,
+    "relative_error": 0.0,
+    "pass": true
+  },
+  {
+    "case": "synthetic_review.xlsx",
+    "group": "均匀性",
+    "statistic": "Ss",
+    "openpt": 2.9860788111948193,
+    "r": 2.98607881119482,
+    "relative_error": 2.9743971136004216e-16,
+    "pass": true
+  },
+  {
+    "case": "synthetic_review.xlsx",
+    "group": "稳定期/单元均值",
+    "statistic": "t_pooled",
+    "openpt": 0.06433340349803005,
+    "r": 0.0643334034980301,
+    "relative_error": 8.628666946395521e-16,
+    "pass": true
+  },
+  {
+    "case": "synthetic_review.xlsx",
+    "group": "稳定期/单元均值",
+    "statistic": "df_pooled",
+    "openpt": 11,
+    "r": 11.0,
+    "relative_error": 0.0,
+    "pass": true
+  },
+  {
+    "case": "synthetic_review.xlsx",
+    "group": "稳定期/单元均值",
+    "statistic": "p_pooled",
+    "openpt": 0.9498589932196957,
+    "r": 0.949858993219696,
+    "relative_error": 3.506487907837399e-16,
+    "pass": true
+  },
+  {
+    "case": "synthetic_review.xlsx",
+    "group": "稳定期/单元均值",
+    "statistic": "t_welch",
+    "openpt": 0.11224811807013549,
+    "r": 0.112248118070135,
+    "relative_error": 4.327222421404109e-15,
+    "pass": true
+  },
+  {
+    "case": "synthetic_review.xlsx",
+    "group": "稳定期/单元均值",
+    "statistic": "df_welch",
+    "openpt": 10.93223912066878,
+    "r": 10.9322391206688,
+    "relative_error": 1.787367164011261e-15,
+    "pass": true
+  },
+  {
+    "case": "synthetic_review.xlsx",
+    "group": "稳定期/单元均值",
+    "statistic": "p_welch",
+    "openpt": 0.9126612088186374,
+    "r": 0.912661208818637,
+    "relative_error": 4.865871426976703e-16,
+    "pass": true
+  },
+  {
+    "case": "synthetic_review.xlsx",
+    "group": "后期/单元均值",
+    "statistic": "t_pooled",
+    "openpt": 0.2929311545598223,
+    "r": 0.292931154559822,
+    "relative_error": 1.1370142854488634e-15,
+    "pass": true
+  },
+  {
+    "case": "synthetic_review.xlsx",
+    "group": "后期/单元均值",
+    "statistic": "df_pooled",
+    "openpt": 11,
+    "r": 11.0,
+    "relative_error": 0.0,
+    "pass": true
+  },
+  {
+    "case": "synthetic_review.xlsx",
+    "group": "后期/单元均值",
+    "statistic": "p_pooled",
+    "openpt": 0.7750268139502835,
+    "r": 0.775026813950284,
+    "relative_error": 7.162481378975711e-16,
+    "pass": true
+  },
+  {
+    "case": "synthetic_review.xlsx",
+    "group": "后期/单元均值",
+    "statistic": "t_welch",
+    "openpt": 0.48867777742521856,
+    "r": 0.488677777425219,
+    "relative_error": 9.087567112012176e-16,
+    "pass": true
+  },
+  {
+    "case": "synthetic_review.xlsx",
+    "group": "后期/单元均值",
+    "statistic": "df_welch",
+    "openpt": 10.828129784838323,
+    "r": 10.8281297848383,
+    "relative_error": 2.1326525790758293e-15,
+    "pass": true
+  },
+  {
+    "case": "synthetic_review.xlsx",
+    "group": "后期/单元均值",
+    "statistic": "p_welch",
+    "openpt": 0.6348163517495167,
+    "r": 0.634816351749517,
+    "relative_error": 5.24666553515255e-16,
+    "pass": true
+  },
+  {
+    "case": "synthetic_review.xlsx",
+    "group": "P1",
+    "statistic": "z",
+    "openpt": 0.19607843137254904,
+    "r": 0.196078431372549,
+    "relative_error": 2.831068712794149e-16,
+    "pass": true
+  },
+  {
+    "case": "synthetic_review.xlsx",
+    "group": "P2",
+    "statistic": "z",
+    "openpt": 0.0,
+    "r": 0.0,
+    "relative_error": 0.0,
+    "pass": true
+  },
+  {
+    "case": "trace_run/input/source.xlsx",
+    "group": "均匀性",
+    "statistic": "MS_between",
+    "openpt": 18.333333333333332,
+    "r": 18.3333333333334,
+    "relative_error": 3.681903267120506e-15,
+    "pass": true
+  },
+  {
+    "case": "trace_run/input/source.xlsx",
+    "group": "均匀性",
+    "statistic": "MS_within",
+    "openpt": 0.5,
+    "r": 0.500000000000005,
+    "relative_error": 9.99200722162631e-15,
+    "pass": true
+  },
+  {
+    "case": "trace_run/input/source.xlsx",
+    "group": "均匀性",
+    "statistic": "F",
+    "openpt": 36.666666666666664,
+    "r": 36.6666666666664,
+    "relative_error": 7.170022151761012e-15,
+    "pass": true
+  },
+  {
+    "case": "trace_run/input/source.xlsx",
+    "group": "均匀性",
+    "statistic": "p",
+    "openpt": 1.7246757431041793e-06,
+    "r": 1.72467574310425e-06,
+    "relative_error": 4.100901365286894e-14,
+    "pass": true
+  },
+  {
+    "case": "trace_run/input/source.xlsx",
+    "group": "均匀性",
+    "statistic": "n0",
+    "openpt": 2.0,
+    "r": 2.0,
+    "relative_error": 0.0,
+    "pass": true
+  },
+  {
+    "case": "trace_run/input/source.xlsx",
+    "group": "均匀性",
+    "statistic": "Ss",
+    "openpt": 2.9860788111948193,
+    "r": 2.98607881119482,
+    "relative_error": 2.9743971136004216e-16,
+    "pass": true
+  },
+  {
+    "case": "trace_run/input/source.xlsx",
+    "group": "稳定期/单元均值",
+    "statistic": "t_pooled",
+    "openpt": 0.06433340349803005,
+    "r": 0.0643334034980301,
+    "relative_error": 8.628666946395521e-16,
+    "pass": true
+  },
+  {
+    "case": "trace_run/input/source.xlsx",
+    "group": "稳定期/单元均值",
+    "statistic": "df_pooled",
+    "openpt": 11,
+    "r": 11.0,
+    "relative_error": 0.0,
+    "pass": true
+  },
+  {
+    "case": "trace_run/input/source.xlsx",
+    "group": "稳定期/单元均值",
+    "statistic": "p_pooled",
+    "openpt": 0.9498589932196957,
+    "r": 0.949858993219696,
+    "relative_error": 3.506487907837399e-16,
+    "pass": true
+  },
+  {
+    "case": "trace_run/input/source.xlsx",
+    "group": "稳定期/单元均值",
+    "statistic": "t_welch",
+    "openpt": 0.11224811807013549,
+    "r": 0.112248118070135,
+    "relative_error": 4.327222421404109e-15,
+    "pass": true
+  },
+  {
+    "case": "trace_run/input/source.xlsx",
+    "group": "稳定期/单元均值",
+    "statistic": "df_welch",
+    "openpt": 10.93223912066878,
+    "r": 10.9322391206688,
+    "relative_error": 1.787367164011261e-15,
+    "pass": true
+  },
+  {
+    "case": "trace_run/input/source.xlsx",
+    "group": "稳定期/单元均值",
+    "statistic": "p_welch",
+    "openpt": 0.9126612088186374,
+    "r": 0.912661208818637,
+    "relative_error": 4.865871426976703e-16,
+    "pass": true
+  },
+  {
+    "case": "trace_run/input/source.xlsx",
+    "group": "后期/单元均值",
+    "statistic": "t_pooled",
+    "openpt": 0.2929311545598223,
+    "r": 0.292931154559822,
+    "relative_error": 1.1370142854488634e-15,
+    "pass": true
+  },
+  {
+    "case": "trace_run/input/source.xlsx",
+    "group": "后期/单元均值",
+    "statistic": "df_pooled",
+    "openpt": 11,
+    "r": 11.0,
+    "relative_error": 0.0,
+    "pass": true
+  },
+  {
+    "case": "trace_run/input/source.xlsx",
+    "group": "后期/单元均值",
+    "statistic": "p_pooled",
+    "openpt": 0.7750268139502835,
+    "r": 0.775026813950284,
+    "relative_error": 7.162481378975711e-16,
+    "pass": true
+  },
+  {
+    "case": "trace_run/input/source.xlsx",
+    "group": "后期/单元均值",
+    "statistic": "t_welch",
+    "openpt": 0.48867777742521856,
+    "r": 0.488677777425219,
+    "relative_error": 9.087567112012176e-16,
+    "pass": true
+  },
+  {
+    "case": "trace_run/input/source.xlsx",
+    "group": "后期/单元均值",
+    "statistic": "df_welch",
+    "openpt": 10.828129784838323,
+    "r": 10.8281297848383,
+    "relative_error": 2.1326525790758293e-15,
+    "pass": true
+  },
+  {
+    "case": "trace_run/input/source.xlsx",
+    "group": "后期/单元均值",
+    "statistic": "p_welch",
+    "openpt": 0.6348163517495167,
+    "r": 0.634816351749517,
+    "relative_error": 5.24666553515255e-16,
+    "pass": true
+  },
+  {
+    "case": "trace_run/input/source.xlsx",
+    "group": "P1",
+    "statistic": "z",
+    "openpt": 0.19607843137254904,
+    "r": 0.196078431372549,
+    "relative_error": 2.831068712794149e-16,
+    "pass": true
+  },
+  {
+    "case": "trace_run/input/source.xlsx",
+    "group": "P2",
+    "statistic": "z",
+    "openpt": 0.0,
+    "r": 0.0,
+    "relative_error": 0.0,
+    "pass": true
+  }
+]

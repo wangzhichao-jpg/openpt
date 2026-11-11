@@ -1,0 +1,64 @@
+# 公开工作簿及追溯示例 R 对照
+
+均匀性和稳定性采用单元均值的对应数值模型，参加者评分基于 openpt 已处理的指定值、不确定度及 σ 输入，R 独立计算统计量；不代表指定值预算本身已独立验证。参加者稳健量另见 b1_report。
+
+| 数据集 | 组/参加者 | 统计量 | openpt | R | 相对误差 | 结论 |
+|---|---|---|---:|---:|---:|---|
+| GL003_A1.xlsx | 均匀性 | MS_between | 48.260055555555553 | 48.260055555555503 | 1.03e-15 | 通过 |
+| GL003_A1.xlsx | 均匀性 | MS_within | 41.32850000000002 | 41.328499999999998 | 5.16e-16 | 通过 |
+| GL003_A1.xlsx | 均匀性 | F | 1.167718536979458 | 1.16771853697946 | 1.71e-15 | 通过 |
+| GL003_A1.xlsx | 均匀性 | p | 0.40354534348704724 | 0.40354534348704901 | 4.4e-15 | 通过 |
+| GL003_A1.xlsx | 均匀性 | n0 | 2 | 2 | 0 | 通过 |
+| GL003_A1.xlsx | 均匀性 | Ss | 1.8616599522409474 | 1.8616599522409401 | 3.94e-15 | 通过 |
+| assigned_value_scores.xlsx | P1 | z | -0.20000000000000001 | -0.20000000000000001 | 0 | 通过 |
+| assigned_value_scores.xlsx | P1 | zprime | -0.19596545041740512 | -0.19596545041740501 | 5.67e-16 | 通过 |
+| assigned_value_scores.xlsx | P1 | zeta | -0.55131784641997128 | -0.55131784641997095 | 6.04e-16 | 通过 |
+| assigned_value_scores.xlsx | P1 | En | -0.27565892320998564 | -0.27565892320998597 | 1.21e-15 | 通过 |
+| assigned_value_scores.xlsx | P2 | z | 0.20000000000000001 | 0.20000000000000001 | 0 | 通过 |
+| assigned_value_scores.xlsx | P2 | zprime | 0.19596545041740512 | 0.19596545041740501 | 5.67e-16 | 通过 |
+| assigned_value_scores.xlsx | P2 | zeta | 0.55131784641997128 | 0.55131784641997095 | 6.04e-16 | 通过 |
+| assigned_value_scores.xlsx | P2 | En | 0.27565892320998564 | 0.27565892320998597 | 1.21e-15 | 通过 |
+| assigned_value_scores.xlsx | P3 | z | 0.59999999999999998 | 0.59999999999999998 | 0 | 通过 |
+| assigned_value_scores.xlsx | P3 | zprime | 0.58789635125221529 | 0.58789635125221495 | 5.67e-16 | 通过 |
+| assigned_value_scores.xlsx | P3 | zeta | 1.6539535392599138 | 1.6539535392599101 | 2.28e-15 | 通过 |
+| assigned_value_scores.xlsx | P3 | En | 0.82697676962995692 | 0.82697676962995703 | 1.34e-16 | 通过 |
+| synthetic_review.xlsx | 均匀性 | MS_between | 18.333333333333332 | 18.3333333333334 | 3.68e-15 | 通过 |
+| synthetic_review.xlsx | 均匀性 | MS_within | 0.5 | 0.500000000000005 | 9.99e-15 | 通过 |
+| synthetic_review.xlsx | 均匀性 | F | 36.666666666666664 | 36.666666666666401 | 7.17e-15 | 通过 |
+| synthetic_review.xlsx | 均匀性 | p | 1.7246757431041793e-06 | 1.72467574310425e-06 | 4.1e-14 | 通过 |
+| synthetic_review.xlsx | 均匀性 | n0 | 2 | 2 | 0 | 通过 |
+| synthetic_review.xlsx | 均匀性 | Ss | 2.9860788111948193 | 2.9860788111948202 | 2.97e-16 | 通过 |
+| synthetic_review.xlsx | 稳定期/单元均值 | t_pooled | 0.064333403498030045 | 0.064333403498030101 | 8.63e-16 | 通过 |
+| synthetic_review.xlsx | 稳定期/单元均值 | df_pooled | 11 | 11 | 0 | 通过 |
+| synthetic_review.xlsx | 稳定期/单元均值 | p_pooled | 0.94985899321969569 | 0.94985899321969602 | 3.51e-16 | 通过 |
+| synthetic_review.xlsx | 稳定期/单元均值 | t_welch | 0.11224811807013549 | 0.112248118070135 | 4.33e-15 | 通过 |
+| synthetic_review.xlsx | 稳定期/单元均值 | df_welch | 10.932239120668781 | 10.9322391206688 | 1.79e-15 | 通过 |
+| synthetic_review.xlsx | 稳定期/单元均值 | p_welch | 0.91266120881863744 | 0.91266120881863699 | 4.87e-16 | 通过 |
+| synthetic_review.xlsx | 后期/单元均值 | t_pooled | 0.29293115455982233 | 0.29293115455982199 | 1.14e-15 | 通过 |
+| synthetic_review.xlsx | 后期/单元均值 | df_pooled | 11 | 11 | 0 | 通过 |
+| synthetic_review.xlsx | 后期/单元均值 | p_pooled | 0.7750268139502835 | 0.77502681395028405 | 7.16e-16 | 通过 |
+| synthetic_review.xlsx | 后期/单元均值 | t_welch | 0.48867777742521856 | 0.48867777742521901 | 9.09e-16 | 通过 |
+| synthetic_review.xlsx | 后期/单元均值 | df_welch | 10.828129784838323 | 10.8281297848383 | 2.13e-15 | 通过 |
+| synthetic_review.xlsx | 后期/单元均值 | p_welch | 0.63481635174951667 | 0.634816351749517 | 5.25e-16 | 通过 |
+| synthetic_review.xlsx | P1 | z | 0.19607843137254904 | 0.19607843137254899 | 2.83e-16 | 通过 |
+| synthetic_review.xlsx | P2 | z | 0 | 0 | 0 | 通过 |
+| trace_run/input/source.xlsx | 均匀性 | MS_between | 18.333333333333332 | 18.3333333333334 | 3.68e-15 | 通过 |
+| trace_run/input/source.xlsx | 均匀性 | MS_within | 0.5 | 0.500000000000005 | 9.99e-15 | 通过 |
+| trace_run/input/source.xlsx | 均匀性 | F | 36.666666666666664 | 36.666666666666401 | 7.17e-15 | 通过 |
+| trace_run/input/source.xlsx | 均匀性 | p | 1.7246757431041793e-06 | 1.72467574310425e-06 | 4.1e-14 | 通过 |
+| trace_run/input/source.xlsx | 均匀性 | n0 | 2 | 2 | 0 | 通过 |
+| trace_run/input/source.xlsx | 均匀性 | Ss | 2.9860788111948193 | 2.9860788111948202 | 2.97e-16 | 通过 |
+| trace_run/input/source.xlsx | 稳定期/单元均值 | t_pooled | 0.064333403498030045 | 0.064333403498030101 | 8.63e-16 | 通过 |
+| trace_run/input/source.xlsx | 稳定期/单元均值 | df_pooled | 11 | 11 | 0 | 通过 |
+| trace_run/input/source.xlsx | 稳定期/单元均值 | p_pooled | 0.94985899321969569 | 0.94985899321969602 | 3.51e-16 | 通过 |
+| trace_run/input/source.xlsx | 稳定期/单元均值 | t_welch | 0.11224811807013549 | 0.112248118070135 | 4.33e-15 | 通过 |
+| trace_run/input/source.xlsx | 稳定期/单元均值 | df_welch | 10.932239120668781 | 10.9322391206688 | 1.79e-15 | 通过 |
+| trace_run/input/source.xlsx | 稳定期/单元均值 | p_welch | 0.91266120881863744 | 0.91266120881863699 | 4.87e-16 | 通过 |
+| trace_run/input/source.xlsx | 后期/单元均值 | t_pooled | 0.29293115455982233 | 0.29293115455982199 | 1.14e-15 | 通过 |
+| trace_run/input/source.xlsx | 后期/单元均值 | df_pooled | 11 | 11 | 0 | 通过 |
+| trace_run/input/source.xlsx | 后期/单元均值 | p_pooled | 0.7750268139502835 | 0.77502681395028405 | 7.16e-16 | 通过 |
+| trace_run/input/source.xlsx | 后期/单元均值 | t_welch | 0.48867777742521856 | 0.48867777742521901 | 9.09e-16 | 通过 |
+| trace_run/input/source.xlsx | 后期/单元均值 | df_welch | 10.828129784838323 | 10.8281297848383 | 2.13e-15 | 通过 |
+| trace_run/input/source.xlsx | 后期/单元均值 | p_welch | 0.63481635174951667 | 0.634816351749517 | 5.25e-16 | 通过 |
+| trace_run/input/source.xlsx | P1 | z | 0.19607843137254904 | 0.19607843137254899 | 2.83e-16 | 通过 |
+| trace_run/input/source.xlsx | P2 | z | 0 | 0 | 0 | 通过 |

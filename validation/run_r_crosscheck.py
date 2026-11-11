@@ -13,6 +13,8 @@ from pathlib import Path
 
 import run_metr_crosscheck
 import run_r_b1
+import run_r_examples
+import run_r_random_stats
 import run_r_statistics
 
 from openpt.core.homogeneity import analyze
@@ -63,6 +65,7 @@ def main() -> int:
                 )
     statistics_status = run_r_statistics.main()
     b1_status = run_r_b1.main()
+    examples_status = run_r_examples.main()
     random_run = subprocess.run(
         [sys.executable, str(HERE / "run_r_random.py")],
         capture_output=True,
@@ -72,6 +75,7 @@ def main() -> int:
     if random_run.returncode not in (0, 1) or random_run.stderr:
         raise RuntimeError("随机对照执行错误：" + random_run.stderr)
     random_status = random_run.returncode
+    random_stats_status = run_r_random_stats.main()
     package_check = subprocess.run(
         [rscript, "-e", 'quit(status=if (requireNamespace("metRology", quietly=TRUE)) 0 else 1)'],
         capture_output=True,
@@ -85,6 +89,10 @@ def main() -> int:
         metrology_text = (HERE / "metrology_report.md").read_text(encoding="utf-8")
     statistics_rows = json.loads((HERE / "statistics_report.json").read_text(encoding="utf-8"))
     b1_rows = json.loads((HERE / "b1_report.json").read_text(encoding="utf-8"))
+    examples_rows = json.loads((HERE / "examples_report.json").read_text(encoding="utf-8"))
+    random_stats_rows = json.loads(
+        (HERE / "random_statistics_report.json").read_text(encoding="utf-8")
+    )
     random_report = json.loads((HERE / "random_anova_report.json").read_text(encoding="utf-8"))
     (HERE / "crosscheck_report.json").write_text(
         json.dumps(
@@ -93,7 +101,9 @@ def main() -> int:
                 "rows": rows,
                 "statistics": statistics_rows,
                 "b1_and_examples": b1_rows,
+                "examples": examples_rows,
                 "random_anova": random_report,
+                "random_statistics": random_stats_rows,
                 "metRology": metrology,
             },
             ensure_ascii=False,
@@ -120,7 +130,9 @@ def main() -> int:
     )
     statistics_report = (HERE / "statistics_report.md").read_text(encoding="utf-8")
     b1_text = (HERE / "b1_report.md").read_text(encoding="utf-8")
+    examples_text = (HERE / "examples_report.md").read_text(encoding="utf-8")
     random_text = (HERE / "random_anova_report.md").read_text(encoding="utf-8")
+    random_stats_text = (HERE / "random_statistics_report.md").read_text(encoding="utf-8")
     (HERE / "crosscheck_report.md").write_text(
         "\n".join(lines)
         + "\n\n"
@@ -128,14 +140,24 @@ def main() -> int:
         + "\n"
         + b1_text
         + "\n"
+        + examples_text
+        + "\n"
         + random_text
+        + "\n"
+        + random_stats_text
         + "\n"
         + metrology_text,
         encoding="utf-8",
     )
     return (
         0
-        if all(row["pass"] for row in rows) and statistics_status == b1_status == random_status == 0
+        if all(row["pass"] for row in rows)
+        and statistics_status
+        == b1_status
+        == examples_status
+        == random_status
+        == random_stats_status
+        == 0
         else 1
     )
 
