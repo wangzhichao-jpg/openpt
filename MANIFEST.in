@@ -4,9 +4,10 @@ exclude tests/test_internal.py
 exclude tests/test_internal_cli.py
 include examples/GL003_A1.xlsx
 include examples/synthetic_review.xlsx
+include examples/assigned_value_scores.xlsx
 include examples/trace_workflow.py
 recursive-include examples/trace_run *
 include docs/计算书截图.png
 include docs/使用手册.md
-recursive-include validation *.R *.json *.md *.py
+recursive-include validation *.R *.json *.md *.py *.csv
 prune tools
