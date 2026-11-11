@@ -278,7 +278,12 @@ def _parser() -> argparse.ArgumentParser:
     batch.add_argument("--mapping", help="可选 JSON 评分映射")
     for name in ("run", "review"):
         p = sub.add_parser(name, help="运行计算" if name == "run" else "复核报告")
-        p.add_argument("input", help="输入 Excel 文件")
+        p.add_argument("input", help="输入 Excel 或 CSV 文件")
+        p.add_argument("--columns", help="JSON 列映射文件")
+        p.add_argument("--encoding", default="utf-8-sig", help="CSV 编码")
+        p.add_argument("--csv-sheet", default="均匀性", help="CSV 对应的测量表")
+        p.add_argument("--unit", help="CSV 测量单位，须明确提供")
+        p.add_argument("--project", default="CSV 输入", help="CSV 项目名称")
         p.add_argument("--docx", help="计算书路径；默认写入输入文件旁")
         p.add_argument("--json", help="结果 JSON 路径；默认写入输入文件旁")
         if name == "review":
@@ -291,6 +296,8 @@ def _validate_output_paths(args: argparse.Namespace) -> None:
     """防止输出文件覆盖输入、映射文件或彼此覆盖。"""
     outputs = [Path(args.docx).resolve(), Path(args.json).resolve()]
     protected = {Path(args.input).resolve()}
+    if args.columns:
+        protected.add(Path(args.columns).resolve())
     if args.command == "review":
         outputs.append(Path(args.differences).resolve())
         if args.mapping:
@@ -395,7 +402,17 @@ def main(argv: list[str] | None = None) -> int:
             )
         _validate_output_paths(args)
         digest = hashlib.sha256(Path(args.input).read_bytes()).hexdigest()
-        data = read_workbook(args.input)
+        columns = json.loads(Path(args.columns).read_text(encoding="utf-8")) if args.columns else {}
+        if not isinstance(columns, dict):
+            raise ValueError("列映射必须是 JSON 对象")
+        data = read_workbook(
+            args.input,
+            columns,
+            encoding=args.encoding,
+            csv_sheet=args.csv_sheet,
+            unit=args.unit,
+            project=args.project,
+        )
         result = calculate(data, review_mode=args.command == "review")
         differences = None
         if args.command == "review":

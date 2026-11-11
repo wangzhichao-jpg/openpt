@@ -48,7 +48,7 @@ python -m pytest -m "not internal"
 
 `openpt validate input.xlsx [--columns columns.json]` 只读检查已有的均匀性、稳定性和参加者测量表，输出 JSON 问题列表。列映射 JSON 格式示例：`{"均匀性": {"单元编号": "样品", "值": "读数"}}`，即标准字段映射到原表头；未列出的字段使用标准表头。CSV 用 `openpt validate input.csv --sheet 均匀性 --encoding utf-8-sig` 检查；GBK 文件须显式指定 `--encoding gbk`。有问题返回码为 1，输入错误返回码为 2。
 
-这是独立的预检查，不会修改输入、不会创建快照；**映射和 CSV 目前尚未接入 run/review，不能用于计算**。检查范围限上述测量表，同表单位按首个非空单位比较，不等于完整的跨表测量对象单位检查，也不检查其他工作表或补全缺失工作表。公式即使有缓存，现有计算器仍不接受。
+这是独立的预检查，不会修改输入、不会创建快照。`run`/`review` 也支持 `--columns columns.json`，或用 `--unit mg --encoding utf-8-sig --csv-sheet 均匀性` 导入单测量表 CSV。CSV 的工作表名是所选类型，列号和行号对应原文件；项目名称可通过 `--project` 指定。检查范围限上述测量表，同表单位按首个非空单位比较，不等于完整的跨表测量对象单位检查，也不检查其他工作表或补全缺失工作表。公式即使有缓存，现有计算器仍不接受；快照及映射记录尚未接入。
 
 ## 随机抽样
 

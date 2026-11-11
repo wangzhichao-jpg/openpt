@@ -1,10 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
 """固定模板、输入校验及来源定位。"""
 
+import csv
 import re
 import statistics
 from collections import defaultdict
 from collections.abc import Iterator
+from contextlib import suppress
 from decimal import Decimal
 from math import isfinite
 from pathlib import Path
@@ -145,12 +147,22 @@ def template(path: str | Path) -> None:
 def _rows(book: Any, name: str) -> Iterator[Any]:
     """检查表头和公式，再逐行返回原始单元格。"""
     ws = book[name]
-    headers = [ws.cell(1, i).value for i in range(1, len(SHEETS[name]) + 1)]
-    if name == "报告声称值" and headers[-1] is None:
-        headers[-1] = "时间组"
-    if headers != SHEETS[name]:
-        raise InputError(f"{name}!1 表头错误")
-    for cells in ws.iter_rows(min_row=2, max_col=len(SHEETS[name])):
+    aliases = getattr(book, "_openpt_columns", {}).get(name, {})
+    if not isinstance(aliases, dict) or set(aliases) - set(SHEETS[name]):
+        raise InputError(f"{name}：列映射包含未知字段")
+    headers = [ws.cell(1, i).value for i in range(1, max(ws.max_column, len(SHEETS[name])) + 1)]
+    if name == "报告声称值" and headers[5] is None:
+        headers[5] = "时间组"
+    indices = []
+    for field in SHEETS[name]:
+        label = aliases.get(field, field)
+        if not isinstance(label, str) or headers.count(label) != 1:
+            raise InputError(f"{name}!1 表头 {label!r} 不存在或不唯一")
+        indices.append(headers.index(label) + 1)
+    if len(set(indices)) != len(indices):
+        raise InputError(f"{name}!1 列映射重复")
+    for row in range(2, ws.max_row + 1):
+        cells = tuple(ws.cell(row, col) for col in indices)
         if not any(c.value is not None for c in cells):
             continue
         if any(c.data_type == "f" for c in cells):
@@ -257,8 +269,18 @@ def _participants(book: Any, unit: str) -> list[dict[str, Any]]:
             "value": _numeric(row[1], "参加者结果"),
             "source": f"参加者结果!{row[1].coordinate}",
         }
-        for column, key in ((4, "u"), (5, "U"), (6, "k")):
-            cell = book["参加者结果"].cell(row[0].row, column)
+        worksheet = book["参加者结果"]
+        for column, key, header in (
+            (4, "u", "标准不确定度u(x)"),
+            (5, "U", "扩展不确定度U(x)"),
+            (6, "k", "包含因子k"),
+        ):
+            if getattr(book, "_openpt_columns", {}).get("参加者结果"):
+                headers = [worksheet.cell(1, i).value for i in range(1, worksheet.max_column + 1)]
+                if header not in headers:
+                    continue
+                column = headers.index(header) + 1
+            cell = worksheet.cell(row[0].row, column)
             if cell.data_type == "f":
                 raise InputError(f"参加者结果!{cell.coordinate}: 不接受公式")
             if cell.value is not None:
@@ -327,9 +349,57 @@ def _batches(book: Any) -> list[dict[str, Any]]:
     return records
 
 
-def read_workbook(path: str | Path) -> dict[str, Any]:
-    """导入 GL003 和 GL002 输入并记录测量单元格来源。"""
-    book = load_workbook(Path(path), data_only=False)
+def read_workbook(
+    path: str | Path,
+    columns: dict[str, Any] | None = None,
+    *,
+    encoding: str = "utf-8-sig",
+    csv_sheet: str = "均匀性",
+    unit: str | None = None,
+    project: str = "CSV 输入",
+) -> dict[str, Any]:
+    """读取 XLSX 或单测量表 CSV；CSV 单位必须由使用者明确登记。"""
+    source = Path(path)
+    if source.suffix.lower() == ".csv":
+        if csv_sheet not in ("均匀性", "稳定性", "参加者结果") or not unit:
+            raise InputError("CSV 导入须指定有效表类型和 --unit")
+        try:
+            with source.open("r", encoding=encoding, errors="strict", newline="") as stream:
+                rows = list(csv.reader(stream))
+        except (UnicodeDecodeError, LookupError) as exc:
+            raise InputError("CSV 编码错误；GBK 文件请指定 --encoding gbk") from exc
+        if not rows:
+            raise InputError("CSV 缺少表头")
+        book = Workbook()
+        book.remove(book.active)
+        for sheet, headers in SHEETS.items():
+            book.create_sheet(sheet).append(headers)
+        book["项目信息"].append(["项目名称", project])
+        book["项目信息"].append(["单位", unit])
+        ws = book[csv_sheet]
+        ws.delete_rows(1)
+        for row in rows:
+            ws.append(row)
+        aliases = (columns or {}).get(csv_sheet, {})
+        if not isinstance(aliases, dict):
+            raise InputError("CSV 列映射必须是对象")
+        value_label = aliases.get("值", "值")
+        if rows[0].count(value_label) == 1:
+            index = rows[0].index(value_label) + 1
+            for row_number in range(2, ws.max_row + 1):
+                cell = ws.cell(row_number, index)
+                with suppress(ValueError, TypeError):
+                    cell.value = float(cell.value) if cell.value not in (None, "") else None
+        # CSV 是文本，不能将以等号开头的输入当作 Excel 公式。
+        for row in ws.iter_rows():
+            for cell in row:
+                if cell.data_type == "f":
+                    cell.data_type = "s"
+    elif source.suffix.lower() == ".xlsx":
+        book = load_workbook(source, data_only=False)
+    else:
+        raise InputError("只支持 XLSX 或 CSV")
+    book._openpt_columns = columns or {}
     missing = set(SHEETS) - {"指定值与不确定度", "算法S", "候选批次"} - set(book.sheetnames)
     if missing:
         raise InputError("缺少工作表：" + ", ".join(sorted(missing)))
