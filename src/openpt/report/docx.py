@@ -643,7 +643,16 @@ def _unevaluated(result: Any, path: str = "结果") -> list[tuple[str, str, str]
                 )
                 if isinstance(reason, list):
                     reason = "；".join(map(str, reason))
+                if not reason and key in ("Ss_status", "mean_difference_status"):
+                    reason = "未提供用于用途判据的 σ"
                 rows.append((current, str(value), str(reason or "结果未记录具体原因，需人工核查")))
+            elif isinstance(value, str) and any(
+                value.startswith(status + separator)
+                for status in ("NOT_EVALUATED", "DESIGN_REVIEW", "UNASSESSED")
+                for separator in ("：", ":")
+            ):
+                status, reason = value.replace("：", ":", 1).split(":", 1)
+                rows.append((current, status, reason.strip() or "结果未记录具体原因，需人工核查"))
             elif isinstance(value, (dict, list)):
                 rows.extend(_unevaluated(value, current))
     elif isinstance(result, list):
