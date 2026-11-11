@@ -24,9 +24,9 @@ def test_unevaluated_and_report(tmp_path: Path) -> None:
         cell.text for table in doc.tables for row in table.rows for cell in row.cells
     )
     assert "待人工复核" in text and "不自动放行" in text
-    assert "缺少 σ" in table_text and "相关设计" in table_text
+    assert "未提供用于用途判据的 σ" in table_text and "相关设计" in table_text
     assert _unevaluated(result) == [
-        ("结果.均匀性.Ss_status", "NOT_EVALUATED", "缺少 σ"),
+        ("结果.均匀性.Ss_status", "NOT_EVALUATED", "未提供用于用途判据的 σ"),
         ("结果.稳定性.status", "DESIGN_REVIEW", "相关设计"),
     ]
 
