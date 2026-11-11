@@ -40,6 +40,7 @@ SHEETS = {
         "关联批次",
     ],
 }
+PARTICIPANT_OPTIONAL = ("标准不确定度u(x)", "扩展不确定度U(x)", "包含因子k")
 
 
 def template(path: str | Path) -> None:
@@ -148,7 +149,8 @@ def _rows(book: Any, name: str) -> Iterator[Any]:
     """检查表头和公式，再逐行返回原始单元格。"""
     ws = book[name]
     aliases = getattr(book, "_openpt_columns", {}).get(name, {})
-    if not isinstance(aliases, dict) or set(aliases) - set(SHEETS[name]):
+    allowed = set(SHEETS[name]) | (set(PARTICIPANT_OPTIONAL) if name == "参加者结果" else set())
+    if not isinstance(aliases, dict) or set(aliases) - allowed:
         raise InputError(f"{name}：列映射包含未知字段")
     headers = [ws.cell(1, i).value for i in range(1, max(ws.max_column, len(SHEETS[name])) + 1)]
     if name == "报告声称值" and headers[5] is None:
@@ -161,6 +163,18 @@ def _rows(book: Any, name: str) -> Iterator[Any]:
         indices.append(headers.index(label) + 1)
     if len(set(indices)) != len(indices):
         raise InputError(f"{name}!1 列映射重复")
+    if name == "参加者结果":
+        used = set(indices)
+        for field in PARTICIPANT_OPTIONAL:
+            label = aliases.get(field, field)
+            if label not in headers and field not in aliases:
+                continue
+            if not isinstance(label, str) or headers.count(label) != 1:
+                raise InputError(f"{name}!1 可选列 {label!r} 不存在或不唯一")
+            index = headers.index(label) + 1
+            if index in used:
+                raise InputError(f"{name}!1 列映射重复")
+            used.add(index)
     for row in range(2, ws.max_row + 1):
         cells = tuple(ws.cell(row, col) for col in indices)
         if not any(c.value is not None for c in cells):
@@ -275,11 +289,15 @@ def _participants(book: Any, unit: str) -> list[dict[str, Any]]:
             (5, "U", "扩展不确定度U(x)"),
             (6, "k", "包含因子k"),
         ):
-            if getattr(book, "_openpt_columns", {}).get("参加者结果"):
-                headers = [worksheet.cell(1, i).value for i in range(1, worksheet.max_column + 1)]
-                if header not in headers:
-                    continue
-                column = headers.index(header) + 1
+            headers = [worksheet.cell(1, i).value for i in range(1, worksheet.max_column + 1)]
+            aliases = getattr(book, "_openpt_columns", {}).get("参加者结果", {})
+            label = aliases.get(header, header)
+            if label in headers:
+                if headers.count(label) != 1:
+                    raise InputError(f"参加者结果!1 表头 {label!r} 不唯一")
+                column = headers.index(label) + 1
+            elif aliases or headers[:3] != SHEETS["参加者结果"]:
+                continue
             cell = worksheet.cell(row[0].row, column)
             if cell.data_type == "f":
                 raise InputError(f"参加者结果!{cell.coordinate}: 不接受公式")
@@ -383,13 +401,15 @@ def read_workbook(
         aliases = (columns or {}).get(csv_sheet, {})
         if not isinstance(aliases, dict):
             raise InputError("CSV 列映射必须是对象")
-        value_label = aliases.get("值", "值")
-        if rows[0].count(value_label) == 1:
-            index = rows[0].index(value_label) + 1
-            for row_number in range(2, ws.max_row + 1):
-                cell = ws.cell(row_number, index)
-                with suppress(ValueError, TypeError):
-                    cell.value = float(cell.value) if cell.value not in (None, "") else None
+        numeric_fields = ("值", *PARTICIPANT_OPTIONAL) if csv_sheet == "参加者结果" else ("值",)
+        for field in numeric_fields:
+            value_label = aliases.get(field, field)
+            if rows[0].count(value_label) == 1:
+                index = rows[0].index(value_label) + 1
+                for row_number in range(2, ws.max_row + 1):
+                    cell = ws.cell(row_number, index)
+                    with suppress(ValueError, TypeError):
+                        cell.value = float(cell.value) if cell.value not in (None, "") else None
         # CSV 是文本，不能将以等号开头的输入当作 Excel 公式。
         for row in ws.iter_rows():
             for cell in row:
@@ -399,6 +419,8 @@ def read_workbook(
         book = load_workbook(source, data_only=False)
     else:
         raise InputError("只支持 XLSX 或 CSV")
+    if columns and set(columns) - set(SHEETS):
+        raise InputError("列映射包含未知工作表")
     book._openpt_columns = columns or {}
     missing = set(SHEETS) - {"指定值与不确定度", "算法S", "候选批次"} - set(book.sheetnames)
     if missing:

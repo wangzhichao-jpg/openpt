@@ -36,6 +36,24 @@ def test_mapped_workbook_and_sources(tmp_path: Path) -> None:
     assert path.read_bytes() == original
 
 
+def test_mapped_optional_participant_values(tmp_path: Path) -> None:
+    """重排后的不确定度仍从原始列读取。"""
+    path = tmp_path / "input.xlsx"
+    template(path)
+    book = load_workbook(path)
+    book["项目信息"]["B2"] = "测试"
+    book["项目信息"]["B3"] = "mg"
+    sheet = book["参加者结果"]
+    sheet.delete_rows(1)
+    sheet.append(["不确定度", "结果", "单位", "编号"])
+    sheet.append([0.2, 1.1, "mg", "P1"])
+    book.save(path)
+    mapping = {"参加者结果": {"参加者编号": "编号", "值": "结果", "标准不确定度u(x)": "不确定度"}}
+    participant = read_workbook(path, mapping)["participants"][0]
+    assert participant["value"] == 1.1 and participant["u"] == 0.2
+    assert participant["source"] == "参加者结果!B2" and participant["u_source"] == "参加者结果!A2"
+
+
 def test_csv_calculation_and_encoding(tmp_path: Path, capsys: object) -> None:
     """CSV 按明确编码导入并作为测量值计算。"""
     path = tmp_path / "input.csv"

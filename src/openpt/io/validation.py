@@ -11,7 +11,7 @@ from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
 
 from ..errors import InputError
-from .excel import SHEETS
+from .excel import PARTICIPANT_OPTIONAL, SHEETS
 
 MEASUREMENT_SHEETS = ("均匀性", "稳定性", "参加者结果")
 
@@ -37,7 +37,8 @@ def _positions(headers: list[Any], sheet: str, mapping: dict[str, Any]) -> dict[
     if not isinstance(aliases, dict):
         raise InputError(f"{sheet} 的列映射必须是对象")
     required = SHEETS[sheet]
-    if set(aliases) - set(required):
+    allowed = set(required) | (set(PARTICIPANT_OPTIONAL) if sheet == "参加者结果" else set())
+    if set(aliases) - allowed:
         raise InputError(f"{sheet} 的列映射包含未知标准字段")
     positions = {}
     for field in required:
