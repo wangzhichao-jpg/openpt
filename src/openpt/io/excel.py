@@ -133,8 +133,9 @@ def _precision(cell: Any) -> int:
 def _observations(
     book: Any, name: str, unit: str, precision: list[int], stability: bool = False
 ) -> tuple[dict[str, Any], list[str], dict[str, list[str]]]:
-    """读取包装单元和重复测量，并验证平衡设计。"""
+    """读取包装单元和重复测量，记录单元格位置。"""
     grouped: dict[tuple[str, str], dict[str, float]] = defaultdict(dict)
+    unit_sources: dict[tuple[str, str], str] = {}
     sources = []
     for row in _rows(book, name):
         group, uid, rep, val, actual_unit = (
@@ -150,18 +151,16 @@ def _observations(
         if repeat in grouped[key]:
             raise InputError(f"{name}!{row[0].row}: 重复编号")
         grouped[key][repeat] = _numeric(val, name)
+        unit_sources[key] = f"{name}!{val.coordinate}"
         precision.append(_precision(val))
         sources.append(f"{name}!{val.coordinate}")
     groups: dict[str, list[list[float]]] = defaultdict(list)
     unit_ids: dict[str, list[str]] = defaultdict(list)
     for (group, uid), values in grouped.items():
+        if not stability and len(values) < 2:
+            raise InputError(f"{unit_sources[(group, uid)]}: 单元 {uid} 至少需要两次重复")
         groups[group].append(list(values.values()))
         unit_ids[group].append(uid)
-    for group, items in groups.items():
-        if len({len(x) for x in items}) > 1:
-            raise InputError(f"{name}: {group} 重复数不平衡")
-        if not stability and items and len(items[0]) < 2:
-            raise InputError(f"{sources[0]}: 每个单元至少需要两次重复")
     return dict(groups), sources, dict(unit_ids)
 
 

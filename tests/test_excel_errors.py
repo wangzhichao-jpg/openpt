@@ -86,13 +86,13 @@ def test_invalid_zero_alpha_is_not_replaced(tmp_path: Path) -> None:
 
 
 def test_unequal_repetitions_and_empty_sheet(tmp_path: Path) -> None:
-    """不平衡设计阻止计算；空数据表不得产生结果。"""
+    """单次重复定位到对应单元格；空数据表不得产生结果。"""
     path = tmp_path / "bad.xlsx"
     _make(path)
     book = load_workbook(path)
     book["均匀性"].delete_rows(5)
     book.save(path)
-    with pytest.raises(ValueError, match="重复数不平衡"):
+    with pytest.raises(ValueError, match="至少需要两次重复"):
         read_workbook(path)
     book["均匀性"].delete_rows(2, 3)
     book.save(path)

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""CNAS-GL003:2018 4.2 和 4.3，平衡单因子设计。"""
+"""GL003 4.2、4.3 与不平衡单因子随机效应扩展。"""
 
 import math
 from typing import Any
@@ -12,28 +12,35 @@ from .models import HomogeneityResult
 
 
 def _anova(data: Any) -> dict[str, Any]:
-    """计算平衡设计的平方和、均方和原始方差分量。"""
+    """GL003 4.2；扩展方法：随机效应 ANOVA 有效重复数 n₀。"""
     try:
-        a = np.asarray(data, dtype=float)
+        groups = [np.asarray(row, dtype=float) for row in data]
     except (ValueError, TypeError):
-        raise InputError("均匀性数据须为平衡数值矩阵") from None
-    if a.ndim != 2 or a.shape[0] < 2 or a.shape[1] < 2 or not np.isfinite(a).all():
+        raise InputError("均匀性数据须为数值序列") from None
+    if len(groups) < 2 or any(
+        row.ndim != 1 or len(row) < 2 or not np.isfinite(row).all() for row in groups
+    ):
         raise InputError("至少需要两个单元、每单元两次有限数值")
-    g, m = a.shape
+    g = len(groups)
+    counts = [len(row) for row in groups]
+    total = sum(counts)
+    n0 = (total - sum(n * n for n in counts) / total) / (g - 1)
     with np.errstate(over="ignore", invalid="ignore"):
-        means = a.mean(axis=1)
-        grand = float(means.mean())
-        ssb = float(m * np.sum((means - grand) ** 2))
-        ssw = float(np.sum((a - means[:, None]) ** 2))
-    db, dw = g - 1, g * (m - 1)
+        means = [float(row.mean()) for row in groups]
+        grand = float(sum(n * mean for n, mean in zip(counts, means, strict=True)) / total)
+        ssb = float(sum(n * (mean - grand) ** 2 for n, mean in zip(counts, means, strict=True)))
+        ssw = float(sum(np.sum((row - mean) ** 2) for row, mean in zip(groups, means, strict=True)))
+    db, dw = g - 1, total - g
     msb, msw = ssb / db, ssw / dw
-    raw = (msb - msw) / m
-    if not all(math.isfinite(v) for v in (ssb, ssw, msb, msw, raw)):
+    raw = (msb - msw) / n0
+    if not all(math.isfinite(v) for v in (grand, ssb, ssw, msb, msw, raw)):
         raise InputError("数据范围导致数值溢出")
     return {
         "g": g,
-        "m": m,
-        "means": means.tolist(),
+        "m": counts[0],
+        "counts": counts,
+        "n0": n0,
+        "means": means,
         "mean": grand,
         "SS_between": ssb,
         "SS_within": ssw,
@@ -72,11 +79,14 @@ def analyze(
     warnings = (["组间方差估计为负，Ss截零；不代表绝对均匀"] if raw < 0 else []) + (
         ["组内方差为零，F不可判定，请检查分辨力"] if stat is None else []
     )
+    design_warnings = ["GL003 4.1 样品数不足10"] if values["g"] < 10 else []
+    if len(set(values["counts"])) > 1:
+        design_warnings.append("扩展方法：不平衡随机效应 ANOVA，采用有效重复数 n₀；需审核")
     return HomogeneityResult(
         **values,
         status="INDETERMINATE" if stat is None else "OK",
-        design_status="DESIGN_WARNING" if values["g"] < 10 else "OK",
-        design_warnings=["GL003 4.1 样品数不足10"] if values["g"] < 10 else [],
+        design_status="DESIGN_WARNING" if design_warnings else "OK",
+        design_warnings=design_warnings,
         warnings=warnings,
         F=stat,
         F_critical=critical,

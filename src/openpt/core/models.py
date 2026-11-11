@@ -34,6 +34,8 @@ class HomogeneityResult(ResultMapping):
     warnings: list[str]
     g: int
     m: int
+    counts: list[int]
+    n0: float
     means: list[float]
     mean: float
     SS_between: float

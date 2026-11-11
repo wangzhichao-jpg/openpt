@@ -138,7 +138,11 @@ def _raw_tables(doc: Any, data: dict[str, Any]) -> None:
             doc,
             headers,
             [
-                [unit_ids[i] if i < len(unit_ids) else str(i + 1), *map(str, row)]
+                [
+                    unit_ids[i] if i < len(unit_ids) else str(i + 1),
+                    *map(str, row),
+                    *([""] * (count - len(row))),
+                ]
                 for i, row in enumerate(groups)
             ],
         )
@@ -203,6 +207,13 @@ def _homogeneity(
             ],
         ],
     )
+    if len(set(h.get("counts", []))) > 1:
+        doc.add_paragraph(
+            "扩展方法：不平衡随机效应单因子 ANOVA；n₀=(N-Σnᵢ²/N)/(g-1)，"
+            "Ss²=max(0,(MS组间-MS组内)/n₀)。出处：Searle 等，Variance Components，"
+            "1992，单因子随机效应模型；GL003 4.3 仅给出平衡设计。"
+            f" 本例 n₀={_shown(h['n0'])}。"
+        )
     _homogeneity_conclusion(doc, h, sig, ss_places, alpha)
 
 
