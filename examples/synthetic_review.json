@@ -88,7 +88,7 @@
       "mean_difference_status": "OK",
       "design_status": "DESIGN_WARNING",
       "design_warnings": [
-        "GL003 5.2.2 注：n1、n2 均≥6；当前基线 10 个、稳定期 3 个包装单元"
+        "GL003 5.2.2 注：n1、n2 均≥6；当前基线 10 个、后期 3 个包装单元"
       ]
     }
   },
