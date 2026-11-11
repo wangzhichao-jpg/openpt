@@ -231,7 +231,13 @@ def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]
     if data.get("assigned_config", {}).get("method"):
         result.update(_assigned_results(data))
     if data.get("algorithm_s_values"):
-        result["算法S"] = algorithm_s(data["algorithm_s_values"], data["algorithm_s_df"]).to_dict()
+        result["算法S"] = algorithm_s(
+            data["algorithm_s_values"],
+            data["algorithm_s_df"],
+            max_iterations=int(_option(cfg, "algorithm_s_max_iterations", 1000)),
+            stop_rule=str(_option(cfg, "algorithm_s_stop_rule", "gl002")),
+            tolerance=float(_option(cfg, "algorithm_s_tolerance", 1e-12)),
+        ).to_dict()
     if not result:
         raise ValueError("没有可计算的数据")
     return result

@@ -69,6 +69,9 @@ def template(path: str | Path) -> None:
         ("参考不确定度可忽略（reference_uncertainty_negligible）", True),
         ("参考值来源（reference_source）", ""),
         ("统计量类型（score_type）", "z"),
+        ("算法S停止规则（algorithm_s_stop_rule）", "gl002"),
+        ("算法S绝对容差（algorithm_s_tolerance）", 1e-12),
+        ("算法S最大迭代次数（algorithm_s_max_iterations）", 1000),
     ]:
         book["方法配置"].append(config_row)
     for cell, options in [
@@ -81,6 +84,7 @@ def template(path: str | Path) -> None:
         ("B14", '"independent,paired,correlated"'),
         ("B15", '"启用,关闭"'),
         ("B17", '"z,zprime,zeta,En,D,D%,all"'),
+        ("B18", '"gl002,absolute"'),
     ]:
         validation = DataValidation(type="list", formula1=options)
         book["方法配置"].add_data_validation(validation)

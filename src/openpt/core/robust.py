@@ -18,6 +18,9 @@ ALG_A_SD_FACTOR = 1.134
 UNCERTAINTY_FACTOR = 1.25
 # CNAS-GL002:2018 附录 A.4，式 A.13。
 NIQR_FACTOR = 0.7413
+# 算法 S 的绝对容差收敛对照，软件附加规则，见 ADR-002。
+S_REFERENCE_TOLERANCE = 1e-12
+S_REFERENCE_MAX_ITERATIONS = 10000
 # GL002 附录 A.3 表 A.1，依次为自由度 1 至 10 的 (η, ξ)。
 ALGORITHM_S_FACTORS = (
     (1.645, 1.097),
@@ -120,8 +123,51 @@ def algorithm_a(
     return AlgorithmAResult(**result)
 
 
-def algorithm_s(values: Any, df: int, max_iterations: int = 1000) -> AlgorithmSResult:
-    """GL002 附录 A.3 式 A.7—A.10：截尾后均方根乘 ξ，第三有效位收敛。"""
+def _iterate_s(
+    data: Any, eta: float, xi: float, initial: float, rule: str, tolerance: float, maximum: int
+) -> tuple[float, bool, list[dict[str, Any]]]:
+    """GL002 附录 A.3 式 A.8—A.10，迭代并记录截断值及联合值。"""
+    w = initial
+    history: list[dict[str, Any]] = []
+    for i in range(maximum):
+        limit = eta * w
+        if not math.isfinite(limit):
+            raise InputError("算法 S 截断值溢出")
+        clipped = np.minimum(data, limit)
+        new_w = xi * (math.hypot(*clipped) / math.sqrt(len(data)))
+        if not math.isfinite(new_w):
+            raise InputError("算法 S 结果溢出")
+        history.append({"iteration": i + 1, "w": new_w, "limit": limit})
+        stable = (
+            _gl002_stable(0, w, 0, new_w) and i > 0
+            if rule == "gl002"
+            else abs(new_w - w) <= tolerance
+        )
+        w = new_w
+        if stable:
+            return w, True, history
+    return w, False, history
+
+
+def _three_significant(value: float) -> Decimal:
+    """按各自数值量级取三位有效数字，比较结果而不改动计算值。"""
+    if value == 0:
+        return Decimal(0)
+    decimal = Decimal(str(value))
+    quantum = Decimal(1).scaleb(decimal.adjusted() - 2)
+    with localcontext() as context:
+        context.prec = 1024
+        return decimal.quantize(quantum)
+
+
+def algorithm_s(
+    values: Any,
+    df: int,
+    max_iterations: int = 1000,
+    stop_rule: str = "gl002",
+    tolerance: float = S_REFERENCE_TOLERANCE,
+) -> AlgorithmSResult:
+    """GL002 附录 A.3 式 A.7—A.10；另算绝对容差收敛对照。"""
     try:
         data = np.asarray(values, dtype=float)
     except (ValueError, TypeError):
@@ -136,36 +182,51 @@ def algorithm_s(values: Any, df: int, max_iterations: int = 1000) -> AlgorithmSR
         or max_iterations < 1
     ):
         raise InputError("算法 S 最大迭代次数无效")
+    if stop_rule not in ("gl002", "absolute"):
+        raise InputError("算法 S 停止规则无效")
+    if (
+        isinstance(tolerance, bool)
+        or not isinstance(tolerance, (float, int))
+        or not math.isfinite(tolerance)
+        or tolerance <= 0
+    ):
+        raise InputError("算法 S 收敛容差无效")
     eta, xi = ALGORITHM_S_FACTORS[df - 1]
     with np.errstate(over="ignore", invalid="ignore"):
-        w = float(np.median(data))
-    if not math.isfinite(w):
+        initial = float(np.median(data))
+    if not math.isfinite(initial):
         raise InputError("算法 S 初始值溢出")
-    history: list[dict[str, Any]] = []
-    converged = False
-    for i in range(max_iterations):
-        limit = eta * w
-        if not math.isfinite(limit):
-            raise InputError("算法 S 截断值溢出")
-        clipped = np.minimum(data, limit)
-        new_w = xi * (math.hypot(*clipped) / math.sqrt(len(data)))
-        if not math.isfinite(new_w):
-            raise InputError("算法 S 结果溢出")
-        history.append({"iteration": i + 1, "w": new_w, "limit": limit})
-        stable = _gl002_stable(0, w, 0, new_w)
-        w = new_w
-        if stable and i > 0:
-            converged = True
-            break
-    return AlgorithmSResult(
-        w,
-        df,
+    w, converged, history = _iterate_s(data, eta, xi, initial, stop_rule, tolerance, max_iterations)
+    ref, ref_converged, ref_history = _iterate_s(
+        data,
         eta,
         xi,
-        len(history),
-        converged,
-        "NOT_CONVERGED" if not converged else "INDETERMINATE" if w == 0 else "OK",
-        history,
+        initial,
+        "absolute",
+        S_REFERENCE_TOLERANCE,
+        max(S_REFERENCE_MAX_ITERATIONS, max_iterations),
+    )
+    warnings = []
+    if not ref_converged:
+        warnings.append("REFERENCE_NOT_CONVERGED")
+    elif _three_significant(w) != _three_significant(ref):
+        warnings.append("STOP_RULE_SENSITIVITY")
+    return AlgorithmSResult(
+        w=w,
+        df=df,
+        eta=eta,
+        xi=xi,
+        iterations=len(history),
+        converged=converged,
+        status="NOT_CONVERGED" if not converged else "INDETERMINATE" if w == 0 else "OK",
+        history=history,
+        stop_rule=stop_rule,
+        tolerance=tolerance,
+        reference_w=ref,
+        reference_converged=ref_converged,
+        reference_iterations=len(ref_history),
+        reference_tolerance=S_REFERENCE_TOLERANCE,
+        warnings=warnings,
     )
 
 

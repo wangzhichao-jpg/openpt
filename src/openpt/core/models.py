@@ -90,6 +90,13 @@ class AlgorithmSResult(ResultMapping):
     converged: bool
     status: str
     history: list[dict[str, Any]]
+    stop_rule: str = "gl002"
+    tolerance: float = 1e-12
+    reference_w: float | None = None
+    reference_converged: bool = False
+    reference_iterations: int = 0
+    reference_tolerance: float = 1e-12
+    warnings: list[str] = field(default_factory=list)
 
 
 @dataclass
