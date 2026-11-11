@@ -186,6 +186,62 @@ def _algorithm_candidates(
         return None
 
 
+def _adjudicate_models(
+    data: dict[str, Any],
+    result: dict[str, Any],
+    claim: dict[str, Any],
+    row: dict[str, Any],
+    reproduced: Any,
+    digits: int,
+) -> None:
+    """区分候选模型差异与所有候选均无法复现的数值差异。"""
+    name = claim["name"]
+    if name == "t" and row["显示一致"] is False:
+        if reproduced is not None and abs(
+            Decimal(str(reproduced)) - Decimal(str(claim["value"]))
+        ) < Decimal(1).scaleb(-digits):
+            row["说明"] += "；与声称值相差不足一个显示单位，但严格修约不一致"
+        candidate = _candidate_models(data, result, claim, digits)
+        if candidate is True:
+            row["差异类型"] = "|".join(
+                filter(None, (row["差异类型"], "VALUE_MISMATCH", "NOT_REPRODUCIBLE"))
+            )
+            row["状态"] = "DIFFERENCE"
+        elif candidate is False:
+            row["说明"] += "；其他候选模型可按显示位数复现"
+        else:
+            row["说明"] += "；候选模型数据不足，未能确认数值差异"
+    if name in ("x*", "s*"):
+        _adjudicate_stop_rules(data, claim, row, digits)
+
+
+def _adjudicate_stop_rules(
+    data: dict[str, Any],
+    claim: dict[str, Any],
+    row: dict[str, Any],
+    digits: int,
+) -> None:
+    """把算法 A 停止规则敏感性与报告数值错误分开。"""
+    if row["显示一致"] is True and row["推荐一致"] is False:
+        row["差异类型"] = "|".join(filter(None, (row["差异类型"], "STOP_RULE_SENSITIVITY")))
+        row["状态"] = "NOTE"
+        row["说明"] += "；停止规则敏感，不据此认定报告错误"
+    elif row["显示一致"] is False:
+        key = "x" if claim["name"] == "x*" else "s"
+        candidates = _algorithm_candidates(data, key, claim["value"], digits)
+        if candidates is True:
+            row["差异类型"] = "|".join(
+                filter(None, (row["差异类型"], "VALUE_MISMATCH", "NOT_REPRODUCIBLE"))
+            )
+            row["状态"] = "DIFFERENCE"
+            row["说明"] += "；全部可选停止规则均不一致，原因待底稿确认"
+        elif candidates is False:
+            row["差异类型"] = "|".join(filter(None, (row["差异类型"], "STOP_RULE_SENSITIVITY")))
+            row["说明"] += "；其他停止规则可复现，不据此认定报告错误"
+        else:
+            row["说明"] += "；候选停止规则无法完整计算，未能确认数值差异"
+
+
 def _review_claim(
     data: dict[str, Any],
     result: dict[str, Any],
@@ -224,40 +280,7 @@ def _review_claim(
         else mapping.get("performance", "能力统计量计算")
     )
     row = _row(name, claim["value"], digits, claim["source"], reproduced, rec, note, types, item)
-    if name == "t" and row["显示一致"] is False:
-        if reproduced is not None and abs(
-            Decimal(str(reproduced)) - Decimal(str(claim["value"]))
-        ) < Decimal(1).scaleb(-digits):
-            row["说明"] += "；与声称值相差不足一个显示单位，但严格修约不一致"
-        candidate_result = _candidate_models(data, result, claim, digits)
-        if candidate_result is True:
-            row["差异类型"] = "|".join(
-                filter(None, (row["差异类型"], "VALUE_MISMATCH", "NOT_REPRODUCIBLE"))
-            )
-            row["状态"] = "DIFFERENCE"
-        elif candidate_result is False:
-            row["说明"] += "；其他候选模型可按显示位数复现"
-        else:
-            row["说明"] += "；候选模型数据不足，未能确认数值差异"
-    if name in ("x*", "s*"):
-        if row["显示一致"] is True and row["推荐一致"] is False:
-            row["差异类型"] = "|".join(filter(None, (row["差异类型"], "STOP_RULE_SENSITIVITY")))
-            row["状态"] = "NOTE"
-            row["说明"] += "；停止规则敏感，不据此认定报告错误"
-        elif row["显示一致"] is False:
-            key = "x" if name == "x*" else "s"
-            candidates = _algorithm_candidates(data, key, claim["value"], digits)
-            if candidates is True:
-                row["差异类型"] = "|".join(
-                    filter(None, (row["差异类型"], "VALUE_MISMATCH", "NOT_REPRODUCIBLE"))
-                )
-                row["状态"] = "DIFFERENCE"
-                row["说明"] += "；全部可选停止规则均不一致，原因待底稿确认"
-            elif candidates is False:
-                row["差异类型"] = "|".join(filter(None, (row["差异类型"], "STOP_RULE_SENSITIVITY")))
-                row["说明"] += "；其他停止规则可复现，不据此认定报告错误"
-            else:
-                row["说明"] += "；候选停止规则无法完整计算，未能确认数值差异"
+    _adjudicate_models(data, result, claim, row, reproduced, digits)
     rows = [row]
     if name == "t" and model == "displayed_summary" and data["config"].get("s1") is not None:
         s1 = result.get("稳定性", {}).get("s1")

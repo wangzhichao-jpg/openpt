@@ -201,6 +201,17 @@ def _homogeneity(
             ],
         ],
     )
+    _homogeneity_conclusion(doc, h, sig, ss_places, alpha)
+
+
+def _homogeneity_conclusion(
+    doc: Any,
+    h: dict[str, Any],
+    sig: int,
+    ss_places: int,
+    alpha: float,
+) -> None:
+    """按 GL003 4.2 和 4.3 说明统计量、判定与未评价原因。"""
     if h["F"] is None:
         doc.add_paragraph("按 GL003 4.2：未评价，组内均方为零或数值超出范围，F 无法计算。")
     else:
@@ -292,6 +303,12 @@ def _other_results(
             _stability_table(doc, str(name), extra, sig)
     else:
         doc.add_paragraph("未提供稳定性数据。")
+    _robust_results(doc, result, sig, mean_places)
+    _participant_table(doc, data, result, sig)
+
+
+def _robust_results(doc: Any, result: dict[str, Any], sig: int, mean_places: int) -> None:
+    """显示 GL002 稳健统计及停止规则敏感性。"""
     doc.add_heading("稳健统计", 1)
     a = result.get("算法A")
     if a:
@@ -326,6 +343,10 @@ def _other_results(
             )
     else:
         doc.add_paragraph("未提供参加者结果。")
+
+
+def _participant_table(doc: Any, data: dict[str, Any], result: dict[str, Any], sig: int) -> None:
+    """按参加者显示 z、评价及原始数据来源。"""
     doc.add_heading("参加者评价", 1)
     scores = result.get("参加者z", {})
     if scores:
