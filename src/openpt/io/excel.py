@@ -2,6 +2,7 @@
 """固定模板、输入校验及来源定位。"""
 
 import re
+import statistics
 from collections import defaultdict
 from collections.abc import Iterator
 from decimal import Decimal
@@ -24,6 +25,18 @@ SHEETS = {
     "报告声称值": ["统计量", "声称值", "显示小数位", "来源", "报告模型", "时间组"],
     "指定值与不确定度": ["字段", "值"],
     "算法S": ["标准差或极差", "自由度"],
+    "候选批次": [
+        "批次编号",
+        "物品",
+        "目标量值",
+        "材质",
+        "来源",
+        "制备日期",
+        "预实验结果",
+        "状态",
+        "处理理由",
+        "关联批次",
+    ],
 }
 
 
@@ -39,6 +52,7 @@ def template(path: str | Path) -> None:
     instructions.append(["指定值", "按方法登记值、不确定度、来源、σ_pt 确定程序与分量映射。"])
     instructions.append(["参加者结果", "ζ、En 须填写相应不确定度、k，并登记不相关性。"])
     instructions.append(["算法S", "输入至少两个同类型标准差或极差，每行填写相同自由度。"])
+    instructions.append(["候选批次", "预实验结果可填英文逗号分隔的数值；软件不自动选择批次。"])
     instructions.column_dimensions["A"].width = 22
     instructions.column_dimensions["B"].width = 80
     for name, headers in SHEETS.items():
@@ -274,10 +288,49 @@ def _claims(book: Any) -> list[dict[str, Any]]:
     return values
 
 
+def _batches(book: Any) -> list[dict[str, Any]]:
+    """登记全部候选批次并校验状态、理由和批次关联；不做选择。"""
+    if "候选批次" not in book.sheetnames:
+        return []
+    records = []
+    seen: set[str] = set()
+    for row in _rows(book, "候选批次"):
+        if any(row[i].value in (None, "") for i in (0, 1, 2, 3, 4, 5, 7)):
+            raise InputError(f"候选批次!{row[0].row}: 必填字段缺失")
+        ident = str(row[0].value)
+        if ident in seen:
+            raise InputError(f"候选批次!{row[0].coordinate}: 批次编号重复")
+        seen.add(ident)
+        status = row[7].value
+        if status not in ("候选", "失败", "选用", "弃用"):
+            raise InputError(f"候选批次!{row[7].coordinate}: 状态无效")
+        if status in ("失败", "弃用") and not str(row[8].value or "").strip():
+            raise InputError(f"候选批次!{row[8].coordinate}: 失败或弃用须填写理由")
+        record = {field: cell.value for field, cell in zip(SHEETS["候选批次"], row, strict=True)}
+        raw = row[6].value
+        if raw not in (None, ""):
+            try:
+                numbers = [float(item.strip()) for item in str(raw).split(",")]
+                if not all(isfinite(item) for item in numbers):
+                    raise ValueError("非有限数")
+                record["预实验均值"] = statistics.mean(numbers)
+                record["预实验标准差"] = statistics.stdev(numbers) if len(numbers) > 1 else None
+            except (ValueError, OverflowError):
+                raise InputError(
+                    f"候选批次!{row[6].coordinate}: 预实验结果须为逗号分隔的有限数"
+                ) from None
+        records.append(record)
+    for record in records:
+        reference = record["关联批次"]
+        if reference not in (None, "") and str(reference) not in seen:
+            raise InputError(f"候选批次：关联批次 {reference} 不存在")
+    return records
+
+
 def read_workbook(path: str | Path) -> dict[str, Any]:
     """导入 GL003 和 GL002 输入并记录测量单元格来源。"""
     book = load_workbook(Path(path), data_only=False)
-    missing = set(SHEETS) - {"指定值与不确定度", "算法S"} - set(book.sheetnames)
+    missing = set(SHEETS) - {"指定值与不确定度", "算法S", "候选批次"} - set(book.sheetnames)
     if missing:
         raise InputError("缺少工作表：" + ", ".join(sorted(missing)))
     info, config = _metadata(book)
@@ -306,6 +359,7 @@ def read_workbook(path: str | Path) -> dict[str, Any]:
             s_df = int(df)
     return {
         "info": info,
+        "batches": _batches(book),
         "assigned_config": assigned,
         "algorithm_s_values": s_values,
         "algorithm_s_df": s_df,

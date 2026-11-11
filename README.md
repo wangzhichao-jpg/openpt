@@ -40,6 +40,10 @@ python -m pytest -m "not internal"
 
 填入项目名称、统一单位和均匀性表，每个包装单元每次重复一行；支持平衡及不平衡重复，不平衡属于待审核扩展方法。稳定性表的时间组使用 `基线` 和 `稳定期`。参考输入 `examples/GL003_A1.xlsx`。所有输入必须是实际值，不接受公式。复核声称值需填写统计量、数值、显示小数位及来源。报告模型可填 `recommended`、`repeats_pooled`、`repeats_welch`、`displayed_summary`。最后一种还需在配置表输入 `mean1`、`mean2`、`s1`、`s2`、`n1`、`n2`；多时点复核需在声称值表的“时间组”列指定时点。评分映射通过 `--mapping` 加载。差异清单按 `DIFFERENCE`、`NOTE`、`MATCH` 分组排序；报告模型能复现时，推荐模型不同只记为提示，不直接认定报告错误。`REPORT_RULE_UNKNOWN` 表示绝对容差仅作候选，原报告停止规则尚待确认；`STOP_RULE_SENSITIVITY` 表示停止规则影响显示结果。无更具体类别的提示使用 `REVIEW_NOTE`，待核查差异使用 `REVIEW_REQUIRED`。
 
+## 候选批次
+
+新模板的“候选批次”表可登记候选、失败、选用和弃用状态；失败或弃用须填理由，关联批次必须存在。预实验结果可填写英文逗号分隔的有限数，计算书列出均值与样本标准差（单个结果无法计算标准差）。选择由人员登记，软件不自动选择或放行。旧模板可以继续使用。
+
 ## 实验性只读导入检查
 
 `openpt validate input.xlsx [--columns columns.json]` 只读检查已有的均匀性、稳定性和参加者测量表，输出 JSON 问题列表。列映射 JSON 格式示例：`{"均匀性": {"单元编号": "样品", "值": "读数"}}`，即标准字段映射到原表头；未列出的字段使用标准表头。CSV 用 `openpt validate input.csv --sheet 均匀性 --encoding utf-8-sig` 检查；GBK 文件须显式指定 `--encoding gbk`。有问题返回码为 1，输入错误返回码为 2。

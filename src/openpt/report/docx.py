@@ -682,6 +682,31 @@ def make_report(
     ):
         raise ValueError("输出精度配置超出范围，z 小数位须为 0 至 12 的整数")
     _project_methods(doc, data, cfg)
+    if data.get("batches"):
+        doc.add_heading("候选批次追溯", 1)
+        doc.add_paragraph("状态由用户登记，软件不选择批次；标准差为样本标准差。")
+        fields = [
+            "批次编号",
+            "物品",
+            "目标量值",
+            "材质",
+            "来源",
+            "制备日期",
+            "状态",
+            "处理理由",
+            "关联批次",
+            "预实验结果",
+            "预实验均值",
+            "预实验标准差",
+        ]
+        _table(
+            doc,
+            fields,
+            [
+                [str(batch[field]) if batch.get(field) is not None else "" for field in fields]
+                for batch in data["batches"]
+            ],
+        )
     doc.add_heading("原始数据", 1)
     _raw_tables(doc, data)
     _homogeneity(doc, result, mean_places, sig, ss_places, float(cfg.get("alpha") or 0.05))
