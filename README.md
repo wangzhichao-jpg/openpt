@@ -52,7 +52,7 @@ python -m pytest -m "not internal"
 
 方法配置的 `score_type` 可选 `D`、`D%`、`z`、`zprime`、`zeta`、`En` 或 `all`。参加者表中的 u(x)、U(x)、k 用于 ζ 和 En；指定值表需登记 `U_assigned`、`k_assigned` 及结果间 `independent`。En 按 GL002 使用 k=2；ζ 和 En 仅适用于不相关结果。缺少前提时不作评价。指定值由参加者公议时 z′ 转设计审核。D 和 D% 没有默认满意度判据。`examples/assigned_value_scores.xlsx`、`.json`、`.docx` 均为虚构数据。
 
-“算法S”表填写至少两个标准差或极差和统一自由度 1～10，可获得 GL002 A.3 算法 S 结果及迭代历史。`algorithm_s_stop_rule` 可选 `gl002` 或 `absolute`，后者使用 `algorithm_s_tolerance`；程序另算绝对容差 1e-12 的收敛对照，三位有效数字不同则提示 `STOP_RULE_SENSITIVITY`。复核声称值支持 `NIQR`、`u(X)`、`zprime:参加者编号`、`zeta:参加者编号`、`En:参加者编号`；映射 JSON 可将统计量键映射到多个条目字符串组成的数组。批量输出按 `DIFFERENCE`、`NOTE`、`MATCH` 排序并支持筛选。
+“算法S”表填写至少两个标准差或极差和统一自由度 1～10，可获得 GL002 A.3 算法 S 结果及迭代历史。`algorithm_s_stop_rule` 可选 `gl002` 或 `absolute`，后者使用 `algorithm_s_tolerance`；程序另算绝对和相对变化量均不超过 1e-12 的收敛对照，三位有效数字不同则提示 `STOP_RULE_SENSITIVITY`。复核声称值支持 `NIQR`、`u(X)`、`zprime:参加者编号`、`zeta:参加者编号`、`En:参加者编号`；映射 JSON 可将统计量键映射到多个条目字符串组成的数组。批量输出按 `DIFFERENCE`、`NOTE`、`MATCH` 排序并支持筛选。
 
 DOCX 指定中文宋体、西文 Times New Roman，不附带字体；若系统缺字，请安装有授权的相应字体或在文档编辑器中选择已安装的中文字体后重新导出。不同平台排版需逐页检查。
 

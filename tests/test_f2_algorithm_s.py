@@ -17,8 +17,8 @@ from openpt.io.excel import template
 @pytest.mark.parametrize(
     ("values", "df", "iterations", "expected", "reference"),
     [
-        ([0.1, 0.12, 0.11, 0.5, 0.09], 1, 9, 0.17432539327551405, 0.1754516498831609),
-        ([0.21, 0.25, 0.19, 0.8, 0.22, 0.24], 3, 5, 0.26734412666461044, 0.26760406970877826),
+        ([0.1, 0.12, 0.11, 0.5, 0.09], 1, 9, 0.17432539327551405, 0.17545164988445344),
+        ([0.21, 0.25, 0.19, 0.8, 0.22, 0.24], 3, 5, 0.26734412666461044, 0.26760406970907552),
     ],
 )
 def test_gl002_sensitivity(
@@ -27,14 +27,24 @@ def test_gl002_sensitivity(
     """GL002 A.3：验收样例的相邻两次迭代规则和绝对容差对照。"""
     result = algorithm_s(values, df)
     assert result.iterations == iterations and result.w == pytest.approx(expected, abs=1e-14)
-    assert result.reference_converged and result.reference_w == pytest.approx(reference, abs=1e-13)
+    assert result.reference_converged and result.reference_w == pytest.approx(reference, abs=1e-12)
     assert result.warnings == ["STOP_RULE_SENSITIVITY"]
     absolute = algorithm_s(values, df, stop_rule="absolute", tolerance=1e-12)
-    assert absolute.w == pytest.approx(reference, abs=1e-13) and not absolute.warnings
+    assert absolute.w == pytest.approx(reference, abs=5e-12) and not absolute.warnings
     loose = algorithm_s(values, df, stop_rule="absolute", tolerance=0.01)
     assert loose.iterations < absolute.iterations
-    assert loose.reference_w == pytest.approx(reference, abs=1e-13)
+    assert loose.reference_w == pytest.approx(reference, abs=1e-12)
     assert "STOP_RULE_SENSITIVITY" in loose.warnings
+
+
+def test_reference_convergence_at_small_scale() -> None:
+    """小量级时固定绝对容差可能过早停止；对照仍须满足相对收敛。"""
+    values = [0.1, 0.12, 0.11, 0.5, 0.09]
+    normal = algorithm_s(values, 1)
+    small = algorithm_s([x * 1e-16 for x in values], 1)
+    assert small.reference_converged and small.reference_iterations > 2
+    assert small.reference_w == pytest.approx(normal.reference_w * 1e-16, rel=1e-10)
+    assert "STOP_RULE_SENSITIVITY" in small.warnings
 
 
 def test_three_independent_hand_iterations() -> None:

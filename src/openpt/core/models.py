@@ -96,6 +96,7 @@ class AlgorithmSResult(ResultMapping):
     reference_converged: bool = False
     reference_iterations: int = 0
     reference_tolerance: float = 1e-12
+    reference_relative_tolerance: float = 1e-12
     warnings: list[str] = field(default_factory=list)
 
 

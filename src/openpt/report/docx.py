@@ -356,12 +356,12 @@ def _other_results(
         if "STOP_RULE_SENSITIVITY" in algorithm_s_result.get("warnings", []):
             doc.add_paragraph(
                 "STOP_RULE_SENSITIVITY：算法 S 选定规则结果 "
-                f"{_shown(algorithm_s_result['w'], 8)}，绝对容差收敛对照 "
+                f"{_shown(algorithm_s_result['w'], 8)}，绝对及相对容差收敛对照 "
                 f"{_shown(algorithm_s_result.get('reference_w'), 8)}；"
                 "两者第三位有效数字不同，须人工复核。"
             )
         if "REFERENCE_NOT_CONVERGED" in algorithm_s_result.get("warnings", []):
-            doc.add_paragraph("算法 S 绝对容差对照未收敛，停止规则敏感性未评价。")
+            doc.add_paragraph("算法 S 收敛对照未收敛，停止规则敏感性未评价。")
     niqr = result.get("中位数NIQR")
     if niqr:
         doc.add_paragraph(

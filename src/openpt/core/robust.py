@@ -20,6 +20,7 @@ UNCERTAINTY_FACTOR = 1.25
 NIQR_FACTOR = 0.7413
 # 算法 S 的绝对容差收敛对照，软件附加规则，见 ADR-002。
 S_REFERENCE_TOLERANCE = 1e-12
+S_REFERENCE_RELATIVE_TOLERANCE = 1e-12
 S_REFERENCE_MAX_ITERATIONS = 10000
 # GL002 附录 A.3 表 A.1，依次为自由度 1 至 10 的 (η, ξ)。
 ALGORITHM_S_FACTORS = (
@@ -124,7 +125,14 @@ def algorithm_a(
 
 
 def _iterate_s(
-    data: Any, eta: float, xi: float, initial: float, rule: str, tolerance: float, maximum: int
+    data: Any,
+    eta: float,
+    xi: float,
+    initial: float,
+    rule: str,
+    tolerance: float,
+    maximum: int,
+    relative_tolerance: float | None = None,
 ) -> tuple[float, bool, list[dict[str, Any]]]:
     """GL002 附录 A.3 式 A.8—A.10，迭代并记录截断值及联合值。"""
     w = initial
@@ -138,10 +146,14 @@ def _iterate_s(
         if not math.isfinite(new_w):
             raise InputError("算法 S 结果溢出")
         history.append({"iteration": i + 1, "w": new_w, "limit": limit})
+        change = abs(new_w - w)
         stable = (
             _gl002_stable(0, w, 0, new_w) and i > 0
             if rule == "gl002"
-            else abs(new_w - w) <= tolerance
+            else change <= tolerance
+            and (
+                relative_tolerance is None or change <= relative_tolerance * max(abs(w), abs(new_w))
+            )
         )
         w = new_w
         if stable:
@@ -205,6 +217,7 @@ def algorithm_s(
         "absolute",
         S_REFERENCE_TOLERANCE,
         max(S_REFERENCE_MAX_ITERATIONS, max_iterations),
+        relative_tolerance=S_REFERENCE_RELATIVE_TOLERANCE,
     )
     warnings = []
     if not ref_converged:
@@ -226,6 +239,7 @@ def algorithm_s(
         reference_converged=ref_converged,
         reference_iterations=len(ref_history),
         reference_tolerance=S_REFERENCE_TOLERANCE,
+        reference_relative_tolerance=S_REFERENCE_RELATIVE_TOLERANCE,
         warnings=warnings,
     )
 
