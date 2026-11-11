@@ -1,0 +1,530 @@
+[
+  {
+    "case": "A1",
+    "statistic": "t_one",
+    "openpt": 719.2857142857259,
+    "r": 719.285714285726,
+    "relative_error": 1.5805518650472676e-16,
+    "status": "通过"
+  },
+  {
+    "case": "A1",
+    "statistic": "df_one",
+    "openpt": 1,
+    "r": 1.0,
+    "relative_error": 0.0,
+    "status": "通过"
+  },
+  {
+    "case": "A1",
+    "statistic": "p_one",
+    "openpt": 0.0008850716058467759,
+    "r": 0.000885071605846776,
+    "relative_error": 1.224988086074927e-16,
+    "status": "通过"
+  },
+  {
+    "case": "A1",
+    "statistic": "t_pooled",
+    "openpt": 2.775324351032245,
+    "r": 2.77532435103224,
+    "relative_error": 1.7601478928161261e-15,
+    "status": "通过"
+  },
+  {
+    "case": "A1",
+    "statistic": "df_pooled",
+    "openpt": 2,
+    "r": 2.0,
+    "relative_error": 0.0,
+    "status": "通过"
+  },
+  {
+    "case": "A1",
+    "statistic": "p_pooled",
+    "openpt": 0.10900843332700522,
+    "r": 0.109008433327005,
+    "relative_error": 2.03694886852413e-15,
+    "status": "通过"
+  },
+  {
+    "case": "A1",
+    "statistic": "t_welch",
+    "openpt": 2.775324351032245,
+    "r": 2.77532435103224,
+    "relative_error": 1.7601478928161261e-15,
+    "status": "通过"
+  },
+  {
+    "case": "A1",
+    "statistic": "df_welch",
+    "openpt": 1.0126544520314555,
+    "r": 1.01265445203146,
+    "relative_error": 4.3853972987447664e-15,
+    "status": "通过"
+  },
+  {
+    "case": "A1",
+    "statistic": "p_welch",
+    "openpt": 0.21764451384628816,
+    "r": 0.217644513846288,
+    "relative_error": 7.651626533135957e-16,
+    "status": "通过"
+  },
+  {
+    "case": "A1",
+    "statistic": "A_x",
+    "openpt": 250.7822549775968,
+    "r": 250.782254977597,
+    "relative_error": 7.933255326641867e-16,
+    "status": "通过"
+  },
+  {
+    "case": "A1",
+    "statistic": "A_s",
+    "openpt": 5.672725173190743,
+    "r": 5.67272517319074,
+    "relative_error": 6.262798867095835e-16,
+    "status": "通过"
+  },
+  {
+    "case": "A1",
+    "statistic": "A_iterations",
+    "openpt": 9,
+    "r": 9.0,
+    "relative_error": 0.0,
+    "status": "通过"
+  },
+  {
+    "case": "A1",
+    "statistic": "S_w",
+    "openpt": 6.69602635914328,
+    "r": 6.69602635914328,
+    "relative_error": 0.0,
+    "status": "通过"
+  },
+  {
+    "case": "A1",
+    "statistic": "S_iterations",
+    "openpt": 8,
+    "r": 8.0,
+    "relative_error": 0.0,
+    "status": "通过"
+  },
+  {
+    "case": "A1",
+    "statistic": "median",
+    "openpt": 251.75,
+    "r": 251.75,
+    "relative_error": 0.0,
+    "status": "通过"
+  },
+  {
+    "case": "A1",
+    "statistic": "niqr",
+    "openpt": 4.596059999999992,
+    "r": 4.59605999999999,
+    "relative_error": 3.8649557216403916e-16,
+    "status": "通过"
+  },
+  {
+    "case": "A1",
+    "statistic": "median_type6",
+    "openpt": null,
+    "r": 251.75,
+    "relative_error": null,
+    "status": "仅报告"
+  },
+  {
+    "case": "A1",
+    "statistic": "niqr_type6",
+    "openpt": null,
+    "r": 5.48562,
+    "relative_error": null,
+    "status": "仅报告"
+  },
+  {
+    "case": "A1",
+    "statistic": "z",
+    "openpt": 10.208333333333334,
+    "r": 10.2083333333333,
+    "relative_error": 3.306198852108221e-15,
+    "status": "通过"
+  },
+  {
+    "case": "A1",
+    "statistic": "zprime",
+    "openpt": 10.069437972453136,
+    "r": 10.0694379724531,
+    "relative_error": 3.52821447286296e-15,
+    "status": "通过"
+  },
+  {
+    "case": "A1",
+    "statistic": "zeta",
+    "openpt": 27.39183272437242,
+    "r": 27.3918327243724,
+    "relative_error": 7.781984610995535e-16,
+    "status": "通过"
+  },
+  {
+    "case": "A1",
+    "statistic": "En",
+    "openpt": 13.69591636218621,
+    "r": 13.6959163621862,
+    "relative_error": 7.781984610995535e-16,
+    "status": "通过"
+  },
+  {
+    "case": "A2",
+    "statistic": "t_one",
+    "openpt": 209.00000000000074,
+    "r": 209.000000000001,
+    "relative_error": 1.2239013630317457e-15,
+    "status": "通过"
+  },
+  {
+    "case": "A2",
+    "statistic": "df_one",
+    "openpt": 1,
+    "r": 1.0,
+    "relative_error": 0.0,
+    "status": "通过"
+  },
+  {
+    "case": "A2",
+    "statistic": "p_one",
+    "openpt": 0.0030460043748135536,
+    "r": 0.00304600437481355,
+    "relative_error": 1.1390157481851875e-15,
+    "status": "通过"
+  },
+  {
+    "case": "A2",
+    "statistic": "t_pooled",
+    "openpt": 12.72792206135788,
+    "r": 12.7279220613579,
+    "relative_error": 1.5352015151574636e-15,
+    "status": "通过"
+  },
+  {
+    "case": "A2",
+    "statistic": "df_pooled",
+    "openpt": 2,
+    "r": 2.0,
+    "relative_error": 0.0,
+    "status": "通过"
+  },
+  {
+    "case": "A2",
+    "statistic": "p_pooled",
+    "openpt": 0.0061162653263810785,
+    "r": 0.00611626532638108,
+    "relative_error": 2.836246276783453e-16,
+    "status": "通过"
+  },
+  {
+    "case": "A2",
+    "statistic": "t_welch",
+    "openpt": 12.72792206135788,
+    "r": 12.7279220613579,
+    "relative_error": 1.5352015151574636e-15,
+    "status": "通过"
+  },
+  {
+    "case": "A2",
+    "statistic": "df_welch",
+    "openpt": 2.0,
+    "r": 2.0,
+    "relative_error": 0.0,
+    "status": "通过"
+  },
+  {
+    "case": "A2",
+    "statistic": "p_welch",
+    "openpt": 0.0061162653263810785,
+    "r": 0.00611626532638108,
+    "relative_error": 2.836246276783453e-16,
+    "status": "通过"
+  },
+  {
+    "case": "A2",
+    "statistic": "A_x",
+    "openpt": 10.009413767018396,
+    "r": 10.0094137670184,
+    "relative_error": 3.549372382333618e-16,
+    "status": "通过"
+  },
+  {
+    "case": "A2",
+    "statistic": "A_s",
+    "openpt": 0.40331587594280227,
+    "r": 0.403315875942802,
+    "relative_error": 6.881845538747196e-16,
+    "status": "通过"
+  },
+  {
+    "case": "A2",
+    "statistic": "A_iterations",
+    "openpt": 4,
+    "r": 4.0,
+    "relative_error": 0.0,
+    "status": "通过"
+  },
+  {
+    "case": "A2",
+    "statistic": "S_w",
+    "openpt": 0.2714936486365749,
+    "r": 0.271493648636575,
+    "relative_error": 4.08931490736756e-16,
+    "status": "通过"
+  },
+  {
+    "case": "A2",
+    "statistic": "S_iterations",
+    "openpt": 3,
+    "r": 3.0,
+    "relative_error": 0.0,
+    "status": "通过"
+  },
+  {
+    "case": "A2",
+    "statistic": "median",
+    "openpt": 10.0,
+    "r": 10.0,
+    "relative_error": 0.0,
+    "status": "通过"
+  },
+  {
+    "case": "A2",
+    "statistic": "niqr",
+    "openpt": 0.3521174999999997,
+    "r": 0.3521175,
+    "relative_error": 9.45897058190936e-16,
+    "status": "通过"
+  },
+  {
+    "case": "A2",
+    "statistic": "median_type6",
+    "openpt": null,
+    "r": 10.0,
+    "relative_error": null,
+    "status": "仅报告"
+  },
+  {
+    "case": "A2",
+    "statistic": "niqr_type6",
+    "openpt": null,
+    "r": 0.463312500000001,
+    "relative_error": null,
+    "status": "仅报告"
+  },
+  {
+    "case": "A2",
+    "statistic": "z",
+    "openpt": 0.7499999999999989,
+    "r": 0.749999999999999,
+    "relative_error": 1.4802973661668773e-16,
+    "status": "通过"
+  },
+  {
+    "case": "A2",
+    "statistic": "zprime",
+    "openpt": 0.7397954428741067,
+    "r": 0.739795442874107,
+    "relative_error": 4.502148676309511e-16,
+    "status": "通过"
+  },
+  {
+    "case": "A2",
+    "statistic": "zeta",
+    "openpt": 2.0124611797498075,
+    "r": 2.01246117974981,
+    "relative_error": 1.3240182150652127e-15,
+    "status": "通过"
+  },
+  {
+    "case": "A2",
+    "statistic": "En",
+    "openpt": 1.0062305898749038,
+    "r": 1.0062305898749,
+    "relative_error": 3.751384942684774e-15,
+    "status": "通过"
+  },
+  {
+    "case": "负方差",
+    "statistic": "t_one",
+    "openpt": 10.0,
+    "r": 10.0,
+    "relative_error": 0.0,
+    "status": "通过"
+  },
+  {
+    "case": "负方差",
+    "statistic": "df_one",
+    "openpt": 1,
+    "r": 1.0,
+    "relative_error": 0.0,
+    "status": "通过"
+  },
+  {
+    "case": "负方差",
+    "statistic": "p_one",
+    "openpt": 0.06345103486110713,
+    "r": 0.0634510348611071,
+    "relative_error": 4.3743298555153964e-16,
+    "status": "通过"
+  },
+  {
+    "case": "负方差",
+    "statistic": "t_pooled",
+    "openpt": 0.0,
+    "r": 0.0,
+    "relative_error": 0.0,
+    "status": "通过"
+  },
+  {
+    "case": "负方差",
+    "statistic": "df_pooled",
+    "openpt": 2,
+    "r": 2.0,
+    "relative_error": 0.0,
+    "status": "通过"
+  },
+  {
+    "case": "负方差",
+    "statistic": "p_pooled",
+    "openpt": 1.0,
+    "r": 1.0,
+    "relative_error": 0.0,
+    "status": "通过"
+  },
+  {
+    "case": "负方差",
+    "statistic": "t_welch",
+    "openpt": 0.0,
+    "r": 0.0,
+    "relative_error": 0.0,
+    "status": "通过"
+  },
+  {
+    "case": "负方差",
+    "statistic": "df_welch",
+    "openpt": 2.0,
+    "r": 2.0,
+    "relative_error": 0.0,
+    "status": "通过"
+  },
+  {
+    "case": "负方差",
+    "statistic": "p_welch",
+    "openpt": 1.0,
+    "r": 1.0,
+    "relative_error": 0.0,
+    "status": "通过"
+  },
+  {
+    "case": "负方差",
+    "statistic": "A_x",
+    "openpt": 10.0,
+    "r": 10.0,
+    "relative_error": 0.0,
+    "status": "通过"
+  },
+  {
+    "case": "负方差",
+    "statistic": "A_s",
+    "openpt": 1.1634594512645644,
+    "r": 1.16345945126456,
+    "relative_error": 3.816971956928812e-15,
+    "status": "通过"
+  },
+  {
+    "case": "负方差",
+    "statistic": "A_iterations",
+    "openpt": 2,
+    "r": 2.0,
+    "relative_error": 0.0,
+    "status": "通过"
+  },
+  {
+    "case": "负方差",
+    "statistic": "S_w",
+    "openpt": 1.5513922779232852,
+    "r": 1.55139227792329,
+    "relative_error": 3.148772478673012e-15,
+    "status": "通过"
+  },
+  {
+    "case": "负方差",
+    "statistic": "S_iterations",
+    "openpt": 2,
+    "r": 2.0,
+    "relative_error": 0.0,
+    "status": "通过"
+  },
+  {
+    "case": "负方差",
+    "statistic": "median",
+    "openpt": 10.0,
+    "r": 10.0,
+    "relative_error": 0.0,
+    "status": "通过"
+  },
+  {
+    "case": "负方差",
+    "statistic": "niqr",
+    "openpt": 1.4826,
+    "r": 1.4826,
+    "relative_error": 0.0,
+    "status": "通过"
+  },
+  {
+    "case": "负方差",
+    "statistic": "median_type6",
+    "openpt": null,
+    "r": 10.0,
+    "relative_error": null,
+    "status": "仅报告"
+  },
+  {
+    "case": "负方差",
+    "statistic": "niqr_type6",
+    "openpt": null,
+    "r": 1.4826,
+    "relative_error": null,
+    "status": "仅报告"
+  },
+  {
+    "case": "负方差",
+    "statistic": "z",
+    "openpt": 0.0,
+    "r": 0.0,
+    "relative_error": 0.0,
+    "status": "通过"
+  },
+  {
+    "case": "负方差",
+    "statistic": "zprime",
+    "openpt": 0.0,
+    "r": 0.0,
+    "relative_error": 0.0,
+    "status": "通过"
+  },
+  {
+    "case": "负方差",
+    "statistic": "zeta",
+    "openpt": 0.0,
+    "r": 0.0,
+    "relative_error": 0.0,
+    "status": "通过"
+  },
+  {
+    "case": "负方差",
+    "statistic": "En",
+    "openpt": 0.0,
+    "r": 0.0,
+    "relative_error": 0.0,
+    "status": "通过"
+  }
+]

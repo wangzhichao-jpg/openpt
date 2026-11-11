@@ -9,6 +9,8 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+import run_r_statistics
+
 from openpt.core.homogeneity import analyze
 
 HERE = Path(__file__).resolve().parent
@@ -55,9 +57,13 @@ def main() -> int:
                         "pass": math.isfinite(error) and error <= 1e-9,
                     }
                 )
+    statistics_status = run_r_statistics.main()
+    statistics_rows = json.loads((HERE / "statistics_report.json").read_text(encoding="utf-8"))
     (HERE / "crosscheck_report.json").write_text(
         json.dumps(
-            {"scope": "部分 ANOVA；未完成施工单", "rows": rows}, ensure_ascii=False, indent=2
+            {"scope": "阶段性 R 对照；未完成施工单", "rows": rows, "statistics": statistics_rows},
+            ensure_ascii=False,
+            indent=2,
         )
         + "\n",
         encoding="utf-8",
@@ -65,7 +71,7 @@ def main() -> int:
     lines = [
         "# R 独立对照（阶段性，未完成）",
         "",
-        "仅包含 GL003 A.1/A.2、负方差和不平衡合成例的 ANOVA；其余施工单要求均未覆盖。",
+        "ANOVA 仅包含 GL003 A.1/A.2、负方差和不平衡合成例；其他统计量见下节。",
         "",
         "负方差例组间均方理论上为零；R 线性模型运算产生约 1e-31 的舍入残差，"
         "严格相对误差因与零比较为 1，按施工单如实记为差异，不采用绝对容差掩盖。",
@@ -78,8 +84,11 @@ def main() -> int:
         f"| {r['relative_error']:.3g} | {'通过' if r['pass'] else '差异'} |"
         for r in rows
     )
-    (HERE / "crosscheck_report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
-    return 0 if all(row["pass"] for row in rows) else 1
+    statistics_report = (HERE / "statistics_report.md").read_text(encoding="utf-8")
+    (HERE / "crosscheck_report.md").write_text(
+        "\n".join(lines) + "\n\n" + statistics_report, encoding="utf-8"
+    )
+    return 0 if all(row["pass"] for row in rows) and statistics_status == 0 else 1
 
 
 if __name__ == "__main__":
