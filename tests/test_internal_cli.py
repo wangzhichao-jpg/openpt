@@ -6,6 +6,8 @@ import os
 from pathlib import Path
 
 import pytest
+from docx import Document
+from docx.oxml.ns import qn
 
 from openpt.cli import main
 
@@ -60,6 +62,10 @@ def test_u11_participant_review(tmp_path: Path) -> None:
     assert len(z) == 141 and all(r["显示一致"] == "True" for r in z)
     assert all(r["显示一致"] == "True" for r in rows if r["统计量"] in ("x*", "s*"))
     assert any(r["统计量"] == "s*" and r["推荐一致"] == "False" for r in rows)
+    doc = Document(tmp_path / "review.docx")
+    score_table = next(table for table in doc.tables if table.cell(0, 0).text == "参加者")
+    assert len(score_table.rows) == 142
+    assert score_table.rows[0]._tr.get_or_add_trPr().find(qn("w:tblHeader")) is not None
 
 
 def test_u12_participant_review(tmp_path: Path) -> None:

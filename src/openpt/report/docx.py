@@ -33,12 +33,19 @@ def _table(doc: Any, headers: list[str], rows: list[list[Any]]) -> None:
     table = doc.add_table(rows=1, cols=len(headers))
     table.style = "Table Grid"
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    widths = [1.45, 1.35, 1.55, 1.55, 1.35, 2.5, 4.0, 2.0] if len(headers) == 8 else None
+    if widths:
+        table.autofit = False
+        for column, width in zip(table.columns, widths, strict=True):
+            column.width = Cm(width)
     header = table.rows[0]
     trpr = header._tr.get_or_add_trPr()
     repeat = OxmlElement("w:tblHeader")
     repeat.set(qn("w:val"), "true")
     trpr.append(repeat)
-    for cell, title in zip(header.cells, headers, strict=True):
+    for index, (cell, title) in enumerate(zip(header.cells, headers, strict=True)):
+        if widths:
+            cell.width = Cm(widths[index])
         cell.text = title
         tcpr = cell._tc.get_or_add_tcPr()
         shade = OxmlElement("w:shd")
@@ -46,7 +53,9 @@ def _table(doc: Any, headers: list[str], rows: list[list[Any]]) -> None:
         tcpr.append(shade)
     for values in rows:
         cells = table.add_row().cells
-        for cell, value in zip(cells, values, strict=True):
+        for index, (cell, value) in enumerate(zip(cells, values, strict=True)):
+            if widths:
+                cell.width = Cm(widths[index])
             cell.text = str(value)
             if isinstance(value, (int, float)) or (
                 isinstance(value, str) and value.lstrip("-+").replace(".", "", 1).isdigit()
@@ -70,16 +79,26 @@ def _data_places(data: dict[str, Any]) -> int:
 
 def _raw_tables(doc: Any, data: dict[str, Any]) -> None:
     """按单元和重复次数显示均匀性与稳定性原始值。"""
-    blocks = [("均匀性", data.get("homogeneity", []))]
-    blocks.extend((f"稳定性：{key}", value) for key, value in data.get("stability", {}).items())
+    blocks = [("均匀性", data.get("homogeneity", []), data.get("homogeneity_units", []))]
+    blocks.extend(
+        (f"稳定性：{key}", value, data.get("stability_units", {}).get(key, []))
+        for key, value in data.get("stability", {}).items()
+    )
     sources = data.get("sources", [])
-    for name, groups in blocks:
+    for name, groups, unit_ids in blocks:
         if not groups:
             continue
         doc.add_paragraph(name)
         count = max(len(group) for group in groups)
-        headers = ["单元顺序"] + [f"重复 {i}" for i in range(1, count + 1)]
-        _table(doc, headers, [[i, *map(str, row)] for i, row in enumerate(groups, 1)])
+        headers = ["单元编号"] + [f"重复 {i}" for i in range(1, count + 1)]
+        _table(
+            doc,
+            headers,
+            [
+                [unit_ids[i] if i < len(unit_ids) else str(i + 1), *map(str, row)]
+                for i, row in enumerate(groups)
+            ],
+        )
     if sources:
         doc.add_paragraph("数据来源：" + "、".join(sources))
     else:
@@ -122,24 +141,34 @@ def _homogeneity(
         doc.add_paragraph("提示：" + warning)
 
 
-def _other_results(doc: Any, data: dict[str, Any], result: dict[str, Any], sig: int) -> None:
+def _stability_table(doc: Any, name: str, s: dict[str, Any], sig: int) -> None:
+    """显示一个时点的稳定性检验。"""
+    doc.add_paragraph(name)
+    names = [
+        ("均值差", "difference"),
+        ("t 值", "t"),
+        ("自由度", "df"),
+        ("t 临界值", "critical"),
+        ("p 值", "p"),
+        ("t 检验结论", "pass"),
+        ("均值差判据", "mean_difference_pass"),
+    ]
+    _table(doc, ["项目", "结果"], [[label, _shown(s.get(key), sig)] for label, key in names])
+    doc.add_paragraph("计算状态：" + str(s.get("status", "未评价")))
+    for warning in s.get("design_warnings", []):
+        doc.add_paragraph("设计提示：" + warning)
+
+
+def _other_results(
+    doc: Any, data: dict[str, Any], result: dict[str, Any], sig: int, mean_places: int
+) -> None:
     """显示稳定性、稳健统计和参加者评价。"""
     doc.add_heading("稳定性评价", 1)
     s = result.get("稳定性")
     if s:
-        names = [
-            ("均值差", "difference"),
-            ("t 值", "t"),
-            ("自由度", "df"),
-            ("t 临界值", "critical"),
-            ("p 值", "p"),
-            ("t 检验结论", "pass"),
-            ("均值差判据", "mean_difference_pass"),
-        ]
-        _table(doc, ["项目", "结果"], [[label, _shown(s.get(key), sig)] for label, key in names])
-        doc.add_paragraph("计算状态：" + str(s.get("status", "未评价")))
-        for warning in s.get("design_warnings", []):
-            doc.add_paragraph("设计提示：" + warning)
+        _stability_table(doc, "稳定期", s, sig)
+        for name, extra in result.get("其他稳定性", {}).items():
+            _stability_table(doc, str(name), extra, sig)
     else:
         doc.add_paragraph("未提供稳定性数据。")
     doc.add_heading("稳健统计", 1)
@@ -152,7 +181,14 @@ def _other_results(doc: Any, data: dict[str, Any], result: dict[str, Any], sig: 
             ("迭代次数", "iterations"),
             ("收敛", "converged"),
         ]
-        _table(doc, ["项目", "结果"], [[label, _shown(a.get(key), sig)] for label, key in names])
+        _table(
+            doc,
+            ["项目", "结果"],
+            [
+                [label, _shown(a.get(key), sig, places=mean_places if key == "x" else None)]
+                for label, key in names
+            ],
+        )
         rules = {"gl002": "GL002 第三有效位规则", "absolute": "绝对容差", "simplified": "简化法"}
         doc.add_paragraph("停止规则：" + rules.get(a.get("rule"), "未提供"))
     else:
@@ -189,6 +225,7 @@ def make_report(
     doc = Document()
     section = doc.sections[0]
     section.page_width, section.page_height = Cm(21), Cm(29.7)
+    section.left_margin, section.right_margin = Cm(1.5), Cm(1.5)
     style = doc.styles["Normal"]
     style.font.name = "Times New Roman"
     style._element.rPr.rFonts.set(qn("w:eastAsia"), "宋体")
@@ -208,7 +245,15 @@ def make_report(
         [
             ["均匀性方法", "单因子方差分析：CNAS-GL003:2018 4.2"],
             ["并列用途判据", "样品间标准差判据：CNAS-GL003:2018 4.3"],
-            ["稳定性方法", "t 检验及均值差：CNAS-GL003:2018 5.2、5.3"],
+            [
+                "稳定性方法",
+                (
+                    "单均值 t 检验：CNAS-GL003:2018 5.2.1"
+                    if cfg.get("stability_method") == "one_sample"
+                    else "两均值 t 检验：CNAS-GL003:2018 5.2.2"
+                )
+                + "；均值差：5.3",
+            ],
             ["稳健统计方法", "算法 A：CNAS-GL002:2018 附录 A.2"],
             ["显著性水平", _shown(cfg.get("alpha", 0.05))],
             ["严格配置", "启用" if cfg.get("strict_homogeneity") else "未启用"],
@@ -217,18 +262,32 @@ def make_report(
     doc.add_heading("原始数据", 1)
     _raw_tables(doc, data)
     _homogeneity(doc, result, mean_places, sig, ss_places)
-    _other_results(doc, data, result, sig)
+    _other_results(doc, data, result, sig, mean_places)
     if differences is not None:
         doc.add_heading("报告复核差异", 1)
-        headers = ["统计量", "声称值", "报告模型", "推荐模型", "显示一致", "差异说明", "评分条目"]
+        headers = [
+            "统计量",
+            "声称值",
+            "报告模型",
+            "推荐模型",
+            "显示一致",
+            "差异类型",
+            "差异说明",
+            "评分条目",
+        ]
         rows = [
             [
                 r.get("统计量", ""),
                 _shown(r.get("声称值")),
                 _shown(r.get("按报告模型复现值")),
                 _shown(r.get("按推荐模型重算值")),
-                _shown(r.get("显示一致")),
-                (str(r.get("差异类型", "")) + " " + str(r.get("说明", "")))
+                "未评价"
+                if r.get("显示一致") is None
+                else "一致"
+                if r.get("显示一致")
+                else "不一致",
+                r.get("差异类型", ""),
+                str(r.get("说明", ""))
                 .replace("repeats_pooled", "合并方差模型")
                 .replace("repeats_welch", "非齐方差模型")
                 .replace("df=", "自由度=")
@@ -236,8 +295,12 @@ def make_report(
                 r.get("评分条目", ""),
             ]
             for r in differences
+            if r.get("状态") != "MATCH" or r.get("差异类型") or r.get("说明")
         ]
-        _table(doc, headers, rows)
+        if rows:
+            _table(doc, headers, rows)
+        else:
+            doc.add_paragraph("未发现差异；完整逐项比较见差异清单。")
     doc.add_heading("人工复核", 1)
     doc.add_paragraph("计算人：________________    日期：____________")
     doc.add_paragraph("复核人：________________    日期：____________")
