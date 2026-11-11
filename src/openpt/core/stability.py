@@ -134,6 +134,7 @@ def analyze(
     method: str = "two_sample",
     reference: float | None = None,
     model: str = "unit_pooled",
+    group_name: str = "稳定期",
 ) -> StabilityResult:
     """按 GL003 5.2 计算 t 并按 5.3 对比均值差与 0.3σ。"""
     if model not in ("unit_pooled", "repeats_pooled", "repeats_welch"):
@@ -164,16 +165,16 @@ def analyze(
     )
     if method == "one_sample" and len(followup) < 6:
         result["design_warnings"].append(
-            f"GL003 5.2.1 注：n≥6；当前稳定期为 {len(followup)} 个包装单元"
+            f"GL003 5.2.1 注：n≥6；当前{group_name}为 {len(followup)} 个包装单元"
         )
     if method == "two_sample" and (len(followup) < 6 or len(baseline) < 6):
         result["design_warnings"].append(
             f"GL003 5.2.2 注：n1、n2 均≥6；当前基线 {len(baseline)} 个、"
-            f"稳定期 {len(followup)} 个包装单元"
+            f"{group_name} {len(followup)} 个包装单元"
         )
     if sigma is not None and len(followup) < 3:
         result["design_warnings"].append(
-            f"GL003 5.3 注：抽样数≥3；当前稳定期为 {len(followup)} 个包装单元"
+            f"GL003 5.3 注：抽样数≥3；当前{group_name}为 {len(followup)} 个包装单元"
         )
     if sigma is not None and any(len(unit) < 2 for unit in followup):
         result["design_warnings"].append(

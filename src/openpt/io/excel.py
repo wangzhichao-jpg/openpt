@@ -54,6 +54,7 @@ def template(path: str | Path) -> None:
         ("指定值（assigned）", ""),
         ("能力评定标准差（sigma_pt）", ""),
         ("算法A停止规则（algorithm_a_rule）", "gl002"),
+        ("z 值显示小数位（display_z_decimals）", 2),
     ]:
         book["方法配置"].append(config_row)
     for cell, options in [

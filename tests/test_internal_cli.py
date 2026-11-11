@@ -64,6 +64,10 @@ def test_u09_stability_review(tmp_path: Path) -> None:
     designs = [r for r in rows if r["差异类型"] == "DESIGN_WARNING"]
     assert len(designs) == 2 and all("3 个包装单元" in r["说明"] for r in designs)
     assert all("5.2.2" in r["说明"] and "条目3" in r["评分条目"] for r in designs)
+    later = next(r for r in designs if r["统计量"] == "后期设计")
+    assert "后期 3 个包装单元" in later["说明"] and "稳定期 3 个" not in later["说明"]
+    assert all(r["差异类型"] for r in rows if r["状态"] in ("NOTE", "DIFFERENCE"))
+    assert any(r["统计量"] == "x*" and "REPORT_RULE_UNKNOWN" in r["差异类型"] for r in rows)
     assert any("SIGMA_COMPOSITE" in r["差异类型"] and "报告使用合成" in r["说明"] for r in rows)
     assert all(r["显示一致"] == "True" for r in rows if r["统计量"] in ("x*", "s*"))
     assert any(r["统计量"] == "s*" and r["推荐一致"] == "False" for r in rows)
@@ -112,7 +116,14 @@ def test_u11_participant_review(tmp_path: Path) -> None:
 def test_u12_participant_review(tmp_path: Path) -> None:
     """输入及声称值的原始页码见外部 fixtures/来源说明.md。"""
     rows = _run_case(tmp_path, "case_a")
-    assert any("ROUNDING_INTERMEDIATE" in r["差异类型"] for r in rows)
+    assert any(
+        "ROUNDING_INTERMEDIATE" in r["差异类型"]
+        and "最接近的候选模型（修约中间值）0.6887" in r["说明"]
+        and "声称值 0.688 相差 0.0007" in r["说明"]
+        and "不足一个显示单位（0.001）" in r["说明"]
+        for r in rows
+    )
+    assert all(r["差异类型"] for r in rows if r["状态"] in ("NOTE", "DIFFERENCE"))
     assert any(r["统计量"] == "s1" and "VALUE_MISMATCH" in r["差异类型"] for r in rows)
     assert any(
         r["统计量"] == "z:03"

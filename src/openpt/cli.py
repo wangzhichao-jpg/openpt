@@ -85,7 +85,13 @@ def calculate(data: dict[str, Any]) -> dict[str, Any]:
         for name, observations in groups.items():
             if name not in ("基线", "稳定期"):
                 extra[name] = stability(
-                    groups.get("基线"), observations, sigma, alpha, method, reference
+                    groups.get("基线"),
+                    observations,
+                    sigma,
+                    alpha,
+                    method,
+                    reference,
+                    group_name=name,
                 ).to_dict()
         if extra:
             result["其他稳定性"] = extra

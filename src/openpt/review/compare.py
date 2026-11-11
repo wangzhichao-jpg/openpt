@@ -150,27 +150,33 @@ def _row(
 
 def _candidate_models(
     data: dict[str, Any], result: dict[str, Any], claim: dict[str, Any], digits: int
-) -> bool | None:
-    """全部可计算且均不一致为真；有候选一致为假；资料不足为未定。"""
+) -> tuple[bool | None, tuple[str, Any] | None]:
+    """判断可复现性，并返回可计算候选中最接近声称值的模型。"""
     group = claim.get("timegroup") or "稳定期"
     try:
         candidates = [
-            stability(data["stability"].get("基线"), data["stability"][group], model=m)["t"]
-            for m in ("unit_pooled", "repeats_pooled", "repeats_welch")
+            (
+                label,
+                stability(data["stability"].get("基线"), data["stability"][group], model=m)["t"],
+            )
+            for m, label in (
+                ("unit_pooled", "单元均值"),
+                ("repeats_pooled", "重复值合并方差"),
+                ("repeats_welch", "重复值非齐方差"),
+            )
         ]
         if group == "稳定期":
-            summary_claim = {**claim, "model": "displayed_summary"}
-            summary, _, _ = _t_reproduction(data, result, summary_claim)
+            summary, _, _ = _t_reproduction(data, result, {**claim, "model": "displayed_summary"})
             if summary is not None:
-                candidates.append(summary)
-        if any(
-            v is not None and display(v, digits) == display(claim["value"], digits)
-            for v in candidates
-        ):
-            return False
-        return True if all(v is not None for v in candidates) else None
-    except (ValueError, KeyError):
-        return None
+                candidates.append(("修约中间值", summary))
+        valid = [(label, value) for label, value in candidates if value is not None]
+        target = Decimal(str(claim["value"]))
+        closest = min(valid, key=lambda item: abs(Decimal(str(item[1])) - target), default=None)
+        if any(display(value, digits) == display(target, digits) for _, value in valid):
+            return False, closest
+        return (True if len(valid) == len(candidates) else None), closest
+    except (ValueError, KeyError, InvalidOperation):
+        return None, None
 
 
 def _algorithm_candidates(
@@ -193,17 +199,22 @@ def _adjudicate_models(
     result: dict[str, Any],
     claim: dict[str, Any],
     row: dict[str, Any],
-    reproduced: Any,
     digits: int,
 ) -> None:
     """区分候选模型差异与所有候选均无法复现的数值差异。"""
     name = claim["name"]
     if name == "t" and row["显示一致"] is False:
-        if reproduced is not None and abs(
-            Decimal(str(reproduced)) - Decimal(str(claim["value"]))
-        ) < Decimal(1).scaleb(-digits):
-            row["说明"] += "；与声称值相差不足一个显示单位，但严格修约不一致"
-        candidate = _candidate_models(data, result, claim, digits)
+        candidate, closest = _candidate_models(data, result, claim, digits)
+        if closest is not None:
+            label, value = closest
+            gap = abs(Decimal(str(value)) - Decimal(str(claim["value"])))
+            unit = Decimal(1).scaleb(-digits)
+            if gap < unit:
+                row["说明"] += (
+                    f"；最接近的候选模型（{label}）{display(value, digits + 1)} "
+                    f"与声称值 {display(claim['value'], digits)} 相差 {display(gap, digits + 1)}，"
+                    f"不足一个显示单位（{unit}），但严格修约不一致"
+                )
         if candidate is True:
             row["差异类型"] = "|".join(
                 filter(None, (row["差异类型"], "VALUE_MISMATCH", "NOT_REPRODUCIBLE"))
@@ -262,6 +273,8 @@ def _review_claim(
         raise ValueError("报告声称值显示小数位须为0至12的整数") from None
     reproduced, rec, note = _values(data, result, claim)
     types = []
+    if name in ("x*", "s*") and model == "absolute":
+        types.append("REPORT_RULE_UNKNOWN")
     if name == "Ss" and result.get("均匀性", {}).get("Ss_pass") is False:
         note = f"样品间标准差超过 0.3σ：{rec} > {result['均匀性']['threshold']}"
         cfg = data["config"]
@@ -282,7 +295,7 @@ def _review_claim(
         else mapping.get("performance", "能力统计量计算")
     )
     row = _row(name, claim["value"], digits, claim["source"], reproduced, rec, note, types, item)
-    _adjudicate_models(data, result, claim, row, reproduced, digits)
+    _adjudicate_models(data, result, claim, row, digits)
     rows = [row]
     if name == "t" and model == "displayed_summary" and data["config"].get("s1") is not None:
         s1 = result.get("稳定性", {}).get("s1")
@@ -379,6 +392,9 @@ def review(
     if composite is not None:
         rows.append(composite)
     rows.extend(_design_rows(result, mapping))
+    for row in rows:
+        if row["状态"] in ("NOTE", "DIFFERENCE") and not row["差异类型"]:
+            row["差异类型"] = "REVIEW_NOTE" if row["状态"] == "NOTE" else "REVIEW_REQUIRED"
     priority = {"DIFFERENCE": 0, "NOTE": 1, "MATCH": 2}
     return sorted(rows, key=lambda row: priority[row["状态"]])
 

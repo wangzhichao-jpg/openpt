@@ -33,6 +33,8 @@ def test_review_branches(tmp_path):
     assert len(rows) == 9
     assert next(row for row in rows if row["统计量"] == "z:1")["按推荐模型重算值"] == 1
     assert any(row["状态"] == "NOTE" and row["按报告模型复现值"] is None for row in rows)
+    assert all(row["差异类型"] for row in rows if row["状态"] in ("NOTE", "DIFFERENCE"))
+    assert any(row["差异类型"] == "REVIEW_NOTE" for row in rows)
     assert any("伪重复" in row["说明"] for row in rows)
     ranks = {"DIFFERENCE": 0, "NOTE": 1, "MATCH": 2}
     assert [ranks[row["状态"]] for row in rows] == sorted(ranks[row["状态"]] for row in rows)

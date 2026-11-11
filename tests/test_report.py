@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """公开示例的计算书与机器输出核对。"""
 
+import csv
 import json
 from pathlib import Path
 
@@ -28,6 +29,51 @@ def test_report_matches_json(tmp_path: Path) -> None:
     assert "按 F 检验判定均匀" in text
     assert "未评价：未提供 σ" in text
     assert "均匀性!C2:C21" in text
+
+
+def test_z_display_decimals_without_precision_loss(tmp_path: Path) -> None:
+    """DOCX 默认两位、可配置三位；JSON 和 CSV 保留原精度。"""
+    from openpt.demo import _synthetic
+
+    source = tmp_path / "synthetic.xlsx"
+    _synthetic(source)
+    output, docx, diff = tmp_path / "r.json", tmp_path / "r.docx", tmp_path / "r.csv"
+    args = [
+        "review",
+        str(source),
+        "--docx",
+        str(docx),
+        "--json",
+        str(output),
+        "--differences",
+        str(diff),
+    ]
+    assert main(args) == 0
+    first = json.loads(output.read_text(encoding="utf-8"))
+    table = next(t for t in Document(docx).tables if t.cell(0, 0).text == "参加者")
+    assert table.cell(1, 2).text == "0.20"
+    assert table.cell(2, 2).text == "0.00"
+    with diff.open(encoding="utf-8-sig", newline="") as stream:
+        original = list(csv.DictReader(stream))
+    z_row = next(row for row in original if row["统计量"] == "z:P1")
+    assert z_row["按报告模型复现值"] == "0.19607843137254902"
+    book = load_workbook(source)
+    for row in book["方法配置"].iter_rows(min_row=2):
+        if row[0].value == "z 值显示小数位（display_z_decimals）":
+            row[1].value = 3
+    book.save(source)
+    assert main(args) == 0
+    table = next(t for t in Document(docx).tables if t.cell(0, 0).text == "参加者")
+    assert table.cell(1, 2).text == "0.196"
+    assert first == json.loads(output.read_text(encoding="utf-8"))
+    with diff.open(encoding="utf-8-sig", newline="") as stream:
+        assert original == list(csv.DictReader(stream))
+    book = load_workbook(source)
+    for row in book["方法配置"].iter_rows(min_row=2):
+        if row[0].value == "z 值显示小数位（display_z_decimals）":
+            row[1].value = 2.5
+    book.save(source)
+    assert main(args) == 2
 
 
 def test_source_cell_rectangles() -> None:

@@ -22,10 +22,12 @@ def _shown(value: Any, digits: int = 4, places: int | None = None) -> str:
         return "未评价（未提供数据或无法计算）"
     if isinstance(value, bool):
         return "通过" if value else "不通过"
+    if isinstance(value, (int, float)) and places is not None:
+        return f"{value:.{places}f}"
     if isinstance(value, int):
         return str(value)
     if isinstance(value, float):
-        return f"{value:.{places}f}" if places is not None else f"{value:#.{digits}g}"
+        return f"{value:#.{digits}g}"
     return str(value)
 
 
@@ -292,7 +294,12 @@ def _stability_table(doc: Any, name: str, s: dict[str, Any], sig: int) -> None:
 
 
 def _other_results(
-    doc: Any, data: dict[str, Any], result: dict[str, Any], sig: int, mean_places: int
+    doc: Any,
+    data: dict[str, Any],
+    result: dict[str, Any],
+    sig: int,
+    mean_places: int,
+    z_places: int,
 ) -> None:
     """显示稳定性、稳健统计和参加者评价。"""
     doc.add_heading("稳定性评价", 1)
@@ -304,7 +311,7 @@ def _other_results(
     else:
         doc.add_paragraph("未提供稳定性数据。")
     _robust_results(doc, result, sig, mean_places)
-    _participant_table(doc, data, result, sig)
+    _participant_table(doc, data, result, z_places)
 
 
 def _robust_results(doc: Any, result: dict[str, Any], sig: int, mean_places: int) -> None:
@@ -345,7 +352,9 @@ def _robust_results(doc: Any, result: dict[str, Any], sig: int, mean_places: int
         doc.add_paragraph("未提供参加者结果。")
 
 
-def _participant_table(doc: Any, data: dict[str, Any], result: dict[str, Any], sig: int) -> None:
+def _participant_table(
+    doc: Any, data: dict[str, Any], result: dict[str, Any], z_places: int
+) -> None:
     """按参加者显示 z、评价及原始数据来源。"""
     doc.add_heading("参加者评价", 1)
     scores = result.get("参加者z", {})
@@ -357,7 +366,7 @@ def _participant_table(doc: Any, data: dict[str, Any], result: dict[str, Any], s
                 [
                     p["id"],
                     _shown(p["value"]),
-                    _shown(scores[p["id"]]["z"], sig),
+                    _shown(scores[p["id"]]["z"], places=z_places),
                     scores[p["id"]]["classification"],
                     p.get("source", "未提供来源"),
                 ]
@@ -476,13 +485,22 @@ def make_report(
     ss_places = (
         int(cfg["display_ss_decimals"]) if cfg.get("display_ss_decimals") not in (None, "") else 3
     )
-    if not 1 <= sig <= 15 or not 0 <= mean_places <= 12 or not 0 <= ss_places <= 12:
-        raise ValueError("输出精度配置超出范围")
+    raw_z_places = cfg.get("display_z_decimals")
+    z_places = int(raw_z_places) if raw_z_places not in (None, "") else 2
+    if (
+        isinstance(raw_z_places, bool)
+        or (raw_z_places not in (None, "") and float(raw_z_places) != z_places)
+        or not 1 <= sig <= 15
+        or not 0 <= mean_places <= 12
+        or not 0 <= ss_places <= 12
+        or not 0 <= z_places <= 12
+    ):
+        raise ValueError("输出精度配置超出范围，z 小数位须为 0 至 12 的整数")
     _project_methods(doc, data, cfg)
     doc.add_heading("原始数据", 1)
     _raw_tables(doc, data)
     _homogeneity(doc, result, mean_places, sig, ss_places, float(cfg.get("alpha") or 0.05))
-    _other_results(doc, data, result, sig, mean_places)
+    _other_results(doc, data, result, sig, mean_places, z_places)
     if differences is not None:
         _difference_table(doc, differences)
     doc.add_heading("人工复核", 1)
