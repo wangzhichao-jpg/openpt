@@ -4,5 +4,7 @@ exclude tests/test_internal.py
 exclude tests/test_internal_cli.py
 include examples/GL003_A1.xlsx
 include examples/synthetic_review.xlsx
+include examples/trace_workflow.py
+recursive-include examples/trace_run *
 include docs/计算书截图.png
 prune tools
