@@ -68,6 +68,19 @@ def _values(
     if name in ("F", "Ss"):
         value = result.get("均匀性", {}).get(name)
         return value, value, ""
+    if name == "NIQR":
+        value = result.get("中位数NIQR", {}).get("niqr")
+        return value, value, ""
+    if name == "u(X)":
+        value = result.get("指定值与不确定度", {}).get("u")
+        return value, value, ""
+    if ":" in name:
+        kind, participant_id = name.split(":", 1)
+        kind = {"z′": "zprime", "z'": "zprime", "ζ": "zeta"}.get(kind, kind)
+        score = result.get("参加者统计量", {}).get(participant_id, {}).get(kind, {})
+        if score:
+            value = score.get("value") if score.get("status") == "OK" else None
+            return value, value, score.get("reason") or ""
     if name in ("x*", "s*"):
         key = "x" if name == "x*" else "s"
         value = result.get("算法A", {}).get(key)
@@ -257,12 +270,25 @@ def _adjudicate_stop_rules(
             row["说明"] += "；候选停止规则无法完整计算，未能确认数值差异"
 
 
+def _mapping_item(mapping: dict[str, Any], name: str, group: str) -> str:
+    """按统计量优先取评分条目；单项可映射至多个条目。"""
+    default = "均匀性与稳定性评估" if group == "homogeneity" else "能力统计量计算"
+    value = mapping.get(name, mapping.get(name.split(":", 1)[0], mapping.get(group, default)))
+    if isinstance(value, list):
+        if not all(isinstance(item, str) for item in value):
+            raise ValueError("评分映射列表必须为字符串")
+        return "；".join(value)
+    if not isinstance(value, str):
+        raise ValueError("评分映射必须为字符串或字符串列表")
+    return value
+
+
 def _review_claim(
     data: dict[str, Any],
     result: dict[str, Any],
     claim: dict[str, Any],
     models: set[Any],
-    mapping: dict[str, str],
+    mapping: dict[str, Any],
 ) -> list[dict[str, Any]]:
     """复核一条声称值并产生必要的附加中间量差异。"""
     name = claim["name"]
@@ -291,10 +317,8 @@ def _review_claim(
         types.append("MODEL_SWITCH")
     if model == "displayed_summary":
         types.append("ROUNDING_INTERMEDIATE")
-    item = (
-        mapping.get("homogeneity", "均匀性与稳定性评估")
-        if name in ("F", "Ss", "t")
-        else mapping.get("performance", "能力统计量计算")
+    item = _mapping_item(
+        mapping, name, "homogeneity" if name in ("F", "Ss", "t") else "performance"
     )
     row = _row(name, claim["value"], digits, claim["source"], reproduced, rec, note, types, item)
     _adjudicate_models(data, result, claim, row, digits)
@@ -320,7 +344,7 @@ def _review_claim(
 
 
 def _composite_row(
-    data: dict[str, Any], result: dict[str, Any], mapping: dict[str, str]
+    data: dict[str, Any], result: dict[str, Any], mapping: dict[str, Any]
 ) -> dict[str, Any] | None:
     """核查声称的标准差合成及其稳定性用途。"""
     cfg = data["config"]
@@ -347,11 +371,11 @@ def _composite_row(
         ("缺少样品间标准差，未评价；" if composite is None else "合成标准差用途需确认；")
         + source_note,
         ["SIGMA_COMPOSITE"],
-        mapping.get("homogeneity", "均匀性与稳定性评估"),
+        _mapping_item(mapping, "合成标准差", "homogeneity"),
     )
 
 
-def _design_rows(result: dict[str, Any], mapping: dict[str, str]) -> list[dict[str, Any]]:
+def _design_rows(result: dict[str, Any], mapping: dict[str, Any]) -> list[dict[str, Any]]:
     """将稳定性抽样设计提示单独列入复核清单。"""
     periods = []
     if result.get("稳定性"):
@@ -374,7 +398,7 @@ def _design_rows(result: dict[str, Any], mapping: dict[str, str]) -> list[dict[s
                 "推荐一致": None,
                 "状态": "NOTE",
                 "差异类型": "DESIGN_WARNING",
-                "评分条目": mapping.get("homogeneity", "均匀性与稳定性评估"),
+                "评分条目": _mapping_item(mapping, f"{name}设计", "homogeneity"),
                 "说明": "；".join(warnings),
             }
         )
@@ -382,7 +406,7 @@ def _design_rows(result: dict[str, Any], mapping: dict[str, str]) -> list[dict[s
 
 
 def review(
-    data: dict[str, Any], result: dict[str, Any], mapping: dict[str, str] | None = None
+    data: dict[str, Any], result: dict[str, Any], mapping: dict[str, Any] | None = None
 ) -> list[dict[str, Any]]:
     """比较 GL002 和 GL003 计算结果、报告模型和声称值。"""
     mapping = mapping or {"homogeneity": "均匀性与稳定性评估", "performance": "能力统计量计算"}

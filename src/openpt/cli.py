@@ -138,6 +138,10 @@ def _parser() -> argparse.ArgumentParser:
     t.add_argument("output", help="模板文件路径")
     demo = sub.add_parser("demo", help="生成公开演示数据及计算结果")
     demo.add_argument("directory", help="示例输出目录")
+    batch = sub.add_parser("review-batch", help="批量复核并输出 XLSX 差异总表")
+    batch.add_argument("inputs", nargs="+", help="输入 Excel 文件")
+    batch.add_argument("--output", required=True, help="差异总表 XLSX 路径")
+    batch.add_argument("--mapping", help="可选 JSON 评分映射")
     for name in ("run", "review"):
         p = sub.add_parser(name, help="运行计算" if name == "run" else "复核报告")
         p.add_argument("input", help="输入 Excel 文件")
@@ -189,6 +193,21 @@ def main(argv: list[str] | None = None) -> int:
             from .demo import create_demo
 
             create_demo(Path(args.directory))
+            return 0
+        if args.command == "review-batch":
+            from .review.batch import batch_review, write_xlsx
+
+            protected = {Path(path).resolve() for path in args.inputs}
+            if args.mapping:
+                protected.add(Path(args.mapping).resolve())
+            if Path(args.output).resolve() in protected:
+                raise ValueError("输出路径不得覆盖输入或映射")
+            mapping = (
+                json.loads(Path(args.mapping).read_text(encoding="utf-8")) if args.mapping else None
+            )
+            if mapping is not None and not isinstance(mapping, dict):
+                raise ValueError("评分映射必须是 JSON 对象")
+            write_xlsx(args.output, batch_review(args.inputs, mapping))
             return 0
         input_path = Path(args.input)
         args.docx = args.docx or str(input_path.with_name(input_path.stem + "_计算书.docx"))
