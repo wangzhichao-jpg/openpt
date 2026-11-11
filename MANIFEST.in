@@ -10,4 +10,4 @@ recursive-include examples/trace_run *
 include docs/计算书截图.png
 include docs/使用手册.md
 recursive-include validation *.R *.json *.md *.py *.csv
-prune tools
+include tools/normalize_sdist.py
