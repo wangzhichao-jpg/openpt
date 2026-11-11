@@ -7,4 +7,6 @@ include examples/synthetic_review.xlsx
 include examples/trace_workflow.py
 recursive-include examples/trace_run *
 include docs/计算书截图.png
+include docs/使用手册.md
+recursive-include validation *.R *.json *.md *.py
 prune tools
