@@ -105,6 +105,8 @@ def template(path: str | Path) -> None:
         ("U_assigned", ""),
         ("k_assigned", ""),
         ("independent", ""),
+        ("known_components", ""),
+        ("expert_values", ""),
     ]:
         assigned.append(assigned_row)
     for cell, options in [

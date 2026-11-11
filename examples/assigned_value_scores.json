@@ -64,6 +64,8 @@
     "source": "虚构参考证书",
     "uncertainty_source": "虚构标准不确定度预算",
     "base_u": 1.0,
+    "known_components": null,
+    "expert_values": null,
     "consensus_method": null,
     "sigma_temporary": 4.0,
     "sigma_final": 5.0,

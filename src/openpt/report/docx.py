@@ -412,6 +412,8 @@ def _assigned_table(doc: Any, result: dict[str, Any]) -> None:
         ("指定值", "value"),
         ("标准不确定度 u(X)", "u"),
         ("基础标准不确定度", "base_u"),
+        ("制备不确定度分量", "known_components"),
+        ("专家结果", "expert_values"),
         ("指定值来源", "source"),
         ("不确定度来源", "uncertainty_source"),
         ("指定值扩展不确定度 U(X)", "U_assigned"),

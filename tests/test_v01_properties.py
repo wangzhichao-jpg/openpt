@@ -100,3 +100,17 @@ def test_assigned_finite(x: float, u: float, hom: float, stab: float, mapping: s
         assert_finite(result.to_dict())
     except InputError:
         pass
+
+
+@given(st.lists(finite, min_size=2, max_size=6))
+@settings(max_examples=100, deadline=None)
+def test_expert_and_participant_consensus_finite(values: list[float]) -> None:
+    """公议均值及稳健公议的极端输入只能有有限结果或 InputError。"""
+    for method, options in (
+        ("expert_consensus", {"expert_values": values}),
+        ("participant_consensus", {"participants": values}),
+    ):
+        with contextlib.suppress(InputError):
+            assert_finite(
+                assign_value(method, source="合成", uncertainty_source="合成", **options).to_dict()
+            )

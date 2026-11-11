@@ -57,6 +57,24 @@ def test_workflow(tmp_path: Path) -> None:
     assert "指定值与不确定度" in text and "GL002 4.4.1.3" in text
 
 
+def test_workbook_expert_consensus(tmp_path: Path) -> None:
+    """模板中专家结果的字符串正确转换，均值及标准误输出全精度。"""
+    path = tmp_path / "expert.xlsx"
+    make_input(path)
+    book = load_workbook(path)
+    sheet = book["指定值与不确定度"]
+    fields = {sheet.cell(row, 1).value: row for row in range(2, sheet.max_row + 1)}
+    sheet.cell(fields["method"], 2, "expert_consensus")
+    sheet.cell(fields["value"], 2).value = None
+    sheet.cell(fields["uncertainty"], 2).value = None
+    sheet.cell(fields["expert_values"], 2, "99,100,101")
+    book.save(path)
+    assert main(["run", str(path)]) == 0
+    result = json.loads((tmp_path / "expert_结果.json").read_text(encoding="utf-8"))
+    assert result["指定值与不确定度"]["value"] == 100
+    assert result["指定值与不确定度"]["expert_values"] == [99, 100, 101]
+
+
 def test_single_participant_en(tmp_path: Path) -> None:
     """测量审核单个参加者可计算 En，稳健统计单独标记未评价。"""
     path = tmp_path / "one.xlsx"

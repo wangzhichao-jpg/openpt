@@ -16,6 +16,26 @@ def test_external_value(method: str) -> None:
     assert r.value == 10 and r.u == 0.2 and r.status == "OK"
 
 
+def test_known_and_expert_formulas() -> None:
+    """独立分量平方和与独立同精度专家样本标准误解析例。"""
+    known = assign_value(
+        "known",
+        value=10,
+        known_components=[0.3, 0.4],
+        source="制备记录",
+        uncertainty_source="独立分量",
+    )
+    assert known.u == pytest.approx(0.5)
+    expert = assign_value(
+        "expert_consensus",
+        expert_values=[9, 10, 11],
+        source="专家结果",
+        uncertainty_source="样本标准误",
+    )
+    assert expert.value == 10 and expert.u == pytest.approx(1 / math.sqrt(3))
+    assert expert.expert_values == [9, 10, 11]
+
+
 def test_participant_and_component_mapping() -> None:
     """扩展方法：u=1.25s*/√p，独立分量只合成一次。"""
     r = assign_value(

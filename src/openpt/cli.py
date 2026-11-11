@@ -88,6 +88,14 @@ def _assigned_results(data: dict[str, Any]) -> dict[str, Any]:
         "stab_in_base",
     )
     options = {key: a[key] for key in keys if key in a}
+    for key in ("known_components", "expert_values"):
+        if key in a:
+            if not isinstance(a[key], str):
+                raise InputError(f"{key} 须为逗号分隔的数值列表")
+            try:
+                options[key] = [float(item.strip()) for item in a[key].split(",")]
+            except ValueError:
+                raise InputError(f"{key} 须为逗号分隔的数值列表") from None
     assigned = assign_value(
         a["method"], participants=[p["value"] for p in data["participants"]], **options
     )
