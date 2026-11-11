@@ -261,6 +261,7 @@ def _parser() -> argparse.ArgumentParser:
     decision = sub.add_parser("decide", help="追加人工决定并生成新版本计算书")
     decision.add_argument("directory", help="已有运行目录")
     decision.add_argument("--item", required=True, help="复核条目")
+    decision.add_argument("--allow-new-item", action="store_true", help="允许登记结果之外的条目")
     decision.add_argument("--decision", required=True, choices=("接受", "退回", "需补充"))
     decision.add_argument("--by", required=True, dest="person", help="决定人员")
     decision.add_argument("--note", default="", help="决定备注")
@@ -373,7 +374,14 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "decide":
             from .decisions import decide
 
-            decide(Path(args.directory), args.item, args.decision, args.person, args.note)
+            decide(
+                Path(args.directory),
+                args.item,
+                args.decision,
+                args.person,
+                args.note,
+                allow_new_item=args.allow_new_item,
+            )
             print("已记录人工决定；软件不自动放行。")
             return 0
         if args.command == "reproduce":

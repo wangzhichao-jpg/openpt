@@ -18,7 +18,9 @@ from .reproduce import compare_results
 from .runs import _calculate_snapshot, verify_directory
 
 
-def decide(root: Path, item: str, decision: str, person: str, note: str) -> dict[str, Any]:
+def decide(
+    root: Path, item: str, decision: str, person: str, note: str, *, allow_new_item: bool = False
+) -> dict[str, Any]:
     """在锁内核验快照、追加决定、生成新版本；原始输入和既有报告不修改。"""
     if decision not in ("接受", "退回", "需补充"):
         raise InputError("决定只能是接受、退回或需补充")
@@ -37,6 +39,11 @@ def decide(root: Path, item: str, decision: str, person: str, note: str) -> dict
             raise InputError("运行目录校验失败：" + "；".join(errors))
         result_bytes = (root / "result.json").read_bytes()
         result_hash = hashlib.sha256(result_bytes).hexdigest()
+        original_result = json.loads(result_bytes)
+        available = sorted(original_result)
+        custom_item = item not in original_result
+        if custom_item and not allow_new_item:
+            raise InputError("结果中不存在该条目；可用条目：" + "、".join(available))
         decisions_path = root / "decisions.jsonl"
         previous = []
         if decisions_path.exists():
@@ -52,9 +59,11 @@ def decide(root: Path, item: str, decision: str, person: str, note: str) -> dict
             "note": note,
             "result_sha256": result_hash,
         }
+        if custom_item:
+            record["custom_item"] = True
         config = json.loads((root / "config.json").read_text(encoding="utf-8"))
         data, result, differences = _calculate_snapshot(root, config)
-        if compare_results(json.loads(result_bytes), result):
+        if compare_results(original_result, result):
             raise InputError("当前重算结果与原结果不一致，不能生成决定计算书")
         staging = Path(tempfile.mkdtemp(prefix="openpt-decision-", dir=root.parent))
         existing = list(root.glob("report_rev_*.docx"))
