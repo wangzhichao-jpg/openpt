@@ -28,5 +28,6 @@ def test_manual_commands(tmp_path: Path) -> None:
             env=env,
             capture_output=True,
             text=True,
+            encoding="utf-8",
         )
         assert result.returncode == 0, (line, result.stdout, result.stderr)
