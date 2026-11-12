@@ -86,6 +86,19 @@ def test_transfer_full_flow(tmp_path: Path) -> None:
     assert main(["review", str(path), "--runs-dir", str(tmp_path / "reviews")]) == 0
 
 
+def test_transfer_c_condition_is_checked(tmp_path: Path) -> None:
+    path = tmp_path / "input.xlsx"
+    _workbook(path, "C")
+    data = read_workbook(path)
+    options = data["transfer_config"]["STD1|P1"]["uncertainty"]
+    options.update(effect=0.4, measurement_uncertainty=0.9)
+    result = calculate(data)
+    assert result["传递标准稳定性"]["STD1|P1"]["uncertainty_status"] == "DESIGN_REVIEW"
+    assert result["参加者统计量"]["P"]["En"]["status"] == "DESIGN_REVIEW"
+    options["effect"] = 0.2
+    assert calculate(data)["参加者统计量"]["P"]["En"]["status"] == "OK"
+
+
 def test_transfer_a_and_duplicate_protection(tmp_path: Path) -> None:
     path = tmp_path / "input.xlsx"
     _workbook(path, "A")

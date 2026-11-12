@@ -148,6 +148,8 @@ def assess_transfer(
         for rule in cfg["criteria"]:
             current = dict(rule)
             if current.get("kind") == "two_sample" and "baseline" not in current:
+                if cfg["window"] != "transfer_only":
+                    raise InputError("自动选取基线时两样本检验须选择传递期间窗口")
                 current["baseline"] = [
                     row["value"] for row in grouped[key] if row["stage"] == "传递前"
                 ]
@@ -165,6 +167,23 @@ def assess_transfer(
             }
         )
         options = result["uncertainty"]
+        allowed = {
+            "mechanism",
+            "source",
+            "delta",
+            "U_E",
+            "multiplier",
+            "ref_includes_stability",
+            "ignore_condition",
+            "condition_source",
+            "effect",
+            "measurement_uncertainty",
+        }
+        if set(options) - allowed:
+            raise InputError(f"传递标准 {key} 的不确定度配置包含未知字段")
+        for field in ("ref_includes_stability", "ignore_condition"):
+            if options.get(field) is not None and not isinstance(options[field], bool):
+                raise InputError(f"{field} 须为布尔值")
         mechanism = options.get("mechanism")
         if mechanism not in (None, "", "A", "B", "C"):
             raise InputError(f"传递标准 {key} 的不确定度机制无效")
@@ -203,7 +222,21 @@ def assess_transfer(
                     and bool(options["condition_source"].strip())
                     and options.get("U_E") is None
                     and options.get("multiplier") is None
+                    and options.get("ref_includes_stability") is not True
                 )
+                if ("effect" in options) != ("measurement_uncertainty" in options):
+                    raise InputError("忽略条件数值须同时登记影响量和测量结果不确定度")
+                if "effect" in options:
+                    effect = _number(options["effect"], "不稳定性影响量")
+                    bound = (
+                        _number(
+                            options["measurement_uncertainty"], "测量结果不确定度", positive=True
+                        )
+                        / 3
+                    )
+                    if effect < 0:
+                        raise InputError("不稳定性影响量不能为负")
+                    valid = valid and compare(effect, bound) < 0
                 result["uncertainty_status"] = "OK" if valid else "DESIGN_REVIEW"
         else:
             result["uncertainty_status"] = "NOT_EVALUATED"

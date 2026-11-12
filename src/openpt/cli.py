@@ -163,7 +163,14 @@ def _transfer_score_options(
         base = data.get("assigned_config", {}).get("U_assigned")
         if base is None:
             return {}, "机制 A 缺少参考值扩展不确定度", source
-        return {"U_assigned": math.hypot(float(base), 2 * point["u_stab"])}, None, source
+        if (
+            isinstance(base, bool)
+            or not isinstance(base, (int, float))
+            or not math.isfinite(base)
+            or base < 0
+        ):
+            raise InputError("参考值扩展不确定度须为非负有限数")
+        return {"U_assigned": math.hypot(base, 2 * point["u_stab"])}, None, source
     if options.get("mechanism") == "B":
         return {"U_E": point["U_E"], "stability_in_U_ref": already}, None, source
     return {}, None, source
@@ -373,6 +380,8 @@ def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]
     if trend_input and not trend_method:
         raise InputError("趋势稳定性须选择 regression_trend 方法")
     if trend_input:
+        if not isinstance(_option(cfg, "trend_plot", False), bool):
+            raise InputError("trend_plot 须为布尔值")
         if data.get("stability"):
             raise InputError("回归趋势法不能混用稳定性工作表")
         result["趋势稳定性"] = fit_series(
