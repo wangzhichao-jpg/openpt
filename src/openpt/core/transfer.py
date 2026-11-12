@@ -130,6 +130,87 @@ def assess_point(
     }
 
 
+def assess_transfer(
+    records: list[dict[str, Any]], configs: dict[str, dict[str, Any]]
+) -> dict[str, Any]:
+    """按标准器与校准点分组，禁止未登记的测量或单位混用。"""
+    grouped: dict[str, list[dict[str, Any]]] = {key: [] for key in configs}
+    for row in records:
+        key = f"{row['standard']}|{row['point']}"
+        if key not in configs:
+            raise InputError(f"传递标准 {key} 未登记逐点配置")
+        if row.get("unit") != configs[key].get("unit"):
+            raise InputError(f"传递标准 {key} 的测量单位与配置不一致")
+        grouped[key].append(row)
+    results = {}
+    for key, cfg in configs.items():
+        rules = []
+        for rule in cfg["criteria"]:
+            current = dict(rule)
+            if current.get("kind") == "two_sample" and "baseline" not in current:
+                current["baseline"] = [
+                    row["value"] for row in grouped[key] if row["stage"] == "传递前"
+                ]
+            rules.append(current)
+        result = assess_point(
+            grouped[key], rules, window=cfg["window"], summarized_delta=cfg.get("summarized_delta")
+        )
+        result.update(
+            {
+                "standard": cfg["standard"],
+                "point": cfg["point"],
+                "unit": cfg["unit"],
+                "source": cfg["source"],
+                "uncertainty": dict(cfg.get("uncertainty") or {}),
+            }
+        )
+        options = result["uncertainty"]
+        mechanism = options.get("mechanism")
+        if mechanism not in (None, "", "A", "B", "C"):
+            raise InputError(f"传递标准 {key} 的不确定度机制无效")
+        if mechanism:
+            if not isinstance(options.get("source"), str) or not options["source"].strip():
+                raise InputError(f"传递标准 {key} 的不确定度机制须登记来源")
+            spread = _number(options.get("delta", result["delta_max"]), "稳定性变差")
+            if spread < 0:
+                raise InputError("稳定性变差不能为负")
+            if mechanism == "A":
+                result["u_stab"] = spread / (2 * math.sqrt(3))
+                if (
+                    options.get("U_E") is not None
+                    or options.get("multiplier") is not None
+                    or options.get("ref_includes_stability") is True
+                ):
+                    result["uncertainty_status"] = "DESIGN_REVIEW"
+                else:
+                    result["uncertainty_status"] = "OK"
+            elif mechanism == "B":
+                if options.get("U_E") is not None and options.get("multiplier") is not None:
+                    raise InputError("U_E 不可同时指定固定值和倍率")
+                extra = options.get("U_E")
+                if options.get("multiplier") is not None:
+                    extra = _number(options["multiplier"], "U_E 倍率") * spread
+                result["U_E"] = _number(extra, "U_E")
+                if result["U_E"] < 0:
+                    raise InputError("U_E 不能为负")
+                result["uncertainty_status"] = (
+                    "DESIGN_REVIEW" if options.get("ref_includes_stability") is True else "OK"
+                )
+            else:
+                valid = (
+                    options.get("ignore_condition") is True
+                    and isinstance(options.get("condition_source"), str)
+                    and bool(options["condition_source"].strip())
+                    and options.get("U_E") is None
+                    and options.get("multiplier") is None
+                )
+                result["uncertainty_status"] = "OK" if valid else "DESIGN_REVIEW"
+        else:
+            result["uncertainty_status"] = "NOT_EVALUATED"
+        results[key] = result
+    return results
+
+
 def en_with_stability(
     difference: float,
     u_lab: float,

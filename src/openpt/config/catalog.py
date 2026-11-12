@@ -5,6 +5,9 @@ ENUMS: dict[str, tuple[str, ...]] = {
     "decision": ("接受", "退回", "需补充"),
     "stability_method": ("one_sample", "two_sample", "mean_difference", "regression_trend"),
     "trend_aggregate": ("per_series", "time_mean"),
+    "design": ("transfer_standard",),
+    "stability_window": ("all", "transfer_only"),
+    "transfer_mechanism": ("A", "B", "C"),
     "report_stability_method": ("one_sample", "two_sample", "mean_difference", "regression_trend"),
     "baseline_source": ("homogeneity", "baseline_group"),
     "criterion_standard": ("gl003", "gbt28043"),
@@ -88,6 +91,11 @@ CLAIM_NAMES = (
     "趋势Ȳ",
     "趋势t临界值",
     "趋势结论",
+    "Δmax",
+    "传递限值",
+    "U_E",
+    "u_stab",
+    "传递结论",
 )
 
 HOMOGENEITY_CLAIM_NAMES = frozenset(

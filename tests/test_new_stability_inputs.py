@@ -34,8 +34,7 @@ def test_trend_long_and_wide_provenance() -> None:
         read_trend_sheet(book)
 
 
-@pytest.mark.parametrize("sheet_name", ["传递标准复测"])
-def test_not_yet_connected_fails_closed(tmp_path, sheet_name: str) -> None:
+def test_transfer_without_design_fails_closed(tmp_path) -> None:
     from openpyxl import load_workbook
 
     path = tmp_path / "input.xlsx"
@@ -43,15 +42,10 @@ def test_not_yet_connected_fails_closed(tmp_path, sheet_name: str) -> None:
     book = load_workbook(path)
     book["项目信息"]["B2"] = "合成"
     book["项目信息"]["B3"] = "V"
-    sheet = book.create_sheet(sheet_name)
-    sheet.append(["字段"])
-    sheet.append(["非空数据"])
+    book["传递标准复测"].append(["STD", "P", 1, "2025-01-01", "传递中", 1, "V"])
     book.save(path)
-    assert any(
-        issue.category == "NOT_IMPLEMENTED" and issue.sheet == sheet_name
-        for issue in inspect_input(path)
-    )
-    with pytest.raises(InputError, match="尚未接入运行流程"):
+    assert any(issue.category == "INVALID_CONFIG" for issue in inspect_input(path))
+    with pytest.raises(InputError, match="transfer_standard"):
         read_workbook(path)
 
 

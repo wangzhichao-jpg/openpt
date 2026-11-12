@@ -22,7 +22,7 @@ from ..config.catalog import ENUMS, template_rows
 from ..errors import InputError
 from .layout import wide_to_long
 from .measurands import split_measurands
-from .new_stability import read_trend_sheet
+from .new_stability import read_transfer_config, read_transfer_sheet, read_trend_sheet
 from .shape import STABILITY_METHOD_ALIASES, insufficient_homogeneity_replicates
 
 SHEETS = {
@@ -78,6 +78,8 @@ def template(path: str | Path) -> None:
         ("候选批次", "选填：需要记录候选批次时填写。"),
         ("被测量配置", "选填：多个被测量分别登记单位、sigma 等；数据表和声称值的被测量列须对应。"),
         ("趋势稳定性", "选填：序列名、时间 X、时间单位和数值；在方法配置中选回归趋势法。"),
+        ("传递标准复测", "选填：逐次输入标准器、校准点、测量序号、日期、阶段、测量值和单位。"),
+        ("传递标准配置", "选填：逐校准点登记判据、区间、出处和不确定度衔接方式。"),
         (
             "σ 与 σ_pt",
             "sigma 用于均匀性及稳定性判据；sigma_pt 是 z 等评价统计量的分母。"
@@ -134,6 +136,31 @@ def template(path: str | Path) -> None:
     trend_units = DataValidation(type="list", formula1='"天,月,次"')
     trend_sheet.add_data_validation(trend_units)
     trend_units.add("C2:C1048576")
+    transfer_sheet = book.create_sheet("传递标准复测")
+    transfer_sheet.append(
+        ["传递标准编号", "校准点", "测量序号", "日期", "阶段", "测量值", "单位", "（选填）"]
+    )
+    transfer_sheet.freeze_panes = "A2"
+    stage_options = DataValidation(type="list", formula1='"传递前,传递中,传递后"')
+    transfer_sheet.add_data_validation(stage_options)
+    stage_options.add("E2:E1048576")
+    transfer_config = book.create_sheet("传递标准配置")
+    transfer_config.append(
+        [
+            "传递标准编号",
+            "校准点",
+            "单位",
+            "计算区间",
+            "判据JSON",
+            "不确定度JSON",
+            "出处",
+            "汇总变差",
+            "（选填）",
+        ]
+    )
+    window_options = DataValidation(type="list", formula1='"all,transfer_only"')
+    transfer_config.add_data_validation(window_options)
+    window_options.add("D2:D1048576")
     options_sheet = book.create_sheet("被测量配置")
     options_sheet.append(["被测量", "字段", "值", "（选填）"])
     for name in set(SHEETS) - {"项目信息"}:
@@ -182,6 +209,8 @@ def template(path: str | Path) -> None:
         ("趋势长期序列（trend_long_series）", ""),
         ("趋势长期时长（trend_long_span）", ""),
         ("趋势依据来源（trend_source）", ""),
+        ("实验设计类型（design）", ""),
+        ("参加者传递点映射JSON（transfer_en_map）", ""),
     ]:
         book["方法配置"].append(config_row)
 
@@ -211,6 +240,7 @@ def template(path: str | Path) -> None:
         ("B34", options_for("gl003_hom_criterion")),
         ("B35", options_for("report_gl003_hom_criterion")),
         ("B36", options_for("trend_aggregate")),
+        ("B42", options_for("design")),
     ]:
         validation = DataValidation(type="list", formula1=options)
         book["方法配置"].add_data_validation(validation)
@@ -609,18 +639,18 @@ def read_workbook(
         if sheet not in book.sheetnames:
             book.create_sheet(sheet).append(headers)
     info, config = _metadata(book)
-    for pending in ("传递标准复测",):
-        if pending in book.sheetnames and any(
-            any(value not in (None, "") for value in row)
-            for row in book[pending].iter_rows(min_row=2, values_only=True)
-        ):
-            raise InputError(f"{pending}: 数据尚未接入运行流程，不能忽略后继续计算")
     trend = read_trend_sheet(book)
+    transfer = read_transfer_sheet(book)
+    transfer_config = read_transfer_config(book)
+    if (transfer or transfer_config) and config.get("design") != "transfer_standard":
+        raise InputError("传递标准数据须选择 design=transfer_standard")
+    if config.get("design") == "transfer_standard" and not transfer_config:
+        raise InputError("传递标准设计须逐点填写传递标准配置")
     if trend and config.get("stability_method") != "regression_trend":
         raise InputError("趋势稳定性: 须选择 stability_method=regression_trend")
     separated = split_measurands(book, columns)
-    if separated and trend:
-        raise InputError("多个被测量的趋势数据暂不能混合导入，请分别运行")
+    if separated and (trend or transfer or transfer_config):
+        raise InputError("多个被测量的趋势或传递标准数据暂不能混合导入，请分别运行")
     if separated:
         if suffix == ".csv":
             raise InputError("CSV 多被测量输入不支持，请使用 XLSX")
@@ -687,7 +717,15 @@ def read_workbook(
         "stability_units": stab_ids,
         "participants": _participants(book, info["单位"]),
         "claims": _claims(book),
-        "sources": hs + ss + [item["source"] for item in trend],
+        "sources": hs
+        + ss
+        + [item["source"] for item in trend]
+        + [item["source"] for item in transfer],
         "data_decimal_places": max(precision) if precision else None,
         **({"trend_observations": trend} if trend else {}),
+        **(
+            {"transfer_observations": transfer, "transfer_config": transfer_config}
+            if transfer_config
+            else {}
+        ),
     }

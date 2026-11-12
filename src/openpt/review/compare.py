@@ -819,7 +819,61 @@ def review(
     }
     trend_claims: dict[str, list[dict[str, Any]]] = {}
     trend_results = result.get("趋势稳定性", {})
+    transfer_results = result.get("传递标准稳定性", {})
+    transfer_names = {
+        "Δmax": "Δmax",
+        "传递限值": "限值",
+        "U_E": "U_E",
+        "u_stab": "u_stab",
+        "传递结论": "结论",
+    }
     for claim in data["claims"]:
+        if claim["name"] in transfer_names and transfer_results:
+            from .transfer import review_transfer
+
+            group = claim.get("timegroup") or (
+                next(iter(transfer_results)) if len(transfer_results) == 1 else None
+            )
+            if group not in transfer_results:
+                raise ValueError("传递标准声称值须指定标准器|校准点")
+            value = claim["value"]
+            if claim["name"] == "传递结论":
+                if value not in (0, 1):
+                    raise ValueError("传递结论须为1（稳定）或0（不稳定）")
+                value = "稳定" if value == 1 else "不稳定"
+            request = {
+                "name": transfer_names[claim["name"]],
+                "value": value,
+                "digits": claim.get("digits"),
+            }
+            model = claim.get("model") or ""
+            if isinstance(model, str) and model.startswith("rule:"):
+                try:
+                    request["rule_index"] = int(model[5:]) - 1
+                except ValueError:
+                    raise ValueError("传递判据序号应为 rule:1 等正整数") from None
+            item = review_transfer(transfer_results[group], request)
+            actual = item.get("重算值")
+            rows.append(
+                {
+                    "统计量": item["统计量"],
+                    "时间组": str(group),
+                    "声称值": value,
+                    "来源": claim.get("source", ""),
+                    "显示小数位": claim.get("digits"),
+                    "按报告模型复现值": actual,
+                    "按推荐模型重算值": actual,
+                    "按报告显示值": str(actual) if actual is not None else None,
+                    "按推荐显示值": str(actual) if actual is not None else None,
+                    "显示一致": item.get("显示一致"),
+                    "推荐一致": item.get("显示一致"),
+                    "状态": item["状态"],
+                    "差异类型": item["差异类型"],
+                    "评分条目": _mapping_item(mapping, item["统计量"], "homogeneity"),
+                    "说明": item["说明"],
+                }
+            )
+            continue
         if claim["name"] not in trend_names or not trend_results:
             rows.extend(_review_claim(data, result, claim, models, mapping))
             continue

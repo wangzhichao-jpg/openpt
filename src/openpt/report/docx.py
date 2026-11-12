@@ -181,7 +181,13 @@ def _homogeneity(
     h = result.get("均匀性")
     doc.add_heading("均匀性单测分析" if h and h.get("method") == "single" else "均匀性方差分析", 1)
     if not h:
-        doc.add_paragraph("未提供均匀性数据。")
+        standards = {point.get("standard") for point in result.get("传递标准稳定性", {}).values()}
+        if len(standards) == 1:
+            doc.add_paragraph("单台传递标准，不适用样品间均匀性检验。")
+        elif standards:
+            doc.add_paragraph("传递标准各组分别评价；未提供样品间均匀性数据。")
+        else:
+            doc.add_paragraph("未提供均匀性数据。")
         return
     if h.get("method") == "single":
         doc.add_paragraph("GB/T 28043-2019 B.1.2：不能重复测量时，以单测结果标准差作为 s_s。")
@@ -498,7 +504,7 @@ def _other_results(
             )
         for name, extra in result.get("其他稳定性", {}).items():
             _stability_table(doc, str(name), extra, sig)
-    elif not result.get("趋势稳定性"):
+    elif not result.get("趋势稳定性") and not result.get("传递标准稳定性"):
         doc.add_paragraph("未提供稳定性数据，本次未评价稳定性。")
     if result.get("趋势稳定性"):
         doc.add_heading("回归趋势稳定性", 2)
@@ -524,6 +530,33 @@ def _other_results(
                 + _shown(result["趋势不确定度"]["u_stab"], sig)
                 + "；采用登记的短期与长期时长。"
             )
+    if result.get("传递标准稳定性"):
+        doc.add_heading("传递标准稳定性", 2)
+        doc.add_paragraph(
+            "PT-CX-18 附录 A 2.8、2.9：按相关规程、规范或标准规定的误差、"
+            "允差及检验方法和指标判断；JJF 1587 未见原文，待核。t 检验参照 GL003 5.2.1、5.2.2。"
+        )
+        for key, point in result["传递标准稳定性"].items():
+            doc.add_paragraph(
+                f"标准器及校准点 {key}；窗口={point['window']}；"
+                f"Δmax={_shown(point['delta_max'], sig)}；"
+                f"结论={_shown(point['conclusion'])}；出处：{point['source']}。"
+            )
+            for rule in point["criteria"]:
+                doc.add_paragraph(
+                    f"判据 {rule['kind']}：数值={_shown(rule['value'], sig)}；"
+                    f"限值={_shown(rule['limit'], sig)}；"
+                    f"比较={'≤' if rule['inclusive'] else '<'}；结论={_shown(rule['pass'])}。"
+                )
+            options = point.get("uncertainty", {})
+            if options:
+                doc.add_paragraph(
+                    f"En 衔接机制 {options.get('mechanism')}；来源={options.get('source')}；"
+                    f"状态={point['uncertainty_status']}；"
+                    f"u_stab={_shown(point.get('u_stab'), sig)}；"
+                    f"U_E={_shown(point.get('U_E'), sig)}；"
+                    f"忽略条件依据={options.get('condition_source') or '未登记'}。"
+                )
     _robust_results(doc, result, sig, mean_places)
     algorithm_s_result = result.get("算法S")
     if algorithm_s_result:
@@ -1049,7 +1082,12 @@ def make_report(
     elif h:
         doc.add_paragraph(_gl003_homogeneity_summary(h, sig))
     else:
-        doc.add_paragraph("均匀性：未提供数据，本次未评价。")
+        standards = {p.get("standard") for p in result.get("传递标准稳定性", {}).values()}
+        doc.add_paragraph(
+            "单台传递标准，不适用样品间均匀性检验。"
+            if len(standards) == 1
+            else "均匀性：未提供数据，本次未评价。"
+        )
     periods = (
         {result.get("稳定性时间组") or "稳定期": result["稳定性"]} if "稳定性" in result else {}
     )
@@ -1086,8 +1124,14 @@ def make_report(
                 f"趋势稳定性 {name}（线性回归）：{_shown(trend['stable'])}；"
                 f"b1={_shown(trend['b1'], sig)}，阈值={_shown(trend['threshold'], sig)}。"
             )
-    else:
+    elif not result.get("传递标准稳定性"):
         doc.add_paragraph("未提供稳定性数据，本次未评价稳定性。")
+    if result.get("传递标准稳定性"):
+        for name, point in result["传递标准稳定性"].items():
+            doc.add_paragraph(
+                f"传递标准 {name}：{_shown(point['conclusion'])}；"
+                f"Δmax={_shown(point['delta_max'], sig)}；判据见正文。"
+            )
     _project_methods(doc, data, cfg)
     if data.get("batches"):
         doc.add_heading("候选批次追溯", 1)

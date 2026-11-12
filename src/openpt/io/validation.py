@@ -14,12 +14,13 @@ from openpyxl.utils.cell import column_index_from_string, coordinate_from_string
 
 from ..config.catalog import ENUMS
 from ..core.gbt28043 import period_options as gbt_period_options
+from ..core.transfer import assess_transfer
 from ..core.trend import configured_uncertainty, fit_series
 from ..errors import InputError
 from .excel import PARTICIPANT_OPTIONAL, SHEETS
 from .layout import wide_to_long
 from .measurands import DATA_SHEETS, split_measurands
-from .new_stability import read_trend_sheet
+from .new_stability import read_transfer_config, read_transfer_sheet, read_trend_sheet
 from .shape import (
     STABILITY_METHOD_ALIASES,
     insufficient_homogeneity_replicates,
@@ -599,20 +600,6 @@ def inspect_input(
         return separated_issues
     try:
         issues: list[Issue] = []
-        for pending in ("传递标准复测",):
-            if pending in book.sheetnames and any(
-                any(value not in (None, "") for value in row)
-                for row in book[pending].iter_rows(min_row=2, values_only=True)
-            ):
-                issues.append(
-                    Issue(
-                        "NOT_IMPLEMENTED",
-                        pending,
-                        "A1",
-                        None,
-                        "该表尚未接入运行流程，不能忽略后继续计算",
-                    )
-                )
         replicate_type = "technical"
         layout = None
         config_values: dict[str, Any] = {}
@@ -894,6 +881,37 @@ def inspect_input(
                 editable.close()
         elif method == "regression_trend":
             issues.append(Issue("MISSING_SHEET", "趋势稳定性", "A1", None, "回归趋势法须提供数据"))
+        if "传递标准复测" in book.sheetnames or "传递标准配置" in book.sheetnames:
+            editable = load_workbook(BytesIO(payload) if isinstance(source, BytesIO) else source)
+            try:
+                records = read_transfer_sheet(editable)
+                transfer_options = read_transfer_config(editable)
+                if records or transfer_options:
+                    calculation_data_present = True
+                    if config_values.get("design") != "transfer_standard":
+                        issues.append(
+                            Issue(
+                                "INVALID_CONFIG",
+                                "方法配置",
+                                config_cells.get("design", "B1"),
+                                None,
+                                "传递标准须选择 transfer_standard 设计",
+                            )
+                        )
+                    elif not transfer_options:
+                        issues.append(
+                            Issue("MISSING", "传递标准配置", "A1", None, "须登记逐点配置")
+                        )
+                    else:
+                        assess_transfer(records, transfer_options)
+                elif config_values.get("design") == "transfer_standard":
+                    issues.append(Issue("MISSING", "传递标准配置", "A1", None, "须登记逐点配置"))
+            except (InputError, ValueError, TypeError, KeyError) as exc:
+                issues.append(Issue("INPUT_ERROR", "传递标准配置", "A1", None, str(exc)))
+            finally:
+                editable.close()
+        elif config_values.get("design") == "transfer_standard":
+            issues.append(Issue("MISSING_SHEET", "传递标准配置", "A1", None, "须登记逐点配置"))
         if not calculation_data_present:
             issues.append(Issue("NO_DATA", "均匀性", "A1", None, "没有可计算的数据"))
         unique: list[Issue] = []

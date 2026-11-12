@@ -3,6 +3,7 @@
 
 import argparse
 import json
+import math
 import os
 import sys
 from pathlib import Path
@@ -23,6 +24,7 @@ from .core.homogeneity import analyze_single as single_homogeneity
 from .core.robust import algorithm_a, algorithm_s, median_niqr
 from .core.scores import performance_score
 from .core.stability import analyze as stability
+from .core.transfer import assess_transfer
 from .core.trend import configured_uncertainty, fit_series
 from .core.zscore import zscore
 from .errors import InputError
@@ -119,6 +121,52 @@ def _gbt_stability_disposition(
         "stability_disposition_reason": reason,
         "stability_flagged_periods": list(flagged),
     }
+
+
+def _transfer_score_options(
+    data: dict[str, Any],
+    calculations: dict[str, Any],
+    assigned: AssignedResult,
+    participant_id: str,
+) -> tuple[dict[str, Any], str | None, str]:
+    """按参加者绑定逐点机制；缺少配置或重复计入时阻断 En。"""
+    points = calculations.get("传递标准稳定性", {})
+    if not points:
+        return {}, None, ""
+    raw = data["config"].get("transfer_en_map")
+    if raw not in (None, ""):
+        try:
+            mapping = json.loads(raw) if isinstance(raw, str) else raw
+        except ValueError:
+            raise InputError("transfer_en_map 须为有效 JSON 对象") from None
+        if not isinstance(mapping, dict) or not all(
+            isinstance(k, str) and isinstance(v, str) for k, v in mapping.items()
+        ):
+            raise InputError("transfer_en_map 须将参加者编号映射到标准器|校准点")
+        key = mapping.get(participant_id)
+    else:
+        key = next(iter(points)) if len(points) == 1 else None
+    if key not in points:
+        return {}, "参加者未绑定唯一的传递标准校准点", ""
+    point = points[key]
+    options = point.get("uncertainty", {})
+    if point.get("uncertainty_status") != "OK":
+        return {}, "传递标准稳定性衔接条件未通过审核或未登记", str(key)
+    source = f"传递标准 {key}；机制 {options.get('mechanism')}；来源 {options.get('source')}"
+    already = bool(
+        assigned.stab_in_base
+        or (assigned.u_stab > 0 and assigned.stab_mapping in ("assigned", "both"))
+    )
+    if options.get("mechanism") == "A":
+        if already:
+            return {}, "稳定性已计入指定值不确定度，不得再次合成", source
+        base = data.get("assigned_config", {}).get("U_assigned")
+        if base is None:
+            return {}, "机制 A 缺少参考值扩展不确定度", source
+        return {"U_assigned": math.hypot(float(base), 2 * point["u_stab"])}, None, source
+    if options.get("mechanism") == "B":
+        return {"U_E": point["U_E"], "stability_in_U_ref": already}, None, source
+    return {}, None, source
 
 
 def _assigned_results(
@@ -231,6 +279,11 @@ def _assigned_results(
                     "warnings": assigned.warnings,
                 }
             else:
+                extra, transfer_problem, transfer_source = (
+                    _transfer_score_options(data, calculations, assigned, participant["id"])
+                    if name == "En"
+                    else ({}, None, "")
+                )
                 score_result = performance_score(
                     name,
                     participant["value"],
@@ -243,7 +296,9 @@ def _assigned_results(
                     delta_e=delta_e,
                     criterion_basis=basis,
                     u_participant=participant.get("u"),
-                    U_assigned=a.get("U_assigned"),
+                    U_assigned=extra.get("U_assigned", a.get("U_assigned")),
+                    U_E=extra.get("U_E"),
+                    stability_in_U_ref=extra.get("stability_in_U_ref", False),
                     U_participant=participant.get("U"),
                     k_assigned=a.get("k_assigned"),
                     k_participant=participant.get("k"),
@@ -253,6 +308,13 @@ def _assigned_results(
                     unsatisfactory=float(_option(data["config"], "z_unsatisfactory", 3)),
                     en_limit=float(_option(data["config"], "en_limit", 1)),
                 )
+                if transfer_problem:
+                    score_result.status = "DESIGN_REVIEW"
+                    score_result.value = None
+                    score_result.classification = None
+                    score_result.reason = transfer_problem
+                if transfer_source:
+                    score_result.warnings.append(transfer_source)
                 if assigned.sigma_final is None and assigned.sigma_temporary is not None:
                     score_result.warnings.append("能力评定标准差为临时值，评价仅供暂时参考")
                 scores[name] = score_result.to_dict()
@@ -319,6 +381,13 @@ def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]
         trend_u = configured_uncertainty(result["趋势稳定性"], cfg)
         if trend_u is not None:
             result["趋势不确定度"] = trend_u
+    if cfg.get("design") == "transfer_standard":
+        configs = data.get("transfer_config", {})
+        if not configs:
+            raise InputError("传递标准设计须登记逐点配置")
+        result["传递标准稳定性"] = assess_transfer(data.get("transfer_observations", []), configs)
+    elif data.get("transfer_observations") or data.get("transfer_config"):
+        raise InputError("传递标准数据须选择 transfer_standard 设计")
     if data["homogeneity"]:
         strict = cfg.get("strict_homogeneity", False)
         if not isinstance(strict, bool):

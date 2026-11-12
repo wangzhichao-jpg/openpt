@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """趋势和传递标准工作表解析；输入数值及来源保持关联。"""
 
+import json
 import math
 import re
 from datetime import date, datetime
@@ -106,6 +107,79 @@ def read_trend_sheet(book: Any) -> list[dict[str, Any]]:
                     }
                 )
     return output
+
+
+def _json_object(value: Any, label: str, expected: type) -> Any:
+    def pairs(items: list[tuple[str, Any]]) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for key, item in items:
+            if key in result:
+                raise InputError(f"{label}: JSON 键重复")
+            result[key] = item
+        return result
+
+    try:
+        result = json.loads(value, object_pairs_hook=pairs) if isinstance(value, str) else value
+    except (TypeError, ValueError):
+        raise InputError(f"{label}: JSON 格式无效") from None
+    if not isinstance(result, expected):
+        raise InputError(f"{label}: JSON 类型无效")
+    return result
+
+
+def read_transfer_config(book: Any) -> dict[str, dict[str, Any]]:
+    """逐标准器及校准点登记窗口、判据、来源与可选不确定度机制。"""
+    if "传递标准配置" not in book.sheetnames:
+        return {}
+    ws = book["传递标准配置"]
+    names = (
+        "传递标准编号",
+        "校准点",
+        "单位",
+        "计算区间",
+        "判据JSON",
+        "不确定度JSON",
+        "出处",
+        "汇总变差",
+    )
+    positions = _required(_headers(ws), names, ws.title)
+    result = {}
+    for row in ws.iter_rows(min_row=2):
+        if not any(cell.value not in (None, "") for cell in row):
+            continue
+        cells = {name: ws.cell(row[0].row, positions[name]) for name in names}
+        standard, point, unit, window = (str(_value(cells[name])) for name in names[:4])
+        if "|" in standard or "|" in point:
+            raise InputError("传递标准编号和校准点不能包含竖线")
+        key = f"{standard}|{point}"
+        if key in result:
+            raise InputError(f"传递标准配置!{cells['校准点'].coordinate}: 配置重复")
+        if window not in ("all", "transfer_only"):
+            raise InputError(f"传递标准配置!{cells['计算区间'].coordinate}: 计算区间无效")
+        criteria = _json_object(_value(cells["判据JSON"]), "判据JSON", list)
+        if not criteria or not all(isinstance(rule, dict) for rule in criteria):
+            raise InputError("判据JSON 须为非空对象列表")
+        raw = cells["不确定度JSON"].value
+        uncertainty = (
+            _json_object(_value(cells["不确定度JSON"]), "不确定度JSON", dict)
+            if raw not in (None, "")
+            else {}
+        )
+        source = str(_value(cells["出处"]))
+        summary = cells["汇总变差"]
+        result[key] = {
+            "standard": standard,
+            "point": point,
+            "unit": unit,
+            "window": window,
+            "criteria": criteria,
+            "uncertainty": uncertainty,
+            "source": source,
+            "summarized_delta": _value(summary, numeric=True)
+            if summary.value not in (None, "")
+            else None,
+        }
+    return result
 
 
 def read_transfer_sheet(book: Any) -> list[dict[str, Any]]:
