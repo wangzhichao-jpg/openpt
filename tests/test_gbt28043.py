@@ -204,6 +204,8 @@ def test_template_and_workflow(tmp_path: Path) -> None:
         "sigma_procedure": "预设",
         "hom_source": "gbt_ss",
         "hom_mapping": "sigma_prime",
+        "stability_disposition": "reviewed",
+        "stability_disposition_reason": "合成测试：负责人记录处置依据",
     }
     mapped = calculate(data)["指定值与不确定度"]
     assert mapped["u_hom"] == pytest.approx(result["GB/T均匀性"]["ss"])
@@ -250,6 +252,89 @@ def test_preselected_primary_rule_and_no_fallback(tmp_path: Path) -> None:
     data["config"]["gbt_hom_rule"] = "invalid"
     with pytest.raises(InputError, match="basic 或 extended"):
         calculate(data)
+
+
+def test_stability_disposition_links_budget_and_blocks_pending(tmp_path: Path) -> None:
+    path = tmp_path / "data.xlsx"
+    template(path)
+    book = load_workbook(path)
+    book["项目信息"]["B2"], book["项目信息"]["B3"] = "合成", "mg"
+    book.save(path)
+    data = read_workbook(path)
+    data["config"].update({"criterion_standard": "gbt28043", "sigma": 1})
+    data["homogeneity"] = [[0.0, 0.0]] * 10
+    data["stability"] = {"基线": [[0.0, 0.0]] * 2, "稳定期": [[0.4, 0.4]] * 2}
+    data["participants"] = [{"id": "L1", "value": 1.0}]
+    data["assigned_config"] = a = {
+        "method": "known",
+        "value": 1.0,
+        "uncertainty": 0.2,
+        "source": "合成",
+        "uncertainty_source": "合成预算",
+        "sigma_final": 1.0,
+        "sigma_procedure": "预设",
+    }
+    result = calculate(data)
+    assert result["GB/T稳定性"]["稳定期"]["conclusion"] is False
+    assert result["指定值与不确定度"]["status"] == "DESIGN_REVIEW"
+    assert result["指定值与不确定度"]["stability_flagged_periods"] == ["稳定期"]
+    assert result["参加者统计量"]["L1"]["z"]["value"] is None
+    a["stability_disposition"] = "reviewed"
+    with pytest.raises(InputError, match="书面依据"):
+        calculate(data)
+    a["stability_disposition_reason"] = "合成案例的人工批准依据"
+    assert calculate(data)["指定值与不确定度"]["status"] == "OK"
+    a["stability_disposition"] = "budgeted"
+    with pytest.raises(InputError, match="尚未登记"):
+        calculate(data)
+    a.update({"u_stab": 0.1, "stab_mapping": "assigned"})
+    budget = calculate(data)["指定值与不确定度"]
+    assert budget["u"] == pytest.approx(math.hypot(0.2, 0.1))
+    assert budget["status"] == "OK"
+    a["stab_in_base"] = True
+    assert calculate(data)["指定值与不确定度"]["status"] == "DESIGN_REVIEW"
+    a["stab_in_base"] = False
+    data["stability"]["运输期"] = [[0.5, 0.5]] * 2
+    data["config"]["stability_period_options"] = '{"运输期":{"kind":"transport"}}'
+    with pytest.raises(InputError, match="尚未登记"):
+        calculate(data)
+    a.update({"u_trans": 0.2, "trans_mapping": "assigned"})
+    budget = calculate(data)["指定值与不确定度"]
+    assert budget["u"] == pytest.approx(math.sqrt(0.2**2 + 0.1**2 + 0.2**2))
+    assert set(budget["stability_flagged_periods"]) == {"稳定期", "运输期"}
+    a.update({"u_trans": 0, "trans_mapping": "none", "trans_in_stab": True})
+    budget = calculate(data)["指定值与不确定度"]
+    assert budget["u"] == pytest.approx(math.hypot(0.2, 0.1))
+    a.update({"u_trans": 0.2, "trans_mapping": "assigned"})
+    assert calculate(data)["指定值与不确定度"]["status"] == "DESIGN_REVIEW"
+    a["trans_in_stab"] = False
+    target = tmp_path / "disposition.docx"
+    make_report(target, data, calculate(data))
+    cells = [c.text for t in Document(target).tables for r in t.rows for c in r.cells]
+    assert "稳定性处置" in cells and "稳定性处置依据" in cells
+    a["stability_disposition"] = "withhold"
+    assert calculate(data)["指定值与不确定度"]["status"] == "DESIGN_REVIEW"
+    data["stability"] = {"基线": [[0.0, 0.0]] * 2, "稳定期": [[0.0, 0.0]] * 2}
+    data["config"].pop("stability_period_options")
+    assert calculate(data)["指定值与不确定度"]["status"] == "DESIGN_REVIEW"
+    data["config"]["gbt_stability_rule"] = "extended"
+    a["stability_disposition"] = "pending"
+    unevaluated = calculate(data)
+    assert unevaluated["GB/T稳定性"]["稳定期"]["conclusion"] is None
+    assert unevaluated["指定值与不确定度"]["status"] == "DESIGN_REVIEW"
+    a["stability_disposition"] = "invalid"
+    with pytest.raises(InputError, match="stability_disposition"):
+        calculate(data)
+    data["assigned_config"] = {}
+    data["config"].update({"assigned": 1.0, "sigma_pt": 1.0})
+    legacy = calculate(data)
+    assert "参加者z" not in legacy and "DESIGN_REVIEW" in legacy["参加者z状态"]
+    data["claims"] = [{"name": "z:L1", "value": 0.0, "digits": 2, "source": "合成"}]
+    row = next(r for r in review(data, legacy) if r["统计量"] == "z:L1")
+    assert row["显示一致"] is True and row["推荐一致"] is None
+    assert "推荐评价暂停" in row["说明"]
+    make_report(target, data, legacy)
+    assert any("DESIGN_REVIEW" in p.text for p in Document(target).paragraphs)
 
 
 @pytest.mark.r

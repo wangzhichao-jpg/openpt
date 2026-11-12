@@ -193,6 +193,8 @@ def _values(
             if sigma <= 0:
                 raise ValueError("能力评价标准差必须大于零")
             value = (Decimal(str(participant["value"])) - Decimal(str(cfg["assigned"]))) / sigma
+            if result.get("参加者z状态"):
+                return value, None, "仅复现报告数值；稳定性处置未完成，推荐评价暂停"
             return value, value, ""
     return None, None, ""
 

@@ -144,6 +144,8 @@ def template(path: str | Path) -> None:
         ("trans_mapping", "none"),
         ("trans_in_base", False),
         ("trans_in_stab", False),
+        ("stability_disposition", "pending"),
+        ("stability_disposition_reason", ""),
     ]:
         assigned.append(assigned_row)
     for cell, options in [
@@ -158,6 +160,7 @@ def template(path: str | Path) -> None:
         ("B24", '"none,assigned"'),
         ("B25", '"TRUE,FALSE"'),
         ("B26", '"TRUE,FALSE"'),
+        ("B27", '"pending,budgeted,reviewed,withhold"'),
     ]:
         validation = DataValidation(type="list", formula1=options)
         assigned.add_data_validation(validation)

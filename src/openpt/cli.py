@@ -10,7 +10,7 @@ from typing import Any
 from zipfile import BadZipFile
 
 from . import __version__
-from .core.assigned import assign_value
+from .core.assigned import AssignedResult, assign_value
 from .core.gbt28043 import homogeneity as gbt_homogeneity
 from .core.gbt28043 import period_options as gbt_period_options
 from .core.gbt28043 import stability as gbt_stability
@@ -29,7 +29,9 @@ def _option(config: dict[str, Any], key: str, default: Any) -> Any:
     return default if value in (None, "") else value
 
 
-def _participant_results(data: dict[str, Any], sigma: float | None) -> dict[str, Any]:
+def _participant_results(
+    data: dict[str, Any], sigma: float | None, *, legacy_scores: bool = True
+) -> dict[str, Any]:
     """计算 GL002 附录 A.2 算法 A 及 GL002 4.4 的 z。"""
     cfg = data["config"]
     simplified = _option(cfg, "algorithm_a_simplified", False)
@@ -54,7 +56,8 @@ def _participant_results(data: dict[str, Any], sigma: float | None) -> dict[str,
         result["稳健统计状态"] = "NOT_EVALUATED：至少需要两个参加者结果"
     sigma_pt = float(cfg["sigma_pt"]) if cfg.get("sigma_pt") not in (None, "") else sigma
     if (
-        cfg.get("assigned") not in (None, "")
+        legacy_scores
+        and cfg.get("assigned") not in (None, "")
         and sigma_pt is not None
         and not data.get("assigned_config", {}).get("method")
     ):
@@ -69,6 +72,46 @@ def _participant_results(data: dict[str, Any], sigma: float | None) -> dict[str,
             for p in data["participants"]
         }
     return result
+
+
+def _gbt_stability_disposition(
+    assigned: AssignedResult, options: dict[str, Any], periods: dict[str, Any]
+) -> dict[str, Any]:
+    """连接稳定性证据及用户评定的预算；不从均值差生成不确定度。"""
+    disposition = _option(options, "stability_disposition", "pending")
+    reason = _option(options, "stability_disposition_reason", "")
+    if disposition not in ("pending", "budgeted", "reviewed", "withhold"):
+        raise InputError("stability_disposition 应为 pending、budgeted、reviewed 或 withhold")
+    if not isinstance(reason, str):
+        raise InputError("稳定性处置依据须为文字")
+    flagged = {name: p for name, p in periods.items() if p.get("conclusion") is not True}
+    if disposition in ("budgeted", "reviewed") and flagged and not reason.strip():
+        raise InputError("稳定性处置须登记书面依据")
+    if disposition == "budgeted" and flagged:
+        storage_flagged = any(p.get("kind") != "transport" for p in flagged.values())
+        transport_flagged = any(p.get("kind") == "transport" for p in flagged.values())
+        stable_mapped = (
+            assigned.u_stab > 0 and assigned.stab_mapping in ("assigned", "sigma_prime")
+        ) or assigned.stab_in_base
+        transport_mapped = (
+            (assigned.u_trans > 0 and assigned.trans_mapping == "assigned")
+            or assigned.trans_in_base
+            or (assigned.trans_in_stab and stable_mapped)
+        )
+        if (storage_flagged and not stable_mapped) or (transport_flagged and not transport_mapped):
+            raise InputError("稳定性或运输影响尚未登记到不确定度预算；不得凭均值差自动估算")
+    if disposition == "withhold" or (flagged and disposition == "pending"):
+        assigned.status = "DESIGN_REVIEW"
+        assigned.u = None
+        assigned.sigma_prime = None
+        assigned.warnings.append("稳定性或运输处置未完成，或已登记暂停评价")
+    elif flagged:
+        assigned.warnings.append("稳定性处置依据由用户登记，软件不能验证审批、独立性或影响评定")
+    return {
+        "stability_disposition": disposition,
+        "stability_disposition_reason": reason,
+        "stability_flagged_periods": list(flagged),
+    }
 
 
 def _assigned_results(data: dict[str, Any], calculations: dict[str, Any]) -> dict[str, Any]:
@@ -120,7 +163,13 @@ def _assigned_results(data: dict[str, Any], calculations: dict[str, Any]) -> dic
     assigned = assign_value(
         a["method"], participants=[p["value"] for p in data["participants"]], **options
     )
+    disposition_details = {}
+    if _option(data["config"], "criterion_standard", "gl003") == "gbt28043":
+        disposition_details = _gbt_stability_disposition(
+            assigned, a, calculations.get("GB/T稳定性", {})
+        )
     assigned_details = assigned.to_dict()
+    assigned_details.update(disposition_details)
     if hom_source == "gbt_ss":
         assigned_details["hom_source"] = "GB/T 28043-2019 B.3 ss"
     assigned_details.update(
@@ -201,7 +250,7 @@ def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]
         hom_rule not in ("basic", "extended") or stab_rule not in ("basic", "extended")
     ):
         raise InputError("GB/T 判据应为 basic 或 extended")
-    result = {}
+    result: dict[str, Any] = {}
     if data["homogeneity"]:
         strict = cfg.get("strict_homogeneity", False)
         if not isinstance(strict, bool):
@@ -290,7 +339,19 @@ def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]
                 gbt_periods[name] = period
             result["GB/T稳定性"] = gbt_periods
     if data["participants"]:
-        result.update(_participant_results(data, sigma))
+        legacy_blocked = (
+            standard == "gbt28043"
+            and not data.get("assigned_config", {}).get("method")
+            and (
+                data.get("assigned_config", {}).get("stability_disposition") == "withhold"
+                or any(
+                    p.get("conclusion") is not True for p in result.get("GB/T稳定性", {}).values()
+                )
+            )
+        )
+        result.update(_participant_results(data, sigma, legacy_scores=not legacy_blocked))
+        if legacy_blocked and cfg.get("assigned") not in (None, ""):
+            result["参加者z状态"] = "DESIGN_REVIEW：稳定性未通过或未评价，须登记指定值和处置依据"
     if data.get("assigned_config", {}).get("method"):
         result.update(_assigned_results(data, result))
     if data.get("algorithm_s_values"):

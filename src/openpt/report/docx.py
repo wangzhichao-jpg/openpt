@@ -516,6 +516,14 @@ def _assigned_table(doc: Any, result: dict[str, Any]) -> None:
         ("稳定性分量含运输分量", "trans_in_stab"),
         ("状态", "status"),
     ]
+    if "stability_disposition" in assigned:
+        labels.extend(
+            [
+                ("稳定性处置", "stability_disposition"),
+                ("稳定性处置依据", "stability_disposition_reason"),
+                ("待处置时点", "stability_flagged_periods"),
+            ]
+        )
     boolean_keys = {"independent", "hom_in_base", "stab_in_base", "trans_in_base", "trans_in_stab"}
     _table(
         doc,
@@ -606,7 +614,7 @@ def _participant_table(
             ],
         )
     else:
-        doc.add_paragraph("未提供可评价的指定值、标准差或参加者结果。")
+        doc.add_paragraph(result.get("参加者z状态", "未提供可评价的指定值、标准差或参加者结果。"))
 
 
 def _project_methods(doc: Any, data: dict[str, Any], cfg: dict[str, Any]) -> None:
