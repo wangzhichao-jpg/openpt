@@ -25,7 +25,7 @@ def _data() -> dict:
 def test_homogeneity_default_each_period_and_claims() -> None:
     data = _data()
     data["claims"] = [
-        {"name": "均值差", "value": 0.56, "digits": 2, "source": "报告"},
+        {"name": "均值差", "value": 0.96, "digits": 2, "source": "报告"},
         {"name": "x̄", "value": 36.64, "digits": 2, "source": "报告"},
         {"name": "ȳ", "value": 37.1, "digits": 1, "source": "报告", "timegroup": "后期"},
     ]
@@ -37,10 +37,34 @@ def test_homogeneity_default_each_period_and_claims() -> None:
     assert result["其他稳定性"]["后期"]["difference"] == pytest.approx(0.06)
     claims = {row["统计量"]: row for row in review(data, result)}
     assert claims["均值差"]["状态"] == "MATCH"
+    assert claims["均值差"]["推荐一致"] is False
     assert claims["ȳ"]["状态"] == "MATCH"
     assert claims["x̄"]["状态"] == "DIFFERENCE"
     assert "VALUE_MISMATCH" in claims["x̄"]["差异类型"]
     assert "结论受影响" in claims["x̄"]["说明"]
+
+
+def test_reported_means_reproduce_claim_but_keep_recommended_value() -> None:
+    data = _data()
+    data["claims"] = [
+        {
+            "name": "稳定性均值差",
+            "value": 0.96,
+            "digits": 2,
+            "source": "报告",
+            "timegroup": "稳定期",
+        },
+        {"name": "x̄", "value": 36.64, "digits": 2, "source": "报告"},
+        {"name": "ȳ", "value": 37.60, "digits": 2, "source": "报告", "timegroup": "稳定期"},
+    ]
+    rows = {row["统计量"]: row for row in review(data, calculate(data))}
+    assert rows["稳定性均值差"]["状态"] == "MATCH"
+    assert rows["稳定性均值差"]["显示一致"] is True
+    assert rows["稳定性均值差"]["推荐一致"] is False
+    assert "推荐基线" in rows["稳定性均值差"]["说明"]
+    assert rows["稳定性均值差（推荐基线）"]["状态"] == "NOTE"
+    assert "MODEL_SWITCH" in rows["稳定性均值差（推荐基线）"]["差异类型"]
+    assert rows["x̄"]["状态"] == "DIFFERENCE"
 
 
 def test_chinese_f_aliases_and_spaced_threshold() -> None:

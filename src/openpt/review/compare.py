@@ -431,6 +431,44 @@ def _mapping_item(mapping: dict[str, Any], name: str, group: str) -> str:
     return value
 
 
+def _reported_mean_difference(
+    data: dict[str, Any], result: dict[str, Any], claim: dict[str, Any]
+) -> tuple[float, str] | None:
+    """仅在显式登记报告均值时复现报告算术，不把报告基线当成推荐基线。"""
+    if data.get("config", {}).get("stability_method") != "mean_difference":
+        return None
+    if claim.get("name") not in ("均值差", "稳定性均值差", "|x̄-ȳ|"):
+        return None
+    if claim.get("model") not in (None, "", "recommended", "gl003", "gbt28043"):
+        return None
+    group, period = _period(result, claim.get("timegroup"))
+    if period.get("status") == "DESIGN_REVIEW" or period.get("mean2") is None:
+        return None
+    primary = result.get("稳定性时间组") or "稳定期"
+    claims = data.get("claims", [])
+    x_names = ("x̄", "xbar", "均匀性总平均值")
+    y_names = ("ȳ", "ȳ", "ybar", "稳定性时间组平均值")
+    matching_x = [
+        item for item in claims if item.get("name") in x_names and item.get("timegroup") == group
+    ]
+    if not matching_x:
+        matching_x = [
+            item for item in claims if item.get("name") in x_names and not item.get("timegroup")
+        ]
+    matching_y = [
+        item
+        for item in claims
+        if item.get("name") in y_names and (item.get("timegroup") or primary) == group
+    ]
+    x_values = {float(item["value"]) for item in matching_x}
+    y_values = {float(item["value"]) for item in matching_y}
+    if len(x_values) != 1 or len(y_values) > 1:
+        return None
+    x = next(iter(x_values))
+    y = next(iter(y_values)) if y_values else float(period["mean2"])
+    return abs(x - y), f"按报告声明的 x̄={x}、ȳ={y} 复现算术；推荐模型使用配置的正确基线"
+
+
 def _review_claim(
     data: dict[str, Any],
     result: dict[str, Any],
@@ -452,6 +490,10 @@ def _review_claim(
     except (ValueError, TypeError, OverflowError):
         raise ValueError("报告声称值显示小数位须为0至12的整数") from None
     reproduced, rec, note = _values(data, result, claim)
+    report_means = _reported_mean_difference(data, result, claim)
+    if report_means is not None:
+        reproduced, report_note = report_means
+        note = (note + "；" + report_note).strip("；")
     if name in ("x̄", "xbar", "均匀性总平均值") and rec is not None:
         _, period = _period(result, claim.get("timegroup"))
         if display(claim["value"], digits) != display(rec, digits):
@@ -497,8 +539,22 @@ def _review_claim(
     if claim.get("cell"):
         source = f"{source}；输入单元格：{claim['cell']}"
     row = _row(name, claim["value"], digits, source, reproduced, rec, note, types, item)
+    if report_means is not None and row["显示一致"] is True and not row["差异类型"]:
+        row["状态"] = "MATCH"
+        if row["推荐一致"] is False:
+            row["说明"] += "；按推荐基线的数值不同，须结合均值差异条目复核"
     _adjudicate_models(data, result, claim, row, digits)
     rows = [row]
+    if report_means is not None and row["显示一致"] is True and row["推荐一致"] is False:
+        rows.append(
+            {
+                **row,
+                "统计量": name + "（推荐基线）",
+                "状态": "NOTE",
+                "差异类型": "MODEL_SWITCH",
+                "说明": row["说明"] + "；报告数值仅与所声明均值的算术一致，不能代替推荐基线判定",
+            }
+        )
     if name == "t" and model == "displayed_summary" and data["config"].get("s1") is not None:
         s1 = result.get("稳定性", {}).get("s1")
         stated = float(data["config"]["s1"])
