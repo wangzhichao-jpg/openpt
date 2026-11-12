@@ -518,9 +518,13 @@ def _other_results(
         )
         for name, trend in result["趋势稳定性"].items():
             doc.add_paragraph(
-                f"序列 {name}；n={trend['n']}，b1={_shown(trend['b1'], sig)}，"
-                f"b0={_shown(trend['b0'], sig)}，s(b1)={_shown(trend['s_b1'], sig)}，"
-                f"阈值={_shown(trend['threshold'], sig)}，稳定：{_shown(trend['stable'])}。"
+                f"序列 {name}；n={trend['n']}，df={trend['df']}，"
+                f"X̄={_shown(trend['x_bar'], sig)}，Ȳ={_shown(trend['y_bar'], sig)}，"
+                f"b1={_shown(trend['b1'], sig)}，b0={_shown(trend['b0'], sig)}，"
+                f"残差标准差={_shown(trend['s_residuals'], sig)}，"
+                f"s(b1)={_shown(trend['s_b1'], sig)}，t临界={_shown(trend['t_critical'], sig)}，"
+                f"阈值={_shown(trend['threshold'], sig)}，p={_shown(trend['p_value'], sig)}，"
+                f"稳定：{_shown(trend['stable'])}。"
             )
             for warning in trend.get("design_warnings", []):
                 doc.add_paragraph("设计提示：" + warning)
@@ -538,10 +542,12 @@ def _other_results(
                 else:
                     doc.add_picture(image, width=Cm(12.0))
         if result.get("趋势不确定度"):
+            u = result["趋势不确定度"]
             doc.add_paragraph(
-                "趋势稳定性分量 u_stab="
-                + _shown(result["趋势不确定度"]["u_stab"], sig)
-                + "；采用登记的短期与长期时长。"
+                f"u_s1=s(b1)短期×X短期={_shown(u['u_short'], sig)}（序列 {u['short_series']}，"
+                f"时长 {u['short_span']}）；u_s2=s(b1)长期×X长期={_shown(u['u_long'], sig)}"
+                f"（序列 {u['long_series']}，时长 {u['long_span']}）；"
+                f"u_stab=√(u_s1²+u_s2²)={_shown(u['u_stab'], sig)}。"
             )
     if result.get("传递标准稳定性"):
         doc.add_heading("传递标准稳定性", 2)

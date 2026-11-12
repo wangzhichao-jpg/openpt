@@ -45,6 +45,7 @@ def test_trend_end_to_end(tmp_path: Path) -> None:
     assert "仅限微生物领域参考使用" in text and "未见原文" in text
     assert main(["run", str(path), "--runs-dir", str(tmp_path / "runs")]) == 0
     assert main(["review", str(path), "--runs-dir", str(tmp_path / "reviews")]) == 0
+    assert main(["reproduce", str(next((tmp_path / "reviews").iterdir()))]) == 0
 
 
 def test_trend_wide_time_mean_workbook(tmp_path: Path) -> None:
