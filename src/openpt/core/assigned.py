@@ -6,13 +6,14 @@ import statistics
 from dataclasses import dataclass
 from typing import Any
 
+from ..config.catalog import ENUMS
 from ..errors import InputError
 from .models import ResultMapping
 from .robust import algorithm_a, median_niqr
 
 # 参加者公议值的标准不确定度系数；GB/T 28043-2019 7.7.3 式(6)。
 CONSENSUS_U_FACTOR = 1.25
-METHODS = ("known", "certified", "reference", "expert_consensus", "participant_consensus")
+METHODS = ENUMS["assigned_method"]
 
 
 @dataclass
@@ -103,14 +104,9 @@ def assign_value(
         raise InputError("指定值来源必填")
     if not isinstance(uncertainty_source, str) or not uncertainty_source.strip():
         raise InputError("指定值不确定度来源必填")
-    if hom_mapping not in ("none", "assigned", "sigma_prime", "both") or stab_mapping not in (
-        "none",
-        "assigned",
-        "sigma_prime",
-        "both",
-    ):
+    if hom_mapping not in ENUMS["hom_mapping"] or stab_mapping not in ENUMS["stab_mapping"]:
         raise InputError("分量映射无效")
-    if trans_mapping not in ("none", "assigned"):
+    if trans_mapping not in ENUMS["trans_mapping"]:
         raise InputError("运输分量只能映射至指定值不确定度或不分配")
     if not all(
         isinstance(v, bool) for v in (hom_in_base, stab_in_base, trans_in_base, trans_in_stab)

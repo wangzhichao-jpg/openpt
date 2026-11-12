@@ -15,8 +15,10 @@ from typing import Any
 
 from openpyxl import Workbook, load_workbook
 from openpyxl.comments import Comment
+from openpyxl.styles import Alignment
 from openpyxl.worksheet.datavalidation import DataValidation
 
+from ..config.catalog import ENUMS, template_rows
 from ..errors import InputError
 from .layout import wide_to_long
 from .measurands import split_measurands
@@ -81,7 +83,15 @@ def template(path: str | Path) -> None:
         ),
     ]:
         instructions.append([title, note])
-    instructions.column_dimensions["A"].width = 22
+    for title, description in template_rows():
+        instructions.append([title, description])
+        instructions.cell(instructions.max_row, 2).alignment = Alignment(
+            wrap_text=True, vertical="top"
+        )
+        instructions.row_dimensions[instructions.max_row].height = max(
+            20, 15 * (1 + len(description) // 55)
+        )
+    instructions.column_dimensions["A"].width = 26
     instructions.column_dimensions["B"].width = 80
     for name, headers in SHEETS.items():
         ws = book.create_sheet(name)
@@ -158,26 +168,30 @@ def template(path: str | Path) -> None:
         ("测量表布局（layout）", ""),
     ]:
         book["方法配置"].append(config_row)
+
+    def options_for(name: str) -> str:
+        return '"' + ",".join(ENUMS[name]) + '"'
+
     for cell, options in [
         ("B4", '"启用,关闭"'),
-        ("B5", '"两均值,单均值,均值差法（GL003 5.3）"'),
-        ("B9", '"gl002,gbt28043,absolute,simplified"'),
+        ("B5", '"' + ",".join(STABILITY_METHOD_ALIASES) + '"'),
+        ("B9", options_for("algorithm_a_rule")),
         ("B11", '"标准方法精密度,经验值,稳健标准差,其他"'),
-        ("B12", '"temporary,final"'),
-        ("B13", '"unit_means,all_repeats"'),
-        ("B14", '"independent,paired,correlated"'),
+        ("B12", options_for("sigma_stage")),
+        ("B13", options_for("observation_level")),
+        ("B14", options_for("stability_design")),
         ("B15", '"启用,关闭"'),
-        ("B17", '"z,zprime,zeta,En,D,D%,all"'),
-        ("B18", '"gl002,absolute"'),
-        ("B21", '"gl003,gbt28043"'),
-        ("B24", '"gl003,gbt28043"'),
-        ("B26", '"basic,extended"'),
-        ("B27", '"basic,extended"'),
-        ("B29", '"sigma_pt,delta_e"'),
-        ("B30", '"homogeneity,baseline_group"'),
-        ("B31", '"one_sample,two_sample,mean_difference"'),
-        ("B32", '"technical,adjacent_specimens,other,single"'),
-        ("B33", '"long,wide"'),
+        ("B17", options_for("score_type")),
+        ("B18", options_for("algorithm_s_stop_rule")),
+        ("B21", options_for("criterion_standard")),
+        ("B24", options_for("report_standard")),
+        ("B26", options_for("gbt_hom_rule")),
+        ("B27", options_for("gbt_stability_rule")),
+        ("B29", options_for("gbt_criterion_basis")),
+        ("B30", options_for("baseline_source")),
+        ("B31", options_for("report_stability_method")),
+        ("B32", options_for("replicate_type")),
+        ("B33", options_for("layout")),
     ]:
         validation = DataValidation(type="list", formula1=options)
         book["方法配置"].add_data_validation(validation)
@@ -214,18 +228,18 @@ def template(path: str | Path) -> None:
     ]:
         assigned.append(assigned_row)
     for cell, options in [
-        ("B2", '"known,certified,reference,expert_consensus,participant_consensus"'),
-        ("B7", '"robust_mean,median"'),
-        ("B13", '"none,assigned,sigma_prime,both"'),
-        ("B14", '"none,assigned,sigma_prime,both"'),
+        ("B2", options_for("assigned_method")),
+        ("B7", options_for("consensus_method")),
+        ("B13", options_for("hom_mapping")),
+        ("B14", options_for("stab_mapping")),
         ("B15", '"TRUE,FALSE"'),
         ("B16", '"TRUE,FALSE"'),
         ("B19", '"TRUE,FALSE"'),
-        ("B22", '"manual,gbt_ss"'),
-        ("B24", '"none,assigned"'),
+        ("B22", options_for("hom_source")),
+        ("B24", options_for("trans_mapping")),
         ("B25", '"TRUE,FALSE"'),
         ("B26", '"TRUE,FALSE"'),
-        ("B27", '"pending,budgeted,reviewed,withhold"'),
+        ("B27", options_for("stability_disposition")),
     ]:
         validation = DataValidation(type="list", formula1=options)
         assigned.add_data_validation(validation)
@@ -301,11 +315,13 @@ def _metadata(book: Any) -> tuple[dict[str, Any], dict[str, Any]]:
         match = re.search(r"（([a-zA-Z_][a-zA-Z_0-9]*)）$", label)
         key = match.group(1) if match else label
         value = row[1].value
-        if key in ("strict_homogeneity", "reference_uncertainty_negligible") and value in (
-            "启用",
-            "关闭",
+        if (
+            key
+            in ("strict_homogeneity", "reference_uncertainty_negligible", "algorithm_a_simplified")
+            and isinstance(value, str)
+            and value in ("启用", "关闭", "TRUE", "FALSE")
         ):
-            value = value == "启用"
+            value = value in ("启用", "TRUE")
         if key == "stability_method" and value in STABILITY_METHOD_ALIASES:
             value = STABILITY_METHOD_ALIASES[value]
         config[key] = value
@@ -480,7 +496,7 @@ def _batches(book: Any) -> list[dict[str, Any]]:
             raise InputError(f"候选批次!{row[0].coordinate}: 批次编号重复")
         seen.add(ident)
         status = row[7].value
-        if status not in ("候选", "失败", "选用", "弃用"):
+        if status not in ENUMS["候选批次.状态"]:
             raise InputError(f"候选批次!{row[7].coordinate}: 状态无效")
         if status in ("失败", "弃用") and not str(row[8].value or "").strip():
             raise InputError(f"候选批次!{row[8].coordinate}: 失败或弃用须填写理由")
@@ -592,7 +608,7 @@ def read_workbook(
         return {**first, "info": info, "config": config, "measurands": subdata}
     precision: list[int] = []
     replicate_type = config.get("replicate_type") or "technical"
-    if replicate_type not in ("technical", "adjacent_specimens", "other", "single"):
+    if replicate_type not in ENUMS["replicate_type"]:
         raise InputError("replicate_type 应为 technical、adjacent_specimens、other 或 single")
     layout = config.get("layout") or None
     hom, hs, hom_ids = _observations(

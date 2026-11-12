@@ -7,6 +7,7 @@ from typing import Any
 
 import numpy as np
 
+from ..config.catalog import ENUMS
 from ..errors import InputError
 from ..io.shape import insufficient_units
 from .models import AlgorithmAResult, AlgorithmSResult, MedianIqrResult
@@ -103,7 +104,7 @@ def algorithm_a(
         or max_iterations < 1
     ):
         raise InputError("无效迭代参数")
-    if rule not in ("gl002", "gbt28043", "absolute", "simplified"):
+    if rule not in ENUMS["algorithm_a_rule"]:
         raise InputError("算法 A 停止规则无效")
     if simplified:
         rule = "simplified"
@@ -206,7 +207,7 @@ def algorithm_s(
         or max_iterations < 1
     ):
         raise InputError("算法 S 最大迭代次数无效")
-    if stop_rule not in ("gl002", "absolute"):
+    if stop_rule not in ENUMS["algorithm_s_stop_rule"]:
         raise InputError("算法 S 停止规则无效")
     if (
         isinstance(tolerance, bool)

@@ -4,6 +4,8 @@
 from collections.abc import Collection
 from typing import Any
 
+from ..config.catalog import ENUMS
+
 STABILITY_METHOD_ALIASES = {
     "两均值": "two_sample",
     "单均值": "one_sample",
@@ -29,9 +31,9 @@ def stability_structure_problem(
     """返回稳定性计算所需数据的首个结构问题。"""
     if not groups:
         return None
-    if baseline_source not in ("homogeneity", "baseline_group"):
+    if baseline_source not in ENUMS["baseline_source"]:
         return "INVALID_CONFIG", "baseline_source 应为 homogeneity 或 baseline_group"
-    if method not in ("one_sample", "two_sample", "mean_difference"):
+    if method not in ENUMS["stability_method"]:
         return "INVALID_CONFIG", "未知稳定性方法"
     if method == "mean_difference":
         if not any(name != "基线" for name in groups):

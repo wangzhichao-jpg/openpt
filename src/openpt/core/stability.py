@@ -7,6 +7,7 @@ from typing import Any
 import numpy as np
 from scipy.stats import t as t_distribution
 
+from ..config.catalog import ENUMS
 from ..errors import InputError
 from ..io.shape import insufficient_units
 from .decision import compare
@@ -142,7 +143,7 @@ def analyze(
     reference_source: str | None = None,
 ) -> StabilityResult:
     """按 GL003 5.2 计算 t 并按 5.3 对比均值差与 0.3σ。"""
-    if design not in ("independent", "paired", "correlated"):
+    if design not in ENUMS["stability_design"]:
         raise InputError("未知实验设计")
     if not isinstance(reference_uncertainty_negligible, bool):
         raise InputError("参考值不确定度选项必须是布尔值")
@@ -158,7 +159,7 @@ def analyze(
         )
     if model not in ("unit_pooled", "repeats_pooled", "repeats_welch"):
         raise InputError("未知稳定性模型")
-    if method not in ("one_sample", "two_sample", "mean_difference"):
+    if method not in ENUMS["stability_method"]:
         raise InputError("未知稳定性方法")
     if not 0 < alpha < 1:
         raise InputError("alpha 无效")

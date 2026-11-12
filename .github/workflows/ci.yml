@@ -18,6 +18,7 @@ jobs:
       - run: python -m ruff check .
       - run: python -m ruff format --check .
       - run: python -m mypy --ignore-missing-imports --disallow-untyped-defs src/openpt
+      - run: python tools/generate_reference.py --check
       - run: python -m pytest -m "not internal"
       - run: python -m build
       - run: python -m twine check dist/*

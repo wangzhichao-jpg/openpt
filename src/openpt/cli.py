@@ -10,6 +10,7 @@ from typing import Any
 from zipfile import BadZipFile
 
 from . import __version__
+from .config.catalog import ENUMS
 from .config.sigma import criterion_sigma
 from .core.assigned import AssignedResult, assign_value
 from .core.decision import compare
@@ -85,7 +86,7 @@ def _gbt_stability_disposition(
     """连接稳定性证据及用户评定的预算；不从均值差生成不确定度。"""
     disposition = _option(options, "stability_disposition", "pending")
     reason = _option(options, "stability_disposition_reason", "")
-    if disposition not in ("pending", "budgeted", "reviewed", "withhold"):
+    if disposition not in ENUMS["stability_disposition"]:
         raise InputError("stability_disposition 应为 pending、budgeted、reviewed 或 withhold")
     if not isinstance(reason, str):
         raise InputError("稳定性处置依据须为文字")
@@ -150,7 +151,7 @@ def _assigned_results(
     )
     options = {key: a[key] for key in keys if key in a}
     hom_source = a.get("hom_source") or "manual"
-    if hom_source not in ("manual", "gbt_ss"):
+    if hom_source not in ENUMS["hom_source"]:
         raise InputError("hom_source 应为 manual 或 gbt_ss")
     if hom_source == "gbt_ss":
         if _option(data["config"], "criterion_standard", "gl003") != "gbt28043":
@@ -211,7 +212,7 @@ def _assigned_results(
     )
     result: dict[str, Any] = {"指定值与不确定度": assigned_details}
     kind = _option(data["config"], "score_type", "z")
-    if kind not in ("z", "zprime", "zeta", "En", "D", "D%", "all"):
+    if kind not in ENUMS["score_type"]:
         raise ValueError("未知统计量类型")
     kinds = ("D", "D%", "z", "zprime", "zeta", "En") if kind == "all" else (kind,)
     participant_scores: dict[str, Any] = {}
@@ -284,7 +285,7 @@ def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]
     if cfg.get("gbt28043_extension"):
         raise ValueError("旧配置 gbt28043_extension 不支持；请使用 criterion_standard")
     standard = _option(cfg, "criterion_standard", "gl003")
-    if standard not in ("gl003", "gbt28043"):
+    if standard not in ENUMS["criterion_standard"]:
         raise InputError("criterion_standard 应为 gl003 或 gbt28043")
     delta_e = cfg.get("delta_e")
     delta_e = None if delta_e in (None, "") else delta_e
@@ -295,11 +296,11 @@ def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]
     hom_rule = _option(cfg, "gbt_hom_rule", "basic")
     stab_rule = _option(cfg, "gbt_stability_rule", "basic")
     if standard == "gbt28043" and (
-        hom_rule not in ("basic", "extended") or stab_rule not in ("basic", "extended")
+        hom_rule not in ENUMS["gbt_hom_rule"] or stab_rule not in ENUMS["gbt_stability_rule"]
     ):
         raise InputError("GB/T 判据应为 basic 或 extended")
     replicate_type = _option(cfg, "replicate_type", "technical")
-    if replicate_type not in ("technical", "adjacent_specimens", "other", "single"):
+    if replicate_type not in ENUMS["replicate_type"]:
         raise InputError("replicate_type 应为 technical、adjacent_specimens、other 或 single")
     result: dict[str, Any] = {}
     if data["homogeneity"]:
@@ -312,7 +313,7 @@ def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]
             if not 0 < alpha < 1:
                 raise InputError("alpha 必须在 0 和 1 之间")
             stage = _option(cfg, "sigma_stage", None)
-            if stage not in (None, "temporary", "final"):
+            if stage is not None and stage not in ENUMS["sigma_stage"]:
                 raise InputError("sigma 阶段应为 temporary 或 final")
             result["均匀性"] = single_homogeneity(data["homogeneity"], sigma)
             result["均匀性"]["sigma_source"] = _option(cfg, "sigma_source", None)
@@ -386,7 +387,7 @@ def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]
             else:
                 reference = sum(sum(row) / len(row) for row in baseline_data) / len(baseline_data)
         level = _option(cfg, "observation_level", "unit_means")
-        if level not in ("unit_means", "all_repeats"):
+        if level not in ENUMS["observation_level"]:
             raise ValueError("未知实验层级")
         if level == "all_repeats" and not review_mode:
             raise InputError("全部重复值仅供复核模型使用，不可用于常规结论")
@@ -549,7 +550,7 @@ def _parser() -> argparse.ArgumentParser:
     decision.add_argument("directory", help="已有运行目录")
     decision.add_argument("--item", required=True, help="复核条目")
     decision.add_argument("--allow-new-item", action="store_true", help="允许登记结果之外的条目")
-    decision.add_argument("--decision", required=True, choices=("接受", "退回", "需补充"))
+    decision.add_argument("--decision", required=True, choices=ENUMS["decision"])
     decision.add_argument("--by", required=True, dest="person", help="决定人员")
     decision.add_argument("--note", default="", help="决定备注")
     reproduction = sub.add_parser("reproduce", help="校验快照并重新计算")

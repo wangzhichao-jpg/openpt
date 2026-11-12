@@ -12,6 +12,7 @@ from typing import Any
 from openpyxl import load_workbook
 from openpyxl.utils.cell import column_index_from_string, coordinate_from_string, get_column_letter
 
+from ..config.catalog import ENUMS
 from ..errors import InputError
 from .excel import PARTICIPANT_OPTIONAL, SHEETS
 from .layout import wide_to_long
@@ -488,15 +489,21 @@ def inspect_input(
                     value = row[col] if col < len(row) else None
                     if field == "stability_method" and value in STABILITY_METHOD_ALIASES:
                         value = STABILITY_METHOD_ALIASES[value]
-                    if field in (
-                        "strict_homogeneity",
-                        "reference_uncertainty_negligible",
-                    ) and value in ("启用", "关闭"):
-                        value = value == "启用"
+                    if (
+                        field
+                        in (
+                            "strict_homogeneity",
+                            "reference_uncertainty_negligible",
+                            "algorithm_a_simplified",
+                        )
+                        and isinstance(value, str)
+                        and value in ("启用", "关闭", "TRUE", "FALSE")
+                    ):
+                        value = value in ("启用", "TRUE")
                     config_values[field] = value
                     config_cells[field] = f"{get_column_letter(col + 1)}{index}"
                     if field == "layout":
-                        if value not in (None, "", "long", "wide"):
+                        if value not in (None, "") and value not in ENUMS["layout"]:
                             issues.append(
                                 Issue(
                                     "INVALID_CONFIG",
@@ -511,14 +518,7 @@ def inspect_input(
                         continue
                     if field != "replicate_type":
                         continue
-                    if value not in (
-                        None,
-                        "",
-                        "technical",
-                        "adjacent_specimens",
-                        "other",
-                        "single",
-                    ):
+                    if value not in (None, "") and value not in ENUMS["replicate_type"]:
                         issues.append(
                             Issue(
                                 "INVALID_CONFIG",

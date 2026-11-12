@@ -6,6 +6,7 @@ from typing import Any
 
 from openpyxl.utils import get_column_letter
 
+from ..config.catalog import ENUMS
 from ..errors import InputError
 
 
@@ -16,7 +17,7 @@ def wide_to_long(
     layout: str | None = None,
 ) -> tuple[list[list[Any]], dict[str, str]] | None:
     """识别并展开宽表，返回长表值及虚拟地址到原单元格地址的映射。"""
-    if layout not in (None, "", "long", "wide"):
+    if layout not in (None, "") and layout not in ENUMS["layout"]:
         raise InputError("layout 应为 long 或 wide")
     if sheet not in ("均匀性", "稳定性") or not rows:
         return None

@@ -8,6 +8,7 @@ from typing import Any
 import numpy as np
 from scipy.stats import chi2, f
 
+from ..config.catalog import ENUMS
 from ..errors import InputError
 from ..io.shape import insufficient_homogeneity_replicates, insufficient_units
 from .decision import compare
@@ -45,7 +46,7 @@ def criterion_limit(
             invalid = True
         if invalid:
             raise InputError(f"{name} 必须为正有限数")
-    if basis not in (None, "", "sigma_pt", "delta_e"):
+    if basis not in (None, "") and basis not in ENUMS["gbt_criterion_basis"]:
         raise InputError("gbt_criterion_basis 应为 sigma_pt 或 delta_e")
     if not basis:
         if sigma is not None and delta_e is not None:
@@ -191,7 +192,7 @@ def period_options(config: dict[str, Any], groups: Any) -> dict[str, dict[str, A
         if not isinstance(entry, dict) or set(entry) - {"kind", "u2"}:
             raise InputError("逐时点配置仅支持 kind 和 u2")
         kind = entry.get("kind", "storage")
-        if kind not in ("storage", "transport"):
+        if kind not in ENUMS["stability_period_options.kind"]:
             raise InputError("稳定性类型应为 storage 或 transport")
         if name == "稳定期" and "u2" in entry and global_u2 is not None:
             raise InputError("稳定期不确定度不可同时在两处输入")
@@ -219,7 +220,7 @@ def stability(
     basis, basic_limit = criterion_limit(sigma, delta_e, basis)
     if not isinstance(independent, bool):
         raise InputError("独立性必须为布尔值")
-    if kind not in ("storage", "transport"):
+    if kind not in ENUMS["stability_period_options.kind"]:
         raise InputError("稳定性类型应为 storage 或 transport")
     for value in (u1, u2):
         if value is not None and (not math.isfinite(value) or value < 0):

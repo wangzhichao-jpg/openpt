@@ -7,6 +7,7 @@ from typing import Any
 import numpy as np
 from scipy.stats import f as f_distribution
 
+from ..config.catalog import ENUMS
 from ..errors import InputError
 from ..io.shape import insufficient_homogeneity_replicates, insufficient_units
 from .decision import compare
@@ -122,7 +123,7 @@ def analyze(
         raise InputError("alpha 必须在 0 和 1 之间")
     if sigma is not None and (not math.isfinite(sigma) or sigma <= 0):
         raise InputError("sigma 必须为正有限数")
-    if sigma_stage not in (None, "temporary", "final"):
+    if sigma_stage is not None and sigma_stage not in ENUMS["sigma_stage"]:
         raise InputError("sigma 阶段应为 temporary 或 final")
     if sigma_source is not None and not isinstance(sigma_source, str):
         raise InputError("sigma 来源必须为文字")

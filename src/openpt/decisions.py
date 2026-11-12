@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from .audit import MANIFEST, _digest
+from .config.catalog import ENUMS
 from .errors import InputError
 from .report.docx import make_report
 from .report.multi import export_reports
@@ -22,7 +23,7 @@ def decide(
     root: Path, item: str, decision: str, person: str, note: str, *, allow_new_item: bool = False
 ) -> dict[str, Any]:
     """在锁内核验快照、追加决定、生成新版本；原始输入和既有报告不修改。"""
-    if decision not in ("接受", "退回", "需补充"):
+    if decision not in ENUMS["decision"]:
         raise InputError("决定只能是接受、退回或需补充")
     if not item.strip() or not person.strip() or len(note) > 10000:
         raise InputError("条目和人员必填，备注不得超过 10000 字符")

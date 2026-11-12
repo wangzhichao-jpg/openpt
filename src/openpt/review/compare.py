@@ -7,6 +7,7 @@ from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
+from ..config.catalog import ENUMS, HOMOGENEITY_CLAIM_NAMES
 from ..config.sigma import criterion_sigma
 from ..core.decision import compare
 from ..core.gbt28043 import homogeneity as gbt_homogeneity
@@ -149,6 +150,7 @@ def _values(
         "方差分析F值": "F",
         "0.3σ": "稳定性基本限值",
         "0.3σ阈值": "稳定性基本限值",
+        "0.3σ 阈值": "稳定性基本限值",
     }
     canonical = aliases.get(name, name)
     _, period = _period(result, claim.get("timegroup"))
@@ -489,7 +491,7 @@ def _review_claim(
     if model == "displayed_summary":
         types.append("ROUNDING_INTERMEDIATE")
     item = _mapping_item(
-        mapping, name, "homogeneity" if name in ("F", "Ss", "t") else "performance"
+        mapping, name, "homogeneity" if name in HOMOGENEITY_CLAIM_NAMES else "performance"
     )
     source = claim["source"]
     if claim.get("cell"):
@@ -600,7 +602,7 @@ def review(
     cfg = data.get("config", {})
     report_standard = cfg.get("report_standard")
     selected = cfg.get("criterion_standard") or "gl003"
-    if report_standard not in (None, "", "gl003", "gbt28043"):
+    if report_standard not in (None, "") and report_standard not in ENUMS["report_standard"]:
         raise ValueError("report_standard 应为 gl003 或 gbt28043")
     if report_standard and report_standard != selected:
         rows.append(
@@ -623,7 +625,7 @@ def review(
         )
     report_method = cfg.get("report_stability_method")
     selected_method = cfg.get("stability_method") or "two_sample"
-    if report_method not in (None, "", "one_sample", "two_sample", "mean_difference"):
+    if report_method not in (None, "") and report_method not in ENUMS["report_stability_method"]:
         raise ValueError("report_stability_method 无效")
     if report_method and report_method != selected_method:
         rows.append(

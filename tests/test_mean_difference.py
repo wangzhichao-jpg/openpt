@@ -43,6 +43,19 @@ def test_homogeneity_default_each_period_and_claims() -> None:
     assert "结论受影响" in claims["x̄"]["说明"]
 
 
+def test_chinese_f_aliases_and_spaced_threshold() -> None:
+    data = _data()
+    result = calculate(data)
+    data["claims"] = [
+        {"name": "F值", "value": result["均匀性"]["F"], "digits": 2, "source": "报告"},
+        {"name": "方差分析F值", "value": result["均匀性"]["F"], "digits": 2, "source": "报告"},
+        {"name": "0.3σ 阈值", "value": 0.9, "digits": 1, "source": "报告"},
+    ]
+    rows = review(data, result)
+    assert all(row["状态"] == "MATCH" for row in rows)
+    assert all(row["评分条目"] == "均匀性与稳定性评估" for row in rows)
+
+
 def test_named_periods_without_reserved_followup_group() -> None:
     data = _data()
     data["stability"] = {"7月": data["stability"]["稳定期"], "6月": data["stability"]["后期"]}
