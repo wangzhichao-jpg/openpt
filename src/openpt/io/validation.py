@@ -832,12 +832,23 @@ def inspect_input(
                 gbt_period_options(config_values, {group: None for group in stability_groups})
             except InputError as exc:
                 field = "stability_period_options"
-                if config_values.get(field) in (None, ""):
-                    field = (
-                        "stability_u1"
-                        if config_values.get("stability_u1") not in (None, "")
-                        else "stability_u2"
-                    )
+                if "均值标准不确定度" in str(exc):
+                    for candidate in ("stability_u1", "stability_u2"):
+                        value = config_values.get(candidate)
+                        if value in (None, ""):
+                            continue
+                        try:
+                            valid = (
+                                not isinstance(value, bool)
+                                and isinstance(value, (int, float))
+                                and math.isfinite(value)
+                                and value >= 0
+                            )
+                        except OverflowError:
+                            valid = False
+                        if not valid:
+                            field = candidate
+                            break
                 issues.append(
                     Issue(
                         "INVALID_CONFIG",

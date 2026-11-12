@@ -116,6 +116,26 @@ def test_optional_participant_cells_are_checked(tmp_path: Path) -> None:
     )
 
 
+def test_gbt_uncertainty_error_uses_actual_cell(tmp_path: Path) -> None:
+    path = tmp_path / "input.xlsx"
+    template(path)
+    book = load_workbook(path)
+    book["项目信息"]["B2"] = "测试"
+    book["项目信息"]["B3"] = "mg"
+    book["方法配置"]["B21"] = "gbt28043"
+    book["方法配置"]["B22"] = 0.1
+    book["方法配置"]["B23"] = -0.1
+    for group in ("基线", "稳定期"):
+        for uid in (1, 2):
+            for repeat in (1, 2):
+                book["稳定性"].append([group, uid, repeat, uid + repeat / 10, "mg"])
+    book.save(path)
+    assert any(
+        i.category == "INVALID_CONFIG" and i.sheet == "方法配置" and i.cell == "B23"
+        for i in inspect_input(path)
+    )
+
+
 def test_batch_errors_are_located_before_run(tmp_path: Path) -> None:
     path = tmp_path / "input.xlsx"
     template(path)
