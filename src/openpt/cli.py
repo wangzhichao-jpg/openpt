@@ -263,6 +263,22 @@ def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]
         raise ValueError("没有可计算的数据")
     if standard == "gbt28043":
         result["标准模式"] = standard
+        if "均匀性" in result:
+            result["均匀性"]["reference_only"] = True
+        if "稳定性" in result:
+            result["稳定性"]["reference_only"] = True
+        for item in result.get("其他稳定性", {}).values():
+            item["reference_only"] = True
+        h = result.get("GB/T均匀性", {})
+        result["主判据"] = {
+            "standard": standard,
+            "homogeneity_basic": h.get("basic_pass"),
+            "homogeneity_extended": h.get("extended_pass"),
+            "stability": {
+                name: {"basic": s["basic_pass"], "extended": s["extended_pass"]}
+                for name, s in result.get("GB/T稳定性", {}).items()
+            },
+        }
     return result
 
 

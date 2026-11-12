@@ -91,6 +91,9 @@ def test_template_and_workflow(tmp_path: Path) -> None:
     data = read_workbook(path)
     result = calculate(data)
     assert result["标准模式"] == "gbt28043"
+    assert result["均匀性"]["reference_only"] is True
+    assert result["稳定性"]["reference_only"] is True
+    assert result["主判据"]["homogeneity_basic"] is False
     assert result["GB/T均匀性"]["basic_pass"] is False
     assert result["GB/T稳定性"]["稳定期"]["extended_limit"] is not None
     data["claims"] = [
