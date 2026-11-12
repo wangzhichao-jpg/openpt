@@ -5,6 +5,7 @@ import math
 
 import pytest
 
+from openpt.core.scores import performance_score
 from openpt.core.transfer import assess_point, en_with_stability
 from openpt.errors import InputError
 
@@ -55,6 +56,21 @@ def test_single_and_two_sample_t() -> None:
         assess_point(rows, [{"kind": "one_sample", "reference": 1.15, "critical_override": 2.0}])
     with pytest.raises(InputError):
         assess_point([], criteria, summarized_delta=0.2)
+
+
+def test_existing_en_score_with_explicit_stability_component() -> None:
+    options = {
+        "U_assigned": 1.0,
+        "U_participant": 1.0,
+        "k_assigned": 2.0,
+        "k_participant": 2.0,
+        "independent": True,
+    }
+    result = performance_score("En", 1.0, 0.0, U_E=0.4, **options)
+    assert result.value == pytest.approx(1 / math.hypot(1, 1, 0.4))
+    assert "U_E" in result.formula
+    duplicated = performance_score("En", 1.0, 0.0, U_E=0.4, stability_in_U_ref=True, **options)
+    assert duplicated.status == "DESIGN_REVIEW" and duplicated.value is None
 
 
 def test_en_mechanisms_and_review() -> None:

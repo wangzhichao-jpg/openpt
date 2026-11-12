@@ -37,6 +37,8 @@ def performance_score(
     U_participant: float | None = None,
     k_assigned: float | None = None,
     k_participant: float | None = None,
+    U_E: float | None = None,
+    stability_in_U_ref: bool = False,
     independent: bool | None = None,
     assigned_from_participants: bool = False,
     satisfactory: float = 2.0,
@@ -77,6 +79,7 @@ def performance_score(
         ("u(x)", u_participant),
         ("U(X)", U_assigned),
         ("U(x)", U_participant),
+        ("U_E", U_E),
         ("k(X)", k_assigned),
         ("k(x)", k_participant),
     ):
@@ -87,8 +90,10 @@ def performance_score(
             or optional_number < 0
         ):
             raise InputError(f"{name}必须为非负有限数")
-    if (independent is not None and not isinstance(independent, bool)) or not isinstance(
-        assigned_from_participants, bool
+    if (
+        (independent is not None and not isinstance(independent, bool))
+        or not isinstance(assigned_from_participants, bool)
+        or not isinstance(stability_in_U_ref, bool)
     ):
         raise InputError("相关性配置无效")
     if criterion_basis not in ("sigma_pt", "delta_e"):
@@ -137,6 +142,10 @@ def performance_score(
         )
     if statistic == "En" and (k_assigned != 2 or k_participant != 2):
         return absent("GL002 4.4.1.3 f 使用 k=2，其他包含因子需批准模型", "DESIGN_REVIEW")
+    if statistic == "En" and U_E is not None and stability_in_U_ref:
+        return absent("参考扩展不确定度已含稳定性，不得重复外加 U_E", "DESIGN_REVIEW")
+    if statistic == "En" and U_E is not None:
+        formula = "En=(x-X)/√(U(x)²+U(X)²+U_E²)；稳定性外加项按报告登记"
     diff = x - assigned
     if not math.isfinite(diff):
         raise InputError("差值溢出")
@@ -154,7 +163,7 @@ def performance_score(
         elif statistic == "zeta":
             denominator = math.hypot(u_assigned or 0, u_participant or 0)
         else:
-            denominator = math.hypot(U_assigned or 0, U_participant or 0)
+            denominator = math.hypot(U_assigned or 0, U_participant or 0, U_E or 0)
         if denominator is None or denominator == 0:
             return absent("分母为零")
         score = diff / denominator
