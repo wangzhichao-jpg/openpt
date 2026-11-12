@@ -172,10 +172,11 @@ def _values(
         "|x̄-ȳ|": "稳定性均值差",
         "F值": "F",
         "方差分析F值": "F",
-        "0.3σ": "稳定性基本限值",
-        "0.3σ阈值": "稳定性基本限值",
-        "0.3σ 阈值": "稳定性基本限值",
     }
+    if name in ("0.3σ", "0.3σ阈值", "0.3σ 阈值"):
+        sigma_for_threshold = criterion_sigma(cfg)
+        threshold = 0.3 * sigma_for_threshold if sigma_for_threshold is not None else None
+        return threshold, threshold, ""
     canonical = aliases.get(name, name)
     _, period = _period(result, claim.get("timegroup"))
     if name in ("x̄", "xbar", "均匀性总平均值"):
@@ -688,9 +689,8 @@ def _design_rows(
 
 def _applicable_standard(name: str, note: str, selected: str) -> str:
     """按统计量和复核模式标注标准；跨标准比较明确标出两者。"""
-    if (
-        name in ("F", "F值", "方差分析F值", "t", "s1", "稳定性方法", "GL003均匀性主判据")
-        or (name.endswith("设计") and name != "重复性质设计")
+    if name in ("F", "F值", "方差分析F值", "t", "s1", "稳定性方法", "GL003均匀性主判据") or (
+        name.endswith("设计") and name != "重复性质设计"
     ):
         return "GL003"
     base = name.removesuffix("（推荐基线）")

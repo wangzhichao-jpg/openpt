@@ -80,6 +80,19 @@ def test_chinese_f_aliases_and_spaced_threshold() -> None:
     assert all(row["评分条目"] == "均匀性与稳定性评估" for row in rows)
 
 
+def test_sigma_threshold_claim_is_not_delta_e_limit() -> None:
+    data = _data()
+    data["config"].update(
+        criterion_standard="gbt28043", sigma=3.0, delta_e=2.0, gbt_criterion_basis="delta_e"
+    )
+    data["claims"] = [{"name": "0.3σ", "value": 0.9, "digits": 2, "source": "合成"}]
+    result = calculate(data)
+    assert result["GB/T稳定性"]["稳定期"]["basic_limit"] == pytest.approx(0.2)
+    row = next(row for row in review(data, result) if row["统计量"] == "0.3σ")
+    assert row["按报告模型复现值"] == pytest.approx(0.9)
+    assert row["状态"] == "MATCH"
+
+
 def test_optional_t_is_reference_only() -> None:
     data = _data()
     baseline = [[1.0, 1.1], [2.0, 2.1], [3.0, 3.1]]
