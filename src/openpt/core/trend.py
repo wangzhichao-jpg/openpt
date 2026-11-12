@@ -155,6 +155,8 @@ def configured_uncertainty(series: dict[str, Any], cfg: dict[str, Any]) -> dict[
     if not all(present):
         raise InputError("趋势不确定度须同时登记短期、长期序列及时长")
     short, long = str(cfg[keys[0]]), str(cfg[keys[2]])
+    if short == long:
+        raise InputError("短期和长期趋势分量须来自不同序列，不能重复计入")
     if short not in series or long not in series:
         raise InputError("趋势不确定度序列不存在")
     result: dict[str, Any] = stability_uncertainty(

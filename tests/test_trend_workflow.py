@@ -106,6 +106,10 @@ def test_trend_uncertainty_is_mapped_and_duplicate_reviewed(tmp_path: Path) -> N
     result = calculate(data)
     assert result["趋势不确定度"]["u_stab"] > 0
     assert result["指定值与不确定度"]["u_stab"] == pytest.approx(result["趋势不确定度"]["u_stab"])
+    data["config"]["trend_long_series"] = "短期"
+    with pytest.raises(ValueError, match="不同序列"):
+        calculate(data)
+    data["config"]["trend_long_series"] = "长期"
     data["assigned_config"]["stab_in_base"] = True
     assert calculate(data)["指定值与不确定度"]["status"] == "DESIGN_REVIEW"
     data["assigned_config"]["u_stab"] = 1.0
