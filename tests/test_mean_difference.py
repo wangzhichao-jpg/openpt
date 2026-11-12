@@ -43,6 +43,20 @@ def test_homogeneity_default_each_period_and_claims() -> None:
     assert "结论受影响" in claims["x̄"]["说明"]
 
 
+def test_named_periods_without_reserved_followup_group() -> None:
+    data = _data()
+    data["stability"] = {"7月": data["stability"]["稳定期"], "6月": data["stability"]["后期"]}
+    data["claims"] = [
+        {"name": "均值差", "value": 0.56, "digits": 2, "source": "报告", "timegroup": "7月"},
+        {"name": "均值差", "value": 0.06, "digits": 2, "source": "报告", "timegroup": "6月"},
+    ]
+    result = calculate(data)
+    assert result["稳定性时间组"] == "7月"
+    assert result["稳定性"]["difference"] == pytest.approx(0.56)
+    assert result["其他稳定性"]["6月"]["difference"] == pytest.approx(0.06)
+    assert all(row["状态"] == "MATCH" for row in review(data, result))
+
+
 def test_baseline_override_and_gbt() -> None:
     data = _data()
     data["config"].update({"baseline_source": "baseline_group", "criterion_standard": "gbt28043"})

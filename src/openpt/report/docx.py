@@ -447,7 +447,7 @@ def _other_results(
     doc.add_heading("稳定性评价", 1)
     s = result.get("稳定性")
     if s:
-        _stability_table(doc, "稳定期", s, sig)
+        _stability_table(doc, str(result.get("稳定性时间组") or "稳定期"), s, sig)
         report_model = result.get("报告层级稳定性")
         if report_model:
             doc.add_paragraph(
@@ -857,7 +857,9 @@ def make_report(
                     f"Ss={_shown(h.get('Ss'))}；限值={_shown(h.get('threshold'))}{f_note}。"
                 )
             periods = sub.get("GB/T稳定性") or (
-                {"稳定期": sub["稳定性"], **sub.get("其他稳定性", {})} if sub.get("稳定性") else {}
+                {sub.get("稳定性时间组") or "稳定期": sub["稳定性"], **sub.get("其他稳定性", {})}
+                if sub.get("稳定性")
+                else {}
             )
             if not periods:
                 doc.add_paragraph(f"被测量 {name}：未提供稳定性数据，本次未评价稳定性。")
@@ -953,7 +955,9 @@ def make_report(
         )
     else:
         doc.add_paragraph("均匀性：未提供数据，本次未评价。")
-    periods = {"稳定期": result["稳定性"]} if "稳定性" in result else {}
+    periods = (
+        {result.get("稳定性时间组") or "稳定期": result["稳定性"]} if "稳定性" in result else {}
+    )
     periods.update(result.get("其他稳定性", {}))
     if periods and result.get("标准模式") != "gbt28043":
         for name, period in periods.items():

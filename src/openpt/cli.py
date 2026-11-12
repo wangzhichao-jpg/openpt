@@ -390,6 +390,11 @@ def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]
             raise ValueError("未知实验层级")
         if level == "all_repeats" and not review_mode:
             raise InputError("全部重复值仅供复核模型使用，不可用于常规结论")
+        primary_group = (
+            "稳定期" if "稳定期" in groups else next(name for name in groups if name != "基线")
+        )
+        if primary_group != "稳定期":
+            result["稳定性时间组"] = primary_group
         design_options = {
             "design": _option(cfg, "stability_design", "independent"),
             "reference_uncertainty_negligible": _option(
@@ -401,27 +406,29 @@ def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]
         }
         result["稳定性"] = stability(
             groups.get("基线"),
-            groups["稳定期"],
+            groups[primary_group],
             sigma,
             alpha,
             method,
             reference,
+            group_name=primary_group,
             **design_options,
         ).to_dict()
         if level == "all_repeats":
             result["报告层级稳定性"] = stability(
                 groups.get("基线"),
-                groups["稳定期"],
+                groups[primary_group],
                 sigma,
                 alpha,
                 method,
                 reference,
                 model="repeats_pooled",
+                group_name=primary_group,
                 **design_options,
             ).to_dict()
         extra = {}
         for name, observations in groups.items():
-            if name not in ("基线", "稳定期"):
+            if name not in ("基线", primary_group):
                 extra[name] = stability(
                     groups.get("基线"),
                     observations,

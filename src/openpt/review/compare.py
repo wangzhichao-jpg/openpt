@@ -24,18 +24,27 @@ def display(value: float | Decimal | None, digits: int) -> Decimal | None:
     return Decimal(str(value)).quantize(Decimal(1).scaleb(-digits), rounding=ROUND_HALF_UP)
 
 
+def _period(result: dict[str, Any], name: Any) -> tuple[str, dict[str, Any]]:
+    """按实际主时间组名称查找稳定性结果。"""
+    primary = result.get("稳定性时间组") or "稳定期"
+    selected = name or primary
+    value = (
+        result.get("稳定性", {})
+        if selected == primary
+        else result.get("其他稳定性", {}).get(selected, {})
+    )
+    return str(selected), value
+
+
 def _t_reproduction(
     data: dict[str, Any], result: dict[str, Any], claim: dict[str, Any]
 ) -> tuple[Any, Any, str]:
     """按 GL003 5.2.2 对指定时点计算报告和推荐模型。"""
     cfg = data["config"]
     groups = data["stability"]
-    name = claim.get("timegroup") or "稳定期"
+    name, selected = _period(result, claim.get("timegroup"))
     model = claim.get("model") or (
         "repeats_pooled" if cfg.get("observation_level") == "all_repeats" else "recommended"
-    )
-    selected = (
-        result.get("稳定性", {}) if name == "稳定期" else result.get("其他稳定性", {}).get(name, {})
     )
     recommended = selected.get("t")
     if selected.get("status") == "DESIGN_REVIEW":
@@ -80,14 +89,9 @@ def _standard_value(
     """按选定模式重算可比中间量；标准未提供的扩展限值返回空。"""
     cfg = data.get("config", {})
     name = claim["name"]
-    group = claim.get("timegroup") or "稳定期"
+    group, s = _period(result, claim.get("timegroup"))
     if mode == "gl003":
         h = result.get("均匀性", {})
-        s = (
-            result.get("稳定性", {})
-            if group == "稳定期"
-            else result.get("其他稳定性", {}).get(group, {})
-        )
         return {
             "Ss": h.get("Ss"),
             "均匀性基本限值": h.get("threshold"),
@@ -147,12 +151,7 @@ def _values(
         "0.3σ阈值": "稳定性基本限值",
     }
     canonical = aliases.get(name, name)
-    group = claim.get("timegroup") or "稳定期"
-    period = (
-        result.get("稳定性", {})
-        if group == "稳定期"
-        else result.get("其他稳定性", {}).get(group, {})
-    )
+    _, period = _period(result, claim.get("timegroup"))
     if name in ("x̄", "xbar", "均匀性总平均值"):
         value = result.get("均匀性", {}).get("mean")
         return value, value, ""
@@ -311,7 +310,7 @@ def _candidate_models(
     data: dict[str, Any], result: dict[str, Any], claim: dict[str, Any], digits: int
 ) -> tuple[bool | None, tuple[str, Any] | None]:
     """判断可复现性，并返回可计算候选中最接近声称值的模型。"""
-    group = claim.get("timegroup") or "稳定期"
+    group, _ = _period(result, claim.get("timegroup"))
     try:
         candidates = [
             (
@@ -324,7 +323,7 @@ def _candidate_models(
                 ("repeats_welch", "重复值非齐方差"),
             )
         ]
-        if group == "稳定期":
+        if group == (result.get("稳定性时间组") or "稳定期"):
             summary, _, _ = _t_reproduction(data, result, {**claim, "model": "displayed_summary"})
             if summary is not None:
                 candidates.append(("修约中间值", summary))
@@ -452,12 +451,7 @@ def _review_claim(
         raise ValueError("报告声称值显示小数位须为0至12的整数") from None
     reproduced, rec, note = _values(data, result, claim)
     if name in ("x̄", "xbar", "均匀性总平均值") and rec is not None:
-        group = claim.get("timegroup") or "稳定期"
-        period = (
-            result.get("稳定性", {})
-            if group == "稳定期"
-            else result.get("其他稳定性", {}).get(group, {})
-        )
+        _, period = _period(result, claim.get("timegroup"))
         if display(claim["value"], digits) != display(rec, digits):
             mean, threshold = period.get("mean2"), period.get("threshold")
             note = f"报告 x̄={claim['value']}；均匀性总平均值={rec}"
@@ -562,7 +556,7 @@ def _design_rows(
     """将稳定性抽样设计提示单独列入复核清单。"""
     periods = []
     if result.get("稳定性"):
-        periods.append(("稳定期", result["稳定性"]))
+        periods.append((result.get("稳定性时间组") or "稳定期", result["稳定性"]))
     periods.extend(result.get("其他稳定性", {}).items())
     rows = []
     for name, values in periods:
