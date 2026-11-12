@@ -41,6 +41,8 @@ def test_single_workbook_and_report(tmp_path: Path) -> None:
     h = result["均匀性"]
     assert h["Ss"] == pytest.approx(0.1)
     assert h["Ss_pass"] is True and h["F"] is None and h["df_within"] == 0
+    note = next(row for row in review(data, result) if row["统计量"] == "重复性质设计")
+    assert note["差异类型"] == "DESIGN_WARNING" and "B.1.2" in note["说明"]
     doc = tmp_path / "report.docx"
     make_report(doc, data, result)
     text = "\n".join(p.text for p in Document(doc).paragraphs)

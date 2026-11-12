@@ -14,6 +14,48 @@ STABILITY_METHOD_ALIASES = {
 }
 
 
+BOOLEAN_ENUMS = {
+    "strict_homogeneity",
+    "reference_uncertainty_negligible",
+    "algorithm_a_simplified",
+    "independent",
+    "hom_in_base",
+    "stab_in_base",
+    "trans_in_base",
+    "trans_in_stab",
+    "trend_plot",
+}
+ASSIGNED_ENUMS = {
+    "method": "assigned_method",
+    "consensus_method": "consensus_method",
+    "hom_source": "hom_source",
+    "hom_mapping": "hom_mapping",
+    "stab_mapping": "stab_mapping",
+    "trans_mapping": "trans_mapping",
+    "stability_disposition": "stability_disposition",
+    "independent": "independent",
+    "hom_in_base": "hom_in_base",
+    "stab_in_base": "stab_in_base",
+    "trans_in_base": "trans_in_base",
+    "trans_in_stab": "trans_in_stab",
+}
+
+
+def enum_problem(field: str, value: Any, *, assigned: bool = False) -> str | None:
+    """统一工作簿可选枚举校验，不对自由文字及嵌套配置臆断。"""
+    key = ASSIGNED_ENUMS.get(field) if assigned else field
+    if key not in ENUMS or value in (None, ""):
+        return None
+    if key == "stability_method":
+        value = STABILITY_METHOD_ALIASES.get(value, value) if isinstance(value, str) else value
+    if key in BOOLEAN_ENUMS:
+        if isinstance(value, bool) or value in ("TRUE", "FALSE", "启用", "关闭"):
+            return None
+    elif isinstance(value, str) and value in ENUMS[key]:
+        return None
+    return f"{field} 配置无效，可选值：" + "、".join(ENUMS[key])
+
+
 def insufficient_units(count: int) -> bool:
     """单因子方差分析和当前稳定性计算至少需要两个单元。"""
     return count < 2

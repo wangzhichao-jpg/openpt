@@ -11,13 +11,15 @@ def test_two_mean_and_difference_design_clauses() -> None:
     """GL003 5.2.2 注和 5.3 注：两组单元数与抽样数分别检查。"""
     result = analyze([[1, 2], [2, 3], [3, 4]], [[1, 2], [2, 3]], sigma=1)
     assert any("GL003 5.2.2 注：n1、n2 均≥6" in item for item in result.design_warnings)
-    assert any("GL003 5.3 注：抽样数≥3" in item for item in result.design_warnings)
+    assert not any("GL003 5.3" in item for item in result.design_warnings)
     assert result.design_status == "DESIGN_WARNING"
 
 
 def test_difference_design_requires_replicates() -> None:
     """GL003 5.3 注：每个抽取样品分别重复测试两次。"""
-    result = analyze([[1], [2], [3], [4], [5], [6]], [[1], [2], [3], [4], [5], [6]], sigma=1)
+    result = analyze(
+        None, [[1], [2], [3], [4], [5], [6]], sigma=1, method="mean_difference", reference=1
+    )
     assert any("每个抽取样品重复测试2次" in item for item in result.design_warnings)
 
 

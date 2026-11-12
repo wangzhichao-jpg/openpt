@@ -827,6 +827,26 @@ def review(
         "u_stab": "u_stab",
         "传递结论": "结论",
     }
+    if cfg.get("replicate_type") == "single" and data.get("homogeneity"):
+        rows.append(
+            {
+                "统计量": "重复性质设计",
+                "声称值": None,
+                "来源": "方法配置",
+                "显示小数位": None,
+                "按报告模型复现值": None,
+                "按推荐模型重算值": None,
+                "按报告显示值": None,
+                "按推荐显示值": None,
+                "显示一致": None,
+                "推荐一致": None,
+                "状态": "NOTE",
+                "差异类型": "DESIGN_WARNING",
+                "评分条目": _mapping_item(mapping, "重复性质设计", "homogeneity"),
+                "说明": "GB/T 28043-2019 B.1.2：单次测量标准差含测量误差，"
+                "结论偏保守，须选择重复性足够低的方法。",
+            }
+        )
     for claim in data["claims"]:
         if claim["name"] in transfer_names and transfer_results:
             from .transfer import review_transfer

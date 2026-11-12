@@ -23,6 +23,7 @@ from .measurands import DATA_SHEETS, split_measurands
 from .new_stability import read_transfer_config, read_transfer_sheet, read_trend_sheet
 from .shape import (
     STABILITY_METHOD_ALIASES,
+    enum_problem,
     insufficient_homogeneity_replicates,
     insufficient_units,
     stability_structure_problem,
@@ -633,6 +634,17 @@ def inspect_input(
                         value = value in ("启用", "TRUE")
                     config_values[field] = value
                     config_cells[field] = f"{get_column_letter(col + 1)}{index}"
+                    invalid_enum = enum_problem(field, value)
+                    if invalid_enum:
+                        issues.append(
+                            Issue(
+                                "INVALID_CONFIG",
+                                "方法配置",
+                                config_cells[field],
+                                value,
+                                invalid_enum,
+                            )
+                        )
                     if field == "layout":
                         if value not in (None, "") and value not in ENUMS["layout"]:
                             issues.append(
@@ -780,6 +792,22 @@ def inspect_input(
                     issues.extend(_check_numeric_table(sheet, rows, mapping, formulas))
                 else:
                     if sheet == "指定值与不确定度":
+                        positions = _positions(rows[0], sheet, mapping)
+                        for number, row in enumerate(rows[1:], 2):
+                            field = row[positions["字段"]] if positions["字段"] < len(row) else None
+                            column = positions["值"]
+                            value = row[column] if column < len(row) else None
+                            invalid_enum = enum_problem(str(field), value, assigned=True)
+                            if invalid_enum:
+                                issues.append(
+                                    Issue(
+                                        "INVALID_CONFIG",
+                                        sheet,
+                                        f"{get_column_letter(column + 1)}{number}",
+                                        value,
+                                        invalid_enum,
+                                    )
+                                )
                         calculation_data_present |= any(
                             len(row) >= 2 and row[0] == "method" and row[1] not in (None, "")
                             for row in rows[1:]

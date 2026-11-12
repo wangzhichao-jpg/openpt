@@ -241,14 +241,6 @@ def analyze(
             f"GL003 5.2.2 注：n1、n2 均≥6；当前基线 {len(baseline)} 个、"
             f"{group_name} {len(followup)} 个包装单元"
         )
-    if sigma is not None and len(followup) < 3:
-        result["design_warnings"].append(
-            f"GL003 5.3 注：抽样数≥3；当前{group_name}为 {len(followup)} 个包装单元"
-        )
-    if sigma is not None and any(len(unit) < 2 for unit in followup):
-        result["design_warnings"].append(
-            "GL003 5.3 注：每个抽取样品重复测试2次；当前至少一个单元的重复次数不足"
-        )
     if result["design_warnings"]:
         result["design_status"] = "DESIGN_WARNING"
     return StabilityResult.from_dict(result)
