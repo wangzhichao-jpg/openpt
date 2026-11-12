@@ -374,6 +374,9 @@ def _gbt_results(doc: Any, result: dict[str, Any], cfg: dict[str, Any], sig: int
             ("基线均值", "mean1"),
             ("后续均值", "mean2"),
             ("均值差", "difference"),
+            ("基线组内标准差", "sw1"),
+            ("后续组内标准差", "sw2"),
+            ("重复性提示限值", "repeatability_limit"),
             ("σ_pt", "sigma"),
             ("基本限值", "basic_limit"),
             ("基本判据", "basic_pass"),
@@ -385,6 +388,15 @@ def _gbt_results(doc: Any, result: dict[str, Any], cfg: dict[str, Any], sig: int
             ("主结论", "conclusion"),
         ]
         _table(doc, ["项目", "结果"], [[label, _shown(s.get(key), sig)] for label, key in items])
+        repeatability = s.get("repeatability_exceeded")
+        repeatability_text = (
+            "未评价"
+            if repeatability is None
+            else "超过，需审核"
+            if repeatability
+            else "未超过，仍须审核设计"
+        )
+        doc.add_paragraph("B.4.1.2 重复性提示：" + repeatability_text + "。")
         doc.add_paragraph("扩展限值=0.3σ_pt+2√(u₁²+u₂²)，假设两均值独立。")
         for warning in s["warnings"]:
             doc.add_paragraph("提示：" + warning)

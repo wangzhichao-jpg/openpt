@@ -185,8 +185,10 @@ def stability(
     with np.errstate(over="ignore", invalid="ignore"):
         mean1, mean2 = float(x.mean()), float(y.mean())
         diff = abs(mean1 - mean2)
-    if not all(math.isfinite(v) for v in (mean1, mean2, diff)):
-        raise InputError("稳定性均值差数值溢出")
+        sw1 = float(np.sqrt(np.mean(np.var(x, axis=1, ddof=1))))
+        sw2 = float(np.sqrt(np.mean(np.var(y, axis=1, ddof=1))))
+    if not all(math.isfinite(v) for v in (mean1, mean2, diff, sw1, sw2)):
+        raise InputError("稳定性均值或组内重复性数值溢出")
     basic_limit = 0.3 * sigma if sigma is not None else None
     basic = compare(diff, basic_limit) <= 0 if basic_limit is not None and independent else None
     extended_limit = (
@@ -203,13 +205,20 @@ def stability(
         warnings.append("B.4.2.2：确认是否包含运输影响；单独检验运输影响时登记 transport 类型")
     if x.shape[0] != y.shape[0] or x.shape[1] != y.shape[1]:
         warnings.append("B.4.2.3-B.4.2.4：两组样品数或重复数不同；使用历史均匀性数据须人工确认")
+    repeatability_limit = 0.5 * sigma if sigma is not None else None
+    repeatability_exceeded = (
+        compare(max(sw1, sw2), repeatability_limit) > 0 if repeatability_limit is not None else None
+    )
+    if repeatability_exceeded:
+        warnings.append("B.4.1.2：组内重复性超过0.5σ_pt，须评估增加样品或重复测量")
     if not independent:
         warnings.append("相关或配对数据不适用独立样品模型，需人工审核")
     if basic is False:
         warnings.append("基本判据未满足；如预选主判据未通过，按 B.5.3 审核不稳定性影响及处置")
     return {
         "standard": "gbt28043",
-        "reference": "GB/T 28043-2019 B.5.1-B.5.2" + ("、B.6" if kind == "transport" else ""),
+        "reference": "GB/T 28043-2019 B.4.1.2、B.5.1-B.5.2"
+        + ("、B.6" if kind == "transport" else ""),
         "kind": kind,
         "n1": x.shape[0],
         "m1": x.shape[1],
@@ -218,6 +227,10 @@ def stability(
         "mean1": mean1,
         "mean2": mean2,
         "difference": diff,
+        "sw1": sw1,
+        "sw2": sw2,
+        "repeatability_limit": repeatability_limit,
+        "repeatability_exceeded": repeatability_exceeded,
         "sigma": sigma,
         "basic_limit": basic_limit,
         "basic_pass": basic,

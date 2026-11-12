@@ -99,6 +99,21 @@ def test_stability_boundaries_and_independence() -> None:
         stability(a, b, 1, u1=-1)
 
 
+def test_stability_repeatability_review_boundaries() -> None:
+    baseline = [[0.0, 0.0]] * 2
+    half = 0.5 / math.sqrt(2)
+    for factor, expected in ((1 - 1e-8, False), (1, False), (1 + 1e-8, True)):
+        followup = [[-half * factor, half * factor]] * 2
+        result = stability(baseline, followup, 1.0)
+        assert result["sw1"] == 0
+        assert result["sw2"] == pytest.approx(0.5 * factor)
+        assert result["repeatability_exceeded"] is expected
+        assert any("B.4.1.2" in warning for warning in result["warnings"]) is expected
+    assert stability(baseline, baseline, None)["repeatability_exceeded"] is None
+    with pytest.raises(InputError, match="溢出"):
+        stability([[-1e308, 1e308]] * 2, baseline, 1.0)
+
+
 def test_period_configuration_validation() -> None:
     groups = {"基线": [], "稳定期": [], "运输期": []}
     config = {
@@ -163,6 +178,14 @@ def test_template_and_workflow(tmp_path: Path) -> None:
     text = "\n".join(p.text for p in Document(target).paragraphs)
     assert "GB/T 28043-2019 标准模式（主评价）" in text
     assert "GL003 计算仅为参考" in text
+    assert "B.4.1.2 重复性提示：未超过" in text
+    previous = data["stability"]["稳定期"]
+    data["stability"]["稳定期"] = [[-2.0, 2.0]] * 3
+    make_report(target, data, calculate(data))
+    assert "B.4.1.2 重复性提示：超过，需审核" in "\n".join(
+        p.text for p in Document(target).paragraphs
+    )
+    data["stability"]["稳定期"] = previous
 
     data["stability"]["运输期"] = [[0.1, 0.2], [0.2, 0.3], [0.3, 0.4]]
     transported = calculate(data)["GB/T稳定性"]["运输期"]
@@ -372,6 +395,8 @@ def test_r_independent(tmp_path: Path, m: int) -> None:
     ):
         assert values[rkey] == pytest.approx(h[key], rel=1e-10, abs=1e-12)
     assert values["difference"] == pytest.approx(s["difference"])
+    assert values["sw"] == pytest.approx(s["sw1"])
+    assert values["sw_followup"] == pytest.approx(s["sw2"])
     assert values["stability_limit"] == pytest.approx(s["extended_limit"])
 
 
