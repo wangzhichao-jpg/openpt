@@ -99,6 +99,11 @@ def assess_point(
                 if inclusive
                 else compare(abs(t), critical) < 0
             )
+            detail = result.to_dict()
+            if rule.get("critical_override") is not None:
+                detail["theoretical_critical"] = detail["critical"]
+                detail["critical"] = critical
+                detail["pass"] = passed
             results.append(
                 {
                     "kind": kind,
@@ -109,7 +114,7 @@ def assess_point(
                     else "GL003 两侧 t 分位数",
                     "inclusive": inclusive,
                     "pass": passed,
-                    "detail": result.to_dict(),
+                    "detail": detail,
                 }
             )
             continue

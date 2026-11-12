@@ -135,8 +135,19 @@ def _transfer_score_options(
         return {}, None, ""
     raw = data["config"].get("transfer_en_map")
     if raw not in (None, ""):
+
+        def unique_pairs(items: list[tuple[str, Any]]) -> dict[str, Any]:
+            output: dict[str, Any] = {}
+            for item_key, value in items:
+                if item_key in output:
+                    raise InputError("transfer_en_map 含重复参加者编号")
+                output[item_key] = value
+            return output
+
         try:
-            mapping = json.loads(raw) if isinstance(raw, str) else raw
+            mapping = (
+                json.loads(raw, object_pairs_hook=unique_pairs) if isinstance(raw, str) else raw
+            )
         except ValueError:
             raise InputError("transfer_en_map 须为有效 JSON 对象") from None
         if not isinstance(mapping, dict) or not all(
@@ -150,6 +161,8 @@ def _transfer_score_options(
         return {}, "参加者未绑定唯一的传递标准校准点", ""
     point = points[key]
     options = point.get("uncertainty", {})
+    if point.get("conclusion") is not True:
+        return {}, "传递标准稳定性未通过或未评价，En 须先审核", str(key)
     if point.get("uncertainty_status") != "OK":
         return {}, "传递标准稳定性衔接条件未通过审核或未登记", str(key)
     source = f"传递标准 {key}；机制 {options.get('mechanism')}；来源 {options.get('source')}"

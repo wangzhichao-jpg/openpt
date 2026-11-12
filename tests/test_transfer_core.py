@@ -64,6 +64,8 @@ def test_single_and_two_sample_t() -> None:
         ],
     )
     assert overridden["criteria"][0]["limit"] == 2.0
+    assert overridden["criteria"][0]["detail"]["critical"] == 2.0
+    assert overridden["criteria"][0]["detail"]["theoretical_critical"] != 2.0
     with pytest.raises(InputError, match="来源"):
         assess_point(rows, [{"kind": "one_sample", "reference": 1.15, "critical_override": 2.0}])
     with pytest.raises(InputError):

@@ -84,6 +84,7 @@ def test_transfer_full_flow(tmp_path: Path) -> None:
     assert "单台传递标准，不适用样品间均匀性检验" in text and "JJF 1587 未见原文" in text
     assert main(["run", str(path), "--runs-dir", str(tmp_path / "runs")]) == 0
     assert main(["review", str(path), "--runs-dir", str(tmp_path / "reviews")]) == 0
+    assert main(["reproduce", str(next((tmp_path / "reviews").iterdir()))]) == 0
 
 
 def test_transfer_c_condition_is_checked(tmp_path: Path) -> None:
