@@ -27,8 +27,10 @@ def test_formats_decisions_and_security(tmp_path: Path) -> None:
     result_bytes = (root / "result.json").read_bytes()
     result = json.loads(result_bytes)
     doc = Document(root / "report.docx")
-    appendix = next(p.text for p in doc.paragraphs if p.text.startswith("全精度结果："))
-    doc_result = json.loads(appendix.removeprefix("全精度结果："))
+    paragraphs = [p.text for p in doc.paragraphs]
+    start = paragraphs.index("全精度结果") + 1
+    end = paragraphs.index("附录：原始数据及单元格来源")
+    doc_result = json.loads("\n".join(paragraphs[start:end]))
     assert doc_result == result
     html = (root / "report.html").read_text(encoding="utf-8")
     assert "<script>" not in html and "&lt;script&gt;" in html
