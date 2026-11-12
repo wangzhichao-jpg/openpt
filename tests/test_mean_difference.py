@@ -133,6 +133,12 @@ def test_baseline_override_and_gbt() -> None:
     assert result["GB/T稳定性"]["稳定期"]["difference"] == pytest.approx(0.56)
 
 
+@pytest.mark.parametrize("repeats, warning", [(1, True), (2, False), (3, False), (4, False)])
+def test_53_repeat_warning_only_for_insufficient(repeats: int, warning: bool) -> None:
+    result = analyze(None, [[1.0] * repeats] * 3, 1.0, method="mean_difference", reference=1.0)
+    assert any("重复次数不足" in item for item in result.design_warnings) is warning
+
+
 def test_boundary_and_design_warning() -> None:
     result = analyze(None, [[0.3, 0.3], [0.3, 0.3]], 1, method="mean_difference", reference=0)
     assert result.mean_difference_pass is True

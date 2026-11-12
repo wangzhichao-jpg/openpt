@@ -735,16 +735,31 @@ def _project_methods(doc: Any, data: dict[str, Any], cfg: dict[str, Any]) -> Non
         "one_sample": "单均值 t 检验：CNAS-GL003:2018 5.2.1",
         "mean_difference": "均值差法：CNAS-GL003:2018 5.3",
     }.get(cfg.get("stability_method") or "", "两均值 t 检验：CNAS-GL003:2018 5.2.2")
+    criterion = (
+        "both" if cfg.get("strict_homogeneity") else cfg.get("gl003_hom_criterion") or "f_test"
+    )
+    if cfg.get("criterion_standard") == "gbt28043":
+        rule = cfg.get("gbt_hom_rule") or "basic"
+        hom_method = (
+            "GB/T 28043-2019 B.2.3 扩展判据为主"
+            if rule == "extended"
+            else "GB/T 28043-2019 B.2.2 基本判据为主"
+        )
+        if cfg.get("replicate_type") == "single":
+            hom_method += "；单测标准差按 B.1.2"
+    elif cfg.get("replicate_type") == "single":
+        hom_method = "单测标准差：GB/T 28043-2019 B.1.2"
+    else:
+        hom_method = {
+            "f_test": "GL003 4.2 F 检验为主，4.3 Ss 判据为参考",
+            "ss_0.3sigma": "GL003 4.3（Ss≤0.3σ）为主，4.2 F 检验为参考",
+            "both": "GL003 4.2 F 检验与 4.3 Ss 判据均为主",
+        }.get(criterion, "未知均匀性判据")
     _table(
         doc,
         ["项目", "选择与依据"],
         [
-            [
-                "均匀性方法",
-                "单测标准差：GB/T 28043-2019 B.1.2"
-                if cfg.get("replicate_type") == "single"
-                else "单因子方差分析：CNAS-GL003:2018 4.2",
-            ],
+            ["均匀性方法", hom_method],
             ["并列用途判据", "样品间标准差判据：CNAS-GL003:2018 4.3"],
             ["稳定性方法", method + "；均值差：5.3"],
             ["稳健统计方法", "算法 A：CNAS-GL002:2018 附录 A.2"],

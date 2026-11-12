@@ -37,6 +37,10 @@ def test_primary_modes_and_legacy_strict(tmp_path: Path) -> None:
     paragraphs = [p.text for p in Document(target).paragraphs]
     assert "GL003 4.3 主判据" in paragraphs[1] and "通过" in paragraphs[1]
     assert "4.2" in paragraphs[1] and "参考" in paragraphs[1]
+    cells = [
+        cell.text for table in Document(target).tables for row in table.rows for cell in row.cells
+    ]
+    assert "GL003 4.3（Ss≤0.3σ）为主，4.2 F 检验为参考" in cells
     assert any("以下 F 检验仅供参考" in p for p in paragraphs)
     data["config"]["gl003_hom_criterion"] = "both"
     assert calculate(data)["均匀性"]["conclusion"] is False

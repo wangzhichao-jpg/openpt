@@ -178,8 +178,8 @@ def analyze(
             warnings.append(
                 f"GL003 5.3 注：抽样数≥3；当前{group_name}为 {len(followup)} 个包装单元"
             )
-        if any(len(unit) != 2 for unit in followup):
-            warnings.append("GL003 5.3 注：每个抽取样品重复测试2次；当前重复次数不全为2")
+        if any(len(unit) < 2 for unit in followup):
+            warnings.append("GL003 5.3 注：每个抽取样品重复测试2次；当前至少一个样品的重复次数不足")
         reference_t: dict[str, Any] = {}
         if baseline is not None:
             try:
