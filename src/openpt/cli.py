@@ -570,9 +570,9 @@ def _check_cli_paths(args: argparse.Namespace) -> None:
             raise InputError(f"{name} 路径不能为空")
         if not Path(value).exists():
             raise InputError(f"{name} 路径不存在：{value}")
-    output_names = ("output", "docx", "json", "differences", "runs_dir")
+    output_names = ["output", "docx", "json", "differences", "runs_dir"]
     if args.command == "demo":
-        output_names += ("directory",)
+        output_names.append("directory")
     for name in output_names:
         value = getattr(args, name, None)
         if value is not None and (not value or not str(value).strip()):
