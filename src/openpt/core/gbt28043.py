@@ -66,6 +66,8 @@ def homogeneity(data: Any, sigma: float | None) -> dict[str, Any]:
         warnings.append("B.1.1 d)：少于10个样品，须核实减少样本量的依据")
     if f1 is None:
         warnings.append("B.2.3 表B.1 未列此样品数；扩展判据未评价")
+    elif m > 2:
+        warnings.append("B.2.3 的 m>2 系数按印刷更正式实现；统计含义及适用性须独立专家复核")
     if sigma is not None and compare(sw, 0.5 * sigma) >= 0:
         warnings.append(
             "B.1.1 b)：样本内标准差达到或超过0.5σ_pt，方法重复性需审核并考虑增加重复次数"

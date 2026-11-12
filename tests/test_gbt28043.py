@@ -77,6 +77,7 @@ def test_homogeneity_criterion_boundaries() -> None:
 def test_homogeneity_multiple_repeats() -> None:
     result = homogeneity([[float(i), float(i + 1), float(i + 2)] for i in range(10)], 5)
     assert result["f2_or_fm"] == pytest.approx(f.ppf(0.95, 9, 20) / 3)
+    assert any("m>2" in warning and "专家复核" in warning for warning in result["warnings"])
     with pytest.raises(InputError):
         homogeneity([[0.0]] * 10, 1)
 
