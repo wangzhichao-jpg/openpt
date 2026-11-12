@@ -40,7 +40,7 @@ def _table(doc: Any, headers: list[str], rows: list[list[Any]]) -> None:
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
     widths = [1.45, 1.35, 1.55, 1.55, 1.35, 2.5, 4.0, 2.0] if len(headers) == 8 else None
     if headers == ["时间（UTC）", "条目", "决定", "人员", "备注", "结果 SHA-256"]:
-        widths = [3.9, 1.7, 1.5, 1.5, 3.4, 6.0]
+        widths = [3.9, 1.7, 1.5, 2.0, 3.1, 5.8]
     if widths:
         table.autofit = False
         for column, width in zip(table.columns, widths, strict=True):
@@ -965,6 +965,9 @@ def make_report(
         doc.add_heading(title, 2)
         for line in json.dumps(value, ensure_ascii=False, allow_nan=False, indent=2).splitlines():
             paragraph = doc.add_paragraph()
+            paragraph.paragraph_format.space_before = Pt(0)
+            paragraph.paragraph_format.space_after = Pt(0)
+            paragraph.paragraph_format.line_spacing = 1.0
             paragraph.add_run(line).font.name = "Consolas"
     doc.add_heading("附录：原始数据及单元格来源", 1)
     _raw_tables(doc, data)

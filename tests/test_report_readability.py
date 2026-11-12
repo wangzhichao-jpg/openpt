@@ -21,6 +21,10 @@ def test_unprovided_data_and_appendix(tmp_path: Path) -> None:
     assert paragraphs.index("附录：原始数据及单元格来源") > paragraphs.index("人工复核")
     assert '  "示例": {' in paragraphs
     assert '    "value": 1.23456789' in paragraphs
+    code = doc.paragraphs[paragraphs.index('    "value": 1.23456789')]
+    assert code.paragraph_format.space_before.pt == 0
+    assert code.paragraph_format.space_after.pt == 0
+    assert code.paragraph_format.line_spacing == 1.0
 
 
 def test_decision_time() -> None:
