@@ -17,6 +17,7 @@ from openpyxl.comments import Comment
 from openpyxl.worksheet.datavalidation import DataValidation
 
 from ..errors import InputError
+from .shape import insufficient_homogeneity_replicates
 
 SHEETS = {
     "项目信息": ["字段", "值"],
@@ -286,7 +287,7 @@ def _observations(
     groups: dict[str, list[list[float]]] = defaultdict(list)
     unit_ids: dict[str, list[str]] = defaultdict(list)
     for (group, uid), values in grouped.items():
-        if not stability and len(values) < 2:
+        if not stability and insufficient_homogeneity_replicates(len(values)):
             raise InputError(f"{unit_sources[(group, uid)]}: 单元 {uid} 至少需要两次重复")
         groups[group].append(list(values.values()))
         unit_ids[group].append(uid)

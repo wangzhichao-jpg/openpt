@@ -13,6 +13,7 @@ from openpyxl.utils import get_column_letter
 
 from ..errors import InputError
 from .excel import PARTICIPANT_OPTIONAL, SHEETS
+from .shape import insufficient_homogeneity_replicates
 
 MEASUREMENT_SHEETS = ("均匀性", "稳定性", "参加者结果")
 
@@ -69,6 +70,7 @@ def _check_rows(
     positions = _positions(rows[0], sheet, mapping)
     issues: list[Issue] = []
     seen: set[tuple[str, ...]] = set()
+    homogeneity_units: dict[str, tuple[set[str], int, Any]] = {}
     unit: Any = None
     numeric = "值"
     formulas = formulas or set()
@@ -134,6 +136,19 @@ def _check_rows(
             if identifier in seen:
                 add("DUPLICATE", keys[-1], "编号组合重复")
             seen.add(identifier)
+        if sheet == "均匀性" and value("单元编号") not in (None, ""):
+            uid = str(value("单元编号"))
+            repeats, _, _ = homogeneity_units.setdefault(uid, (set(), index, value("值")))
+            if value("重复编号") not in (None, ""):
+                repeats.add(str(value("重复编号")))
+    for uid, (repeats, row_number, original) in homogeneity_units.items():
+        if insufficient_homogeneity_replicates(len(repeats)):
+            cell = f"{get_column_letter(positions['值'] + 1)}{row_number}"
+            issues.append(
+                Issue(
+                    "INSUFFICIENT_REPLICATES", sheet, cell, original, f"单元 {uid} 至少需要两次重复"
+                )
+            )
     return issues
 
 
