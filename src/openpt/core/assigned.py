@@ -10,7 +10,7 @@ from ..errors import InputError
 from .models import ResultMapping
 from .robust import algorithm_a, median_niqr
 
-# 扩展方法：参加者公议值的标准不确定度系数；ISO 13528 待核对条款号。
+# 参加者公议值的标准不确定度系数；GB/T 28043-2019 7.7.3 式(6)。
 CONSENSUS_U_FACTOR = 1.25
 METHODS = ("known", "certified", "reference", "expert_consensus", "participant_consensus")
 
@@ -77,7 +77,7 @@ def assign_value(
     hom_in_base: bool = False,
     stab_in_base: bool = False,
 ) -> AssignedResult:
-    """GL002 4.3.1；扩展方法 u(x*)=1.25 s*/√p，ISO 13528 待核对条款号。
+    """GL002 4.3.1；u(x*)=1.25 s*/√p，GB/T 28043-2019 7.7.3 式(6)。
 
     外部定值和不确定度应由经批准的预算输入；分量按独立假定合成。
     """
@@ -125,7 +125,7 @@ def assign_value(
         else:
             raise InputError("未知参加者公议方法")
         base_u = CONSENSUS_U_FACTOR * (scale / math.sqrt(count))
-        formula = "扩展方法：u(X)=1.25·s*/√p；ISO 13528 待核对条款号"
+        formula = "u(X)=1.25·s*/√p；GB/T 28043-2019 7.7.3 式(6)"
     elif method == "known" and known_components is not None:
         if uncertainty is not None:
             raise InputError("已知值不可同时输入基础不确定度和制备分量")

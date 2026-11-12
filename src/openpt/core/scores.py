@@ -95,9 +95,11 @@ def performance_score(
         reference_sigma is not None
         and reference_sigma > 0
         and u_assigned is not None
-        and compare(u_assigned, 0.3 * reference_sigma) > 0
+        and compare(u_assigned, 0.3 * reference_sigma) >= 0
     ):
-        warnings.append("u(X)>0.3σ_pt；可考虑 z′，依据 ISO 13528，待核对条款号；适用性须审查")
+        warnings.append(
+            "u(X)≥0.3σ_pt；可考虑 z′，依据 GB/T 28043-2019 9.2.1 式(10)、9.2.2；适用性须审查"
+        )
 
     def absent(reason: str, status: str = "NOT_EVALUATED") -> ScoreResult:
         return ScoreResult(statistic, None, status, None, reason, formula, warnings)

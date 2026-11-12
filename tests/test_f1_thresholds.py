@@ -112,7 +112,9 @@ def test_one_display_unit_around_boundaries() -> None:
             (3.001, "不满意"),
         ):
             assert performance_score(kind, value, 0, **options).classification == expected
-    assert not performance_score("z", 0, 0, sigma=1, u_assigned=0.30000000000000004).warnings
+    assert not performance_score("z", 0, 0, sigma=1, u_assigned=0.299).warnings
+    assert performance_score("z", 0, 0, sigma=1, u_assigned=0.3).warnings
+    assert performance_score("z", 0, 0, sigma=1, u_assigned=0.30000000000000004).warnings
     assert performance_score("z", 0, 0, sigma=1, u_assigned=0.301).warnings
 
 

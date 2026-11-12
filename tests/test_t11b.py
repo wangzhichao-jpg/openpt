@@ -31,7 +31,7 @@ def test_six_statistics() -> None:
     for kind, value in expected.items():
         r = performance_score(kind, 12, 10, **options)
         assert r.status == "OK" and r.value == pytest.approx(value)
-        assert r.warnings and "待核对条款号" in r.warnings[0]
+        assert r.warnings and "GB/T 28043-2019 9.2.1" in r.warnings[0]
 
 
 @pytest.mark.parametrize(
