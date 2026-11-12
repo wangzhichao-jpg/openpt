@@ -60,6 +60,7 @@ def test_nested_period_enum_is_checked_in_any_standard(tmp_path: Path) -> None:
 def test_invalid_enum_is_rejected(field: str, value: str) -> None:
     import tempfile
 
+    value = "invalid_" + value
     with tempfile.TemporaryDirectory() as directory:
         path = Path(directory) / "input.xlsx"
         template(path)
