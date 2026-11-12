@@ -438,7 +438,7 @@ def _other_results(
         for name, extra in result.get("其他稳定性", {}).items():
             _stability_table(doc, str(name), extra, sig)
     else:
-        doc.add_paragraph("未提供稳定性数据。")
+        doc.add_paragraph("未提供稳定性数据，本次未评价稳定性。")
     _robust_results(doc, result, sig, mean_places)
     algorithm_s_result = result.get("算法S")
     if algorithm_s_result:
@@ -810,6 +810,32 @@ def make_report(
         or not 0 <= z_places <= 12
     ):
         raise ValueError("输出精度配置超出范围，z 小数位须为 0 至 12 的整数")
+    doc.add_heading("计算结论（须经人工复核签字）", 0)
+    h = result.get("均匀性")
+    if h:
+        doc.add_paragraph(
+            f"均匀性（GL003 4.3）：{_shown(h.get('Ss_pass'))}；"
+            f"Ss={_shown(h.get('Ss'), sig)}，0.3σ={_shown(h.get('threshold'), sig)}；"
+            f"4.2 F={_shown(h.get('F'), sig)}，临界值={_shown(h.get('F_critical'), sig)}。"
+            if result.get("标准模式") != "gbt28043"
+            else "均匀性主判据见正文 GB/T 28043 标准模式；GL003 结果仅供参考。"
+        )
+    else:
+        doc.add_paragraph("均匀性：未提供数据，本次未评价。")
+    periods = {"稳定期": result["稳定性"]} if "稳定性" in result else {}
+    periods.update(result.get("其他稳定性", {}))
+    if periods and result.get("标准模式") != "gbt28043":
+        for name, period in periods.items():
+            doc.add_paragraph(
+                f"稳定性 {name}（GL003 5.3，参考判据）："
+                f"{_shown(period.get('mean_difference_pass'))}；"
+                f"均值差={_shown(period.get('difference'), sig)}，"
+                f"0.3σ={_shown(period.get('threshold'), sig)}。"
+            )
+    elif periods:
+        doc.add_paragraph("稳定性主判据见正文 GB/T 28043 标准模式。")
+    else:
+        doc.add_paragraph("未提供稳定性数据，本次未评价稳定性。")
     _project_methods(doc, data, cfg)
     if data.get("batches"):
         doc.add_heading("候选批次追溯", 1)
@@ -836,8 +862,6 @@ def make_report(
                 for batch in data["batches"]
             ],
         )
-    doc.add_heading("原始数据", 1)
-    _raw_tables(doc, data)
     if result.get("标准模式") == "gbt28043":
         _gbt_results(doc, result, cfg, sig)
     else:
@@ -851,9 +875,12 @@ def make_report(
     if unevaluated:
         _table(doc, ["条目", "状态", "原因"], [list(row) for row in unevaluated])
     else:
-        doc.add_paragraph("结果中未发现上述未评价状态；未输入或未计算的事项仍需人工检查。")
+        doc.add_paragraph(
+            "本次结果中没有'未评价/需设计审查'状态的条目。注意：模板中未填写的内容"
+            "（如未录入稳定性数据）不会被评价，请确认没有应评而未填的项目。"
+        )
     doc.add_heading("人工复核", 1)
-    doc.add_paragraph("待人工复核；软件不自动放行，以下决定仅供人工复核。")
+    doc.add_paragraph("待人工复核；以下决定仅供人工复核。")
     latest = {str(item.get("item")): item for item in decisions or []}
     _table(
         doc,
@@ -881,7 +908,12 @@ def make_report(
     doc.add_heading("附录：全精度记录", 1)
     doc.add_paragraph("软件版本：" + __version__)
     doc.add_paragraph("输入文件 SHA-256：" + (input_sha256 or "未提供"))
-    doc.add_paragraph("生成时间（UTC）：" + datetime.now(timezone.utc).isoformat())
-    doc.add_paragraph("配置原文：" + json.dumps(cfg, ensure_ascii=False, allow_nan=False))
-    doc.add_paragraph("全精度结果：" + json.dumps(result, ensure_ascii=False, allow_nan=False))
+    doc.add_paragraph("生成时间：" + datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"))
+    for title, value in (("配置原文", cfg), ("全精度结果", result)):
+        doc.add_heading(title, 2)
+        for line in json.dumps(value, ensure_ascii=False, allow_nan=False, indent=2).splitlines():
+            paragraph = doc.add_paragraph()
+            paragraph.add_run(line).font.name = "Consolas"
+    doc.add_heading("附录：原始数据及单元格来源", 1)
+    _raw_tables(doc, data)
     doc.save(str(path))
