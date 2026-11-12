@@ -29,6 +29,8 @@ def performance_score(
     *,
     sigma: float | None = None,
     sigma_pt_reference: float | None = None,
+    delta_e: float | None = None,
+    criterion_basis: str = "sigma_pt",
     u_assigned: float | None = None,
     u_participant: float | None = None,
     U_assigned: float | None = None,
@@ -70,6 +72,7 @@ def performance_score(
     for name, optional_number in (
         ("σ_pt", sigma),
         ("原始σ_pt", sigma_pt_reference),
+        ("δ_E", delta_e),
         ("u(X)", u_assigned),
         ("u(x)", u_participant),
         ("U(X)", U_assigned),
@@ -88,17 +91,26 @@ def performance_score(
         assigned_from_participants, bool
     ):
         raise InputError("相关性配置无效")
+    if criterion_basis not in ("sigma_pt", "delta_e"):
+        raise InputError("指定值不确定度的判据依据无效")
+    if criterion_basis == "delta_e" and (delta_e is None or delta_e <= 0):
+        raise InputError("δ_E 判据须提供正的 delta_e")
     formula = formulas[statistic]
     warnings = []
     reference_sigma = sigma_pt_reference if sigma_pt_reference is not None else sigma
-    if (
-        reference_sigma is not None
-        and reference_sigma > 0
-        and u_assigned is not None
-        and compare(u_assigned, 0.3 * reference_sigma) >= 0
-    ):
+    threshold = (
+        0.1 * delta_e
+        if criterion_basis == "delta_e" and delta_e is not None
+        else 0.3 * reference_sigma
+        if reference_sigma is not None and reference_sigma > 0
+        else None
+    )
+    if threshold == 0:
+        raise InputError("指定值不确定度判据限值数值下溢")
+    if threshold is not None and u_assigned is not None and compare(u_assigned, threshold) >= 0:
+        condition = "u(X)≥0.1δ_E" if criterion_basis == "delta_e" else "u(X)≥0.3σ_pt"
         warnings.append(
-            "u(X)≥0.3σ_pt；可考虑 z′，依据 GB/T 28043-2019 9.2.1 式(10)、9.2.2；适用性须审查"
+            condition + "；可考虑 z′，依据 GB/T 28043-2019 9.2.1 式(10)、9.2.2；适用性须审查"
         )
 
     def absent(reason: str, status: str = "NOT_EVALUATED") -> ScoreResult:

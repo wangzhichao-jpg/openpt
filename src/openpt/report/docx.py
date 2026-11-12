@@ -336,13 +336,15 @@ def _gbt_results(doc: Any, result: dict[str, Any], cfg: dict[str, Any], sig: int
     doc.add_paragraph(
         "基本和扩展判据均供核查；主判据须在试验前选定，另一结果仅供参考，处置由授权人员决定。"
     )
+    basis = result.get("主判据", {}).get("criterion_basis", "sigma_pt")
     doc.add_paragraph(
+        f"基本判据依据：{basis}；δ_E={_shown(cfg.get('delta_e'), sig)}；"
         f"σ_pt 阶段：{cfg.get('sigma_stage') or '未登记'}；"
         f"来源：{cfg.get('sigma_source') or '未登记'}。"
     )
     h = result.get("GB/T均匀性")
     if h:
-        doc.add_paragraph("均匀性：B.2.2 式(B.1)、B.2.3、B.3 式(B.10)。")
+        doc.add_paragraph("均匀性：B.2.2 式(B.1)、式(B.2)、B.2.3、B.3 式(B.10)。")
         items = [
             ("样品数 g", "g"),
             ("重复数 m", "m"),
@@ -364,7 +366,14 @@ def _gbt_results(doc: Any, result: dict[str, Any], cfg: dict[str, Any], sig: int
             ("重复性检查", "repeatability_check"),
         ]
         _table(doc, ["项目", "结果"], [[label, _shown(h.get(key), sig)] for label, key in items])
-        doc.add_paragraph("ss=√max(0,sx²-sw²/m)；c=F1(0.3σ_pt)²+F2或Fm·sw²。")
+        doc.add_paragraph(
+            "ss=√max(0,sx²-sw²/m)；基本限值="
+            + (
+                "0.1δ_E。扩展判据未评价。"
+                if basis == "delta_e"
+                else "0.3σ_pt；c=F1(0.3σ_pt)²+F2或Fm·sw²。"
+            )
+        )
         for warning in h["warnings"]:
             doc.add_paragraph("提示：" + warning)
     for name, s in result.get("GB/T稳定性", {}).items():
@@ -397,7 +406,11 @@ def _gbt_results(doc: Any, result: dict[str, Any], cfg: dict[str, Any], sig: int
             else "未超过，仍须审核设计"
         )
         doc.add_paragraph("B.4.1.2 重复性提示：" + repeatability_text + "。")
-        doc.add_paragraph("扩展限值=0.3σ_pt+2√(u₁²+u₂²)，假设两均值独立。")
+        doc.add_paragraph(
+            "基本限值=0.1δ_E；扩展判据未评价。"
+            if basis == "delta_e"
+            else "基本限值=0.3σ_pt；扩展限值=0.3σ_pt+2√(u₁²+u₂²)，假设两均值独立。"
+        )
         for warning in s["warnings"]:
             doc.add_paragraph("提示：" + warning)
     doc.add_paragraph("以下 GL003 计算仅为参考，不作为本次选定标准的主评价。")

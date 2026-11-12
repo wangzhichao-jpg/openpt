@@ -185,6 +185,7 @@ def _check_numeric_config(
         "reference",
         "assigned",
         "sigma_pt",
+        "delta_e",
         "stability_u1",
         "stability_u2",
         "algorithm_a_tolerance",

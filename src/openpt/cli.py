@@ -11,6 +11,7 @@ from zipfile import BadZipFile
 
 from . import __version__
 from .core.assigned import AssignedResult, assign_value
+from .core.gbt28043 import criterion_limit as gbt_criterion_limit
 from .core.gbt28043 import homogeneity as gbt_homogeneity
 from .core.gbt28043 import period_options as gbt_period_options
 from .core.gbt28043 import stability as gbt_stability
@@ -114,7 +115,13 @@ def _gbt_stability_disposition(
     }
 
 
-def _assigned_results(data: dict[str, Any], calculations: dict[str, Any]) -> dict[str, Any]:
+def _assigned_results(
+    data: dict[str, Any],
+    calculations: dict[str, Any],
+    *,
+    basis: str = "sigma_pt",
+    delta_e: float | None = None,
+) -> dict[str, Any]:
     """执行指定值建模和 GL002 4.4.1.3 选定统计量。"""
     a = data.get("assigned_config", {})
     keys = (
@@ -223,6 +230,8 @@ def _assigned_results(data: dict[str, Any], calculations: dict[str, Any]) -> dic
                     if assigned.sigma_final is not None
                     else assigned.sigma_temporary,
                     u_assigned=assigned.u,
+                    delta_e=delta_e,
+                    criterion_basis=basis,
                     u_participant=participant.get("u"),
                     U_assigned=a.get("U_assigned"),
                     U_participant=participant.get("U"),
@@ -263,6 +272,12 @@ def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]
     standard = _option(cfg, "criterion_standard", "gl003")
     if standard not in ("gl003", "gbt28043"):
         raise InputError("criterion_standard 应为 gl003 或 gbt28043")
+    delta_e = cfg.get("delta_e")
+    delta_e = None if delta_e in (None, "") else delta_e
+    basis_option = cfg.get("gbt_criterion_basis") or None
+    basis = "sigma_pt"
+    if standard == "gbt28043":
+        basis, _ = gbt_criterion_limit(sigma, delta_e, basis_option)
     hom_rule = _option(cfg, "gbt_hom_rule", "basic")
     stab_rule = _option(cfg, "gbt_stability_rule", "basic")
     if standard == "gbt28043" and (
@@ -283,7 +298,9 @@ def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]
             _option(cfg, "sigma_stage", None),
         ).to_dict()
         if standard == "gbt28043":
-            gbt_hom = gbt_homogeneity(data["homogeneity"], sigma)
+            gbt_hom = gbt_homogeneity(
+                data["homogeneity"], sigma, delta_e=delta_e, basis=basis_option
+            )
             _select_gbt_rule(gbt_hom, hom_rule)
             result["GB/T均匀性"] = gbt_hom
     groups = data["stability"]
@@ -350,7 +367,13 @@ def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]
                 if name == "基线":
                     continue
                 period = gbt_stability(
-                    groups["基线"], observations, sigma, independent=independent, **settings[name]
+                    groups["基线"],
+                    observations,
+                    sigma,
+                    delta_e=delta_e,
+                    basis=basis_option,
+                    independent=independent,
+                    **settings[name],
                 )
                 if name != "稳定期" and settings[name]["u2"] is None:
                     period["warnings"].append("额外时点不复用稳定期均值不确定度；须分别评定")
@@ -372,7 +395,11 @@ def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]
         if legacy_blocked and cfg.get("assigned") not in (None, ""):
             result["参加者z状态"] = "DESIGN_REVIEW：稳定性未通过或未评价，须登记指定值和处置依据"
     if data.get("assigned_config", {}).get("method"):
-        result.update(_assigned_results(data, result))
+        result.update(
+            _assigned_results(
+                data, result, basis=basis, delta_e=delta_e if standard == "gbt28043" else None
+            )
+        )
     if data.get("algorithm_s_values"):
         result["算法S"] = algorithm_s(
             data["algorithm_s_values"],
@@ -394,6 +421,8 @@ def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]
         h = result.get("GB/T均匀性", {})
         result["主判据"] = {
             "standard": standard,
+            "criterion_basis": basis,
+            "delta_e": delta_e,
             "homogeneity_basic": h.get("basic_pass"),
             "homogeneity_extended": h.get("extended_pass"),
             "homogeneity_selected_rule": hom_rule,

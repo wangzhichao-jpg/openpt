@@ -23,11 +23,43 @@ def _matrix(data: Any, label: str) -> Any:
     return a
 
 
-def homogeneity(data: Any, sigma: float | None) -> dict[str, Any]:
+def criterion_limit(
+    sigma: float | None, delta_e: float | None = None, basis: str | None = None
+) -> tuple[str, float | None]:
+    """选择基本判据依据；双输入须明确选择，不静默替换。"""
+    for name, value in (("sigma", sigma), ("delta_e", delta_e)):
+        try:
+            invalid = value is not None and (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(value)
+                or value <= 0
+            )
+        except OverflowError:
+            invalid = True
+        if invalid:
+            raise InputError(f"{name} 必须为正有限数")
+    if basis not in (None, "", "sigma_pt", "delta_e"):
+        raise InputError("gbt_criterion_basis 应为 sigma_pt 或 delta_e")
+    if not basis:
+        if sigma is not None and delta_e is not None:
+            raise InputError("同时输入 sigma 和 delta_e 时须选择 gbt_criterion_basis")
+        basis = "delta_e" if delta_e is not None else "sigma_pt"
+    elif (basis == "sigma_pt" and sigma is None) or (basis == "delta_e" and delta_e is None):
+        raise InputError("所选 gbt_criterion_basis 缺少对应输入")
+    value = sigma if basis == "sigma_pt" else delta_e
+    threshold = (0.3 if basis == "sigma_pt" else 0.1) * value if value is not None else None
+    if threshold == 0:
+        raise InputError("判据限值数值下溢")
+    return basis, threshold
+
+
+def homogeneity(
+    data: Any, sigma: float | None, *, delta_e: float | None = None, basis: str | None = None
+) -> dict[str, Any]:
     """按 B.2、B.3 计算基本和扩展判据；不对数据进行离群值删除。"""
     a = _matrix(data, "均匀性")
-    if sigma is not None and (not math.isfinite(sigma) or sigma <= 0):
-        raise InputError("sigma 必须为正有限数")
+    basis, limit = criterion_limit(sigma, delta_e, basis)
     g, m = a.shape
     with np.errstate(over="ignore", invalid="ignore"):
         means = a.mean(axis=1)
@@ -38,7 +70,6 @@ def homogeneity(data: Any, sigma: float | None) -> dict[str, Any]:
     if not all(math.isfinite(x) for x in (mean, sx2, sw2, raw)):
         raise InputError("均匀性统计量数值溢出")
     sx, sw, ss = math.sqrt(sx2), math.sqrt(sw2), math.sqrt(max(0.0, raw))
-    limit = 0.3 * sigma if sigma is not None else None
     basic = compare(ss, limit) <= 0 if limit is not None else None
     # B.2.3 表 B.1 覆盖 7 至 20；表外不以外推替代标准表。
     f1 = float(chi2.ppf(0.95, g - 1) / (g - 1)) if 7 <= g <= 20 else None
@@ -52,7 +83,7 @@ def homogeneity(data: Any, sigma: float | None) -> dict[str, Any]:
     try:
         c = (
             f1 * limit**2 + f2 * sw2
-            if f1 is not None and f2 is not None and limit is not None
+            if f1 is not None and f2 is not None and limit is not None and basis == "sigma_pt"
             else None
         )
     except OverflowError:
@@ -68,6 +99,8 @@ def homogeneity(data: Any, sigma: float | None) -> dict[str, Any]:
         warnings.append("B.2.3 表B.1 未列此样品数；扩展判据未评价")
     elif m > 2:
         warnings.append("B.2.3 的 m>2 系数按印刷更正式实现；统计含义及适用性须独立专家复核")
+    if basis == "delta_e":
+        warnings.append("B.2.3 扩展判据以 σ_pt 表达；δ_E 依据下未评价扩展判据")
     if sigma is not None and compare(sw, 0.5 * sigma) >= 0:
         warnings.append(
             "B.1.1 b)：样本内标准差达到或超过0.5σ_pt，方法重复性需审核并考虑增加重复次数"
@@ -90,6 +123,8 @@ def homogeneity(data: Any, sigma: float | None) -> dict[str, Any]:
         "variance_raw": raw,
         "ss": ss,
         "sigma": sigma,
+        "delta_e": delta_e,
+        "criterion_basis": basis,
         "basic_limit": limit,
         "basic_pass": basic,
         "f1": f1,
@@ -168,13 +203,14 @@ def stability(
     *,
     u1: float | None = None,
     u2: float | None = None,
+    delta_e: float | None = None,
+    basis: str | None = None,
     independent: bool = True,
     kind: str = "storage",
 ) -> dict[str, Any]:
     """按 B.5 评价；B.18 仅在提供两均值独立标准不确定度时计算。"""
     x, y = _matrix(baseline, "稳定性基线"), _matrix(followup, "稳定性后续组")
-    if sigma is not None and (not math.isfinite(sigma) or sigma <= 0):
-        raise InputError("sigma 必须为正有限数")
+    basis, basic_limit = criterion_limit(sigma, delta_e, basis)
     if not isinstance(independent, bool):
         raise InputError("独立性必须为布尔值")
     if kind not in ("storage", "transport"):
@@ -189,11 +225,14 @@ def stability(
         sw2 = float(np.sqrt(np.mean(np.var(y, axis=1, ddof=1))))
     if not all(math.isfinite(v) for v in (mean1, mean2, diff, sw1, sw2)):
         raise InputError("稳定性均值或组内重复性数值溢出")
-    basic_limit = 0.3 * sigma if sigma is not None else None
     basic = compare(diff, basic_limit) <= 0 if basic_limit is not None and independent else None
     extended_limit = (
         basic_limit + 2 * math.hypot(u1, u2)
-        if basic_limit is not None and u1 is not None and u2 is not None and independent
+        if basis == "sigma_pt"
+        and basic_limit is not None
+        and u1 is not None
+        and u2 is not None
+        and independent
         else None
     )
     if extended_limit is not None and not math.isfinite(extended_limit):
@@ -211,6 +250,8 @@ def stability(
     )
     if repeatability_exceeded:
         warnings.append("B.4.1.2：组内重复性超过0.5σ_pt，须评估增加样品或重复测量")
+    if basis == "delta_e":
+        warnings.append("B.5.2 扩展判据以 σ_pt 表达；δ_E 依据下未评价扩展判据")
     if not independent:
         warnings.append("相关或配对数据不适用独立样品模型，需人工审核")
     if basic is False:
@@ -232,6 +273,8 @@ def stability(
         "repeatability_limit": repeatability_limit,
         "repeatability_exceeded": repeatability_exceeded,
         "sigma": sigma,
+        "delta_e": delta_e,
+        "criterion_basis": basis,
         "basic_limit": basic_limit,
         "basic_pass": basic,
         "u1": u1,

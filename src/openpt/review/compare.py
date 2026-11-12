@@ -416,14 +416,24 @@ def _review_claim(
     types = []
     if name in ("x*", "s*") and model == "absolute":
         types.append("REPORT_RULE_UNKNOWN")
-    if name == "Ss" and result.get("均匀性", {}).get("Ss_pass") is False:
-        note = f"样品间标准差超过 0.3σ：{rec} > {result['均匀性']['threshold']}"
+    if name == "Ss":
         cfg = data["config"]
-        if cfg.get("sigma_composite") not in (None, ""):
-            note += "；报告处置：将样品间标准差合成为 σ′"
+        gbt = result.get("GB/T均匀性") if cfg.get("criterion_standard") == "gbt28043" else None
+        if gbt is not None:
+            failed = gbt.get("conclusion") is False
+            limit = gbt.get(f"{gbt.get('selected_rule')}_limit")
+            label = "GB/T 预选主判据限值"
         else:
-            note += "；报告处置方式未提供"
-        types.append("CRITERION_EXCEEDED")
+            failed = result.get("均匀性", {}).get("Ss_pass") is False
+            limit = result.get("均匀性", {}).get("threshold")
+            label = "0.3σ"
+        if failed:
+            note = f"样品间标准差超过 {label}：{rec} > {limit}"
+            if cfg.get("sigma_composite") not in (None, ""):
+                note += "；报告处置：将样品间标准差合成为 σ′"
+            else:
+                note += "；报告处置方式未提供"
+            types.append("CRITERION_EXCEEDED")
     if model.startswith("repeats"):
         types.append("PSEUDO_REPLICATION")
     if model == "repeats_welch" and "repeats_pooled" in models:
