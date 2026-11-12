@@ -67,7 +67,9 @@ def fit(x: list[float], y: list[float], alpha: float = 0.05) -> dict[str, Any]:
     }
 
 
-def fit_series(records: list[dict[str, Any]], aggregate: str = "per_series") -> dict[str, Any]:
+def fit_series(
+    records: list[dict[str, Any]], aggregate: str = "per_series", alpha: float = 0.05
+) -> dict[str, Any]:
     """按序列拟合或先按时间取均值；不同单位和缺失/重复记录不混用。"""
     if aggregate not in ("per_series", "time_mean"):
         raise InputError("trend_aggregate 应为 per_series 或 time_mean")
@@ -107,7 +109,7 @@ def fit_series(records: list[dict[str, Any]], aggregate: str = "per_series") -> 
     for name, values in grouped.items():
         ordered = sorted(values)
         result[name] = {
-            **fit([v[0] for v in ordered], [v[1] for v in ordered]),
+            **fit([v[0] for v in ordered], [v[1] for v in ordered], alpha),
             "time_unit": units[name],
         }
     return result
@@ -128,3 +130,28 @@ def stability_uncertainty(
     if not math.isfinite(total):
         raise InputError("稳定性不确定度数值溢出")
     return {"u_short": short, "u_long": long, "u_stab": total}
+
+
+def configured_uncertainty(series: dict[str, Any], cfg: dict[str, Any]) -> dict[str, Any] | None:
+    """解析完整配置并记录短长期时长；不与手工预算静默合并。"""
+    keys = ("trend_short_series", "trend_short_span", "trend_long_series", "trend_long_span")
+    present = [cfg.get(key) not in (None, "") for key in keys]
+    if not any(present):
+        return None
+    if not all(present):
+        raise InputError("趋势不确定度须同时登记短期、长期序列及时长")
+    short, long = str(cfg[keys[0]]), str(cfg[keys[2]])
+    if short not in series or long not in series:
+        raise InputError("趋势不确定度序列不存在")
+    result: dict[str, Any] = stability_uncertainty(
+        series[short]["s_b1"], cfg[keys[1]], series[long]["s_b1"], cfg[keys[3]]
+    )
+    result.update(
+        {
+            "short_series": short,
+            "long_series": long,
+            "short_span": cfg[keys[1]],
+            "long_span": cfg[keys[3]],
+        }
+    )
+    return result

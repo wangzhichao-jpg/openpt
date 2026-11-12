@@ -807,8 +807,72 @@ def review(
                 "说明": "扩展提示：组内方差包含相邻试件之间的差异，可能低估样品间不均匀性。",
             }
         )
+    trend_names = {
+        "b1": "b1",
+        "b0": "b0",
+        "s(b1)": "s(b1)",
+        "趋势阈值": "阈值",
+        "趋势X̄": "X̄",
+        "趋势Ȳ": "Ȳ",
+        "趋势t临界值": "t",
+        "趋势结论": "结论",
+    }
+    trend_claims: dict[str, list[dict[str, Any]]] = {}
+    trend_results = result.get("趋势稳定性", {})
     for claim in data["claims"]:
-        rows.extend(_review_claim(data, result, claim, models, mapping))
+        if claim["name"] not in trend_names or not trend_results:
+            rows.extend(_review_claim(data, result, claim, models, mapping))
+            continue
+        name = claim.get("timegroup") or (
+            next(iter(trend_results)) if len(trend_results) == 1 else None
+        )
+        if name not in trend_results:
+            raise ValueError("趋势声称值须指定存在的序列名")
+        value = claim["value"]
+        if claim["name"] == "趋势结论":
+            if value not in (0, 1):
+                raise ValueError("趋势结论声称值须为1（稳定）或0（趋势显著）")
+            value = "稳定" if value == 1 else "趋势显著"
+        digits = claim.get("digits")
+        if isinstance(digits, float) and digits.is_integer():
+            digits = int(digits)
+        trend_claims.setdefault(str(name), []).append(
+            {
+                "name": trend_names[claim["name"]],
+                "value": value,
+                "digits": digits,
+                "source": claim.get("source", ""),
+                "cell": claim.get("cell", ""),
+            }
+        )
+    if trend_claims:
+        from .trend import review_trend
+
+        for group, claims in trend_claims.items():
+            for item in review_trend(trend_results[group], claims):
+                corresponding = next(
+                    (claim for claim in claims if claim["name"] == item["统计量"]), {}
+                )
+                value, actual = item.get("声称值"), item.get("重算值")
+                rows.append(
+                    {
+                        "统计量": item["统计量"],
+                        "时间组": group,
+                        "声称值": value,
+                        "来源": corresponding.get("source", ""),
+                        "显示小数位": corresponding.get("digits"),
+                        "按报告模型复现值": actual,
+                        "按推荐模型重算值": actual,
+                        "按报告显示值": str(actual) if actual is not None else None,
+                        "按推荐显示值": str(actual) if actual is not None else None,
+                        "显示一致": item.get("显示一致"),
+                        "推荐一致": item.get("显示一致"),
+                        "状态": item["状态"],
+                        "差异类型": item["差异类型"],
+                        "评分条目": _mapping_item(mapping, item["统计量"], "homogeneity"),
+                        "说明": item["说明"],
+                    }
+                )
     composite = _composite_row(data, result, mapping)
     if composite is not None:
         rows.append(composite)
@@ -862,6 +926,8 @@ def write_csv(path: str | Path, rows: list[dict[str, Any]]) -> None:
         "评分条目",
         "说明",
     ]
+    if any("时间组" in row for row in rows):
+        fields.insert(1, "时间组")
     if any("被测量" in row for row in rows):
         fields.insert(0, "被测量")
     with open(path, "w", encoding="utf-8-sig", newline="") as f:

@@ -22,6 +22,7 @@ from ..config.catalog import ENUMS, template_rows
 from ..errors import InputError
 from .layout import wide_to_long
 from .measurands import split_measurands
+from .new_stability import read_trend_sheet
 from .shape import STABILITY_METHOD_ALIASES, insufficient_homogeneity_replicates
 
 SHEETS = {
@@ -76,6 +77,7 @@ def template(path: str | Path) -> None:
         ("算法S", "选填：需要稳健联合标准差或极差时填写。"),
         ("候选批次", "选填：需要记录候选批次时填写。"),
         ("被测量配置", "选填：多个被测量分别登记单位、sigma 等；数据表和声称值的被测量列须对应。"),
+        ("趋势稳定性", "选填：序列名、时间 X、时间单位和数值；在方法配置中选回归趋势法。"),
         (
             "σ 与 σ_pt",
             "sigma 用于均匀性及稳定性判据；sigma_pt 是 z 等评价统计量的分母。"
@@ -126,6 +128,12 @@ def template(path: str | Path) -> None:
     for name in ("均匀性", "稳定性", "报告声称值"):
         ws = book[name]
         ws.cell(1, ws.max_column + 1, "被测量")
+    trend_sheet = book.create_sheet("趋势稳定性")
+    trend_sheet.append(["序列名", "时间 X", "时间单位", "值 Y", "（选填）"])
+    trend_sheet.freeze_panes = "A2"
+    trend_units = DataValidation(type="list", formula1='"天,月,次"')
+    trend_sheet.add_data_validation(trend_units)
+    trend_units.add("C2:C1048576")
     options_sheet = book.create_sheet("被测量配置")
     options_sheet.append(["被测量", "字段", "值", "（选填）"])
     for name in set(SHEETS) - {"项目信息"}:
@@ -168,6 +176,12 @@ def template(path: str | Path) -> None:
         ("测量表布局（layout）", ""),
         ("GL003均匀性主判据（gl003_hom_criterion）", ""),
         ("报告声明GL003均匀性判据（report_gl003_hom_criterion）", ""),
+        ("趋势聚合（trend_aggregate）", "per_series"),
+        ("趋势短期序列（trend_short_series）", ""),
+        ("趋势短期时长（trend_short_span）", ""),
+        ("趋势长期序列（trend_long_series）", ""),
+        ("趋势长期时长（trend_long_span）", ""),
+        ("趋势依据来源（trend_source）", ""),
     ]:
         book["方法配置"].append(config_row)
 
@@ -196,6 +210,7 @@ def template(path: str | Path) -> None:
         ("B33", options_for("layout")),
         ("B34", options_for("gl003_hom_criterion")),
         ("B35", options_for("report_gl003_hom_criterion")),
+        ("B36", options_for("trend_aggregate")),
     ]:
         validation = DataValidation(type="list", formula1=options)
         book["方法配置"].add_data_validation(validation)
@@ -594,13 +609,18 @@ def read_workbook(
         if sheet not in book.sheetnames:
             book.create_sheet(sheet).append(headers)
     info, config = _metadata(book)
-    for pending in ("趋势稳定性", "传递标准复测"):
+    for pending in ("传递标准复测",):
         if pending in book.sheetnames and any(
             any(value not in (None, "") for value in row)
             for row in book[pending].iter_rows(min_row=2, values_only=True)
         ):
             raise InputError(f"{pending}: 数据尚未接入运行流程，不能忽略后继续计算")
+    trend = read_trend_sheet(book)
+    if trend and config.get("stability_method") != "regression_trend":
+        raise InputError("趋势稳定性: 须选择 stability_method=regression_trend")
     separated = split_measurands(book, columns)
+    if separated and trend:
+        raise InputError("多个被测量的趋势数据暂不能混合导入，请分别运行")
     if separated:
         if suffix == ".csv":
             raise InputError("CSV 多被测量输入不支持，请使用 XLSX")
@@ -667,6 +687,7 @@ def read_workbook(
         "stability_units": stab_ids,
         "participants": _participants(book, info["单位"]),
         "claims": _claims(book),
-        "sources": hs + ss,
+        "sources": hs + ss + [item["source"] for item in trend],
         "data_decimal_places": max(precision) if precision else None,
+        **({"trend_observations": trend} if trend else {}),
     }

@@ -10,6 +10,7 @@ STABILITY_METHOD_ALIASES = {
     "两均值": "two_sample",
     "单均值": "one_sample",
     "均值差法（GL003 5.3）": "mean_difference",
+    "回归趋势法": "regression_trend",
 }
 
 
@@ -35,6 +36,8 @@ def stability_structure_problem(
         return "INVALID_CONFIG", "baseline_source 应为 homogeneity 或 baseline_group"
     if method not in ENUMS["stability_method"]:
         return "INVALID_CONFIG", "未知稳定性方法"
+    if method == "regression_trend":
+        return "INVALID_CONFIG", "回归趋势法使用趋势稳定性工作表，不能混用稳定性工作表"
     if method == "mean_difference":
         if not any(name != "基线" for name in groups):
             return "MISSING_GROUP", "均值差法须提供至少一个稳定性时间组"

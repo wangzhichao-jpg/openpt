@@ -71,6 +71,8 @@ def write_xlsx(path: str | Path, rows: list[dict[str, Any]]) -> None:
         "评分条目",
         "说明",
     ]
+    if any("时间组" in row for row in rows):
+        fields.insert(4, "时间组")
     if any("被测量" in row for row in rows):
         fields.insert(3, "被测量")
     book = Workbook()

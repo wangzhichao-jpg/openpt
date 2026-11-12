@@ -14,10 +14,12 @@ from openpyxl.utils.cell import column_index_from_string, coordinate_from_string
 
 from ..config.catalog import ENUMS
 from ..core.gbt28043 import period_options as gbt_period_options
+from ..core.trend import configured_uncertainty, fit_series
 from ..errors import InputError
 from .excel import PARTICIPANT_OPTIONAL, SHEETS
 from .layout import wide_to_long
 from .measurands import DATA_SHEETS, split_measurands
+from .new_stability import read_trend_sheet
 from .shape import (
     STABILITY_METHOD_ALIASES,
     insufficient_homogeneity_replicates,
@@ -597,7 +599,7 @@ def inspect_input(
         return separated_issues
     try:
         issues: list[Issue] = []
-        for pending in ("趋势稳定性", "传递标准复测"):
+        for pending in ("传递标准复测",):
             if pending in book.sheetnames and any(
                 any(value not in (None, "") for value in row)
                 for row in book[pending].iter_rows(min_row=2, values_only=True)
@@ -859,6 +861,39 @@ def inspect_input(
                         str(exc),
                     )
                 )
+        if "趋势稳定性" in book.sheetnames:
+            editable = load_workbook(BytesIO(payload) if isinstance(source, BytesIO) else source)
+            try:
+                trend = read_trend_sheet(editable)
+                if trend:
+                    calculation_data_present = True
+                    if method != "regression_trend":
+                        issues.append(
+                            Issue(
+                                "INVALID_CONFIG",
+                                "方法配置",
+                                config_cells.get("stability_method", "B1"),
+                                method,
+                                "趋势数据须选择 regression_trend",
+                            )
+                        )
+                    else:
+                        trend_result = fit_series(
+                            trend,
+                            config_values.get("trend_aggregate") or "per_series",
+                            float(config_values.get("alpha") or 0.05),
+                        )
+                        configured_uncertainty(trend_result, config_values)
+                elif method == "regression_trend":
+                    issues.append(
+                        Issue("MISSING", "趋势稳定性", "A1", None, "回归趋势法须提供数据")
+                    )
+            except (InputError, ValueError, TypeError) as exc:
+                issues.append(Issue("INPUT_ERROR", "趋势稳定性", "A1", None, str(exc)))
+            finally:
+                editable.close()
+        elif method == "regression_trend":
+            issues.append(Issue("MISSING_SHEET", "趋势稳定性", "A1", None, "回归趋势法须提供数据"))
         if not calculation_data_present:
             issues.append(Issue("NO_DATA", "均匀性", "A1", None, "没有可计算的数据"))
         unique: list[Issue] = []

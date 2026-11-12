@@ -23,6 +23,7 @@ from .core.homogeneity import analyze_single as single_homogeneity
 from .core.robust import algorithm_a, algorithm_s, median_niqr
 from .core.scores import performance_score
 from .core.stability import analyze as stability
+from .core.trend import configured_uncertainty, fit_series
 from .core.zscore import zscore
 from .errors import InputError
 from .io.excel import template
@@ -303,6 +304,21 @@ def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]
     if replicate_type not in ENUMS["replicate_type"]:
         raise InputError("replicate_type 应为 technical、adjacent_specimens、other 或 single")
     result: dict[str, Any] = {}
+    trend_input = data.get("trend_observations", [])
+    trend_method = _option(cfg, "stability_method", "two_sample") == "regression_trend"
+    if trend_method and not trend_input:
+        raise InputError("回归趋势法须填写趋势稳定性数据")
+    if trend_input and not trend_method:
+        raise InputError("趋势稳定性须选择 regression_trend 方法")
+    if trend_input:
+        if data.get("stability"):
+            raise InputError("回归趋势法不能混用稳定性工作表")
+        result["趋势稳定性"] = fit_series(
+            trend_input, str(_option(cfg, "trend_aggregate", "per_series")), alpha
+        )
+        trend_u = configured_uncertainty(result["趋势稳定性"], cfg)
+        if trend_u is not None:
+            result["趋势不确定度"] = trend_u
     if data["homogeneity"]:
         strict = cfg.get("strict_homogeneity", False)
         if not isinstance(strict, bool):
@@ -508,9 +524,19 @@ def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]
         if legacy_blocked and cfg.get("assigned") not in (None, ""):
             result["参加者z状态"] = "DESIGN_REVIEW：稳定性未通过或未评价，须登记指定值和处置依据"
     if data.get("assigned_config", {}).get("method"):
+        assignment_data = data
+        if result.get("趋势不确定度"):
+            assigned_config = dict(data["assigned_config"])
+            if assigned_config.get("u_stab") not in (None, "", 0, 0.0):
+                raise InputError("趋势 u_stab 与手工 u_stab 不可同时输入")
+            assigned_config["u_stab"] = result["趋势不确定度"]["u_stab"]
+            assignment_data = {**data, "assigned_config": assigned_config}
         result.update(
             _assigned_results(
-                data, result, basis=basis, delta_e=delta_e if standard == "gbt28043" else None
+                assignment_data,
+                result,
+                basis=basis,
+                delta_e=delta_e if standard == "gbt28043" else None,
             )
         )
     if data.get("algorithm_s_values"):

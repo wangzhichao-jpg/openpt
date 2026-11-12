@@ -498,8 +498,32 @@ def _other_results(
             )
         for name, extra in result.get("其他稳定性", {}).items():
             _stability_table(doc, str(name), extra, sig)
-    else:
+    elif not result.get("趋势稳定性"):
         doc.add_paragraph("未提供稳定性数据，本次未评价稳定性。")
+    if result.get("趋势稳定性"):
+        doc.add_heading("回归趋势稳定性", 2)
+        doc.add_paragraph(
+            "PT-CX-18 附录 A 2.7 原文标注仅限微生物领域参考使用；"
+            "标准样品研制报告亦有实际应用。ISO Guide 35 / JJF 1343 未见原文，待核。"
+        )
+        doc.add_paragraph(
+            "标准样品研制报告及页码来源："
+            + str(data.get("config", {}).get("trend_source") or "未登记，待核")
+        )
+        for name, trend in result["趋势稳定性"].items():
+            doc.add_paragraph(
+                f"序列 {name}；n={trend['n']}，b1={_shown(trend['b1'], sig)}，"
+                f"b0={_shown(trend['b0'], sig)}，s(b1)={_shown(trend['s_b1'], sig)}，"
+                f"阈值={_shown(trend['threshold'], sig)}，稳定：{_shown(trend['stable'])}。"
+            )
+            for warning in trend.get("design_warnings", []):
+                doc.add_paragraph("设计提示：" + warning)
+        if result.get("趋势不确定度"):
+            doc.add_paragraph(
+                "趋势稳定性分量 u_stab="
+                + _shown(result["趋势不确定度"]["u_stab"], sig)
+                + "；采用登记的短期与长期时长。"
+            )
     _robust_results(doc, result, sig, mean_places)
     algorithm_s_result = result.get("算法S")
     if algorithm_s_result:
@@ -734,6 +758,7 @@ def _project_methods(doc: Any, data: dict[str, Any], cfg: dict[str, Any]) -> Non
     method = {
         "one_sample": "单均值 t 检验：CNAS-GL003:2018 5.2.1",
         "mean_difference": "均值差法：CNAS-GL003:2018 5.3",
+        "regression_trend": "线性回归趋势法；PT-CX-18 附录 A 2.7 仅限微生物领域参考使用",
     }.get(cfg.get("stability_method") or "", "两均值 t 检验：CNAS-GL003:2018 5.2.2")
     criterion = (
         "both" if cfg.get("strict_homogeneity") else cfg.get("gl003_hom_criterion") or "f_test"
@@ -803,7 +828,8 @@ def _difference_table(doc: Any, differences: list[dict[str, Any]]) -> None:
             not_applicable = "不适用（设计提示）"
             rows.append(
                 [
-                    row.get("统计量", ""),
+                    str(row.get("统计量", ""))
+                    + (" / " + str(row["时间组"]) if row.get("时间组") else ""),
                     row.get("适用标准", "通用"),
                     not_applicable if design else _shown(row.get("声称值"), places=claim_places),
                     not_applicable if design else _shown(row.get("按报告模型复现值")),
@@ -1049,6 +1075,12 @@ def make_report(
                     f"临界值={_shown(period.get('critical'), sig)}；"
                     f"5.3 均值差={_shown(period.get('difference'), sig)}（参考）。"
                 )
+    elif result.get("趋势稳定性"):
+        for name, trend in result["趋势稳定性"].items():
+            doc.add_paragraph(
+                f"趋势稳定性 {name}（线性回归）：{_shown(trend['stable'])}；"
+                f"b1={_shown(trend['b1'], sig)}，阈值={_shown(trend['threshold'], sig)}。"
+            )
     else:
         doc.add_paragraph("未提供稳定性数据，本次未评价稳定性。")
     _project_methods(doc, data, cfg)

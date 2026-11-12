@@ -34,7 +34,7 @@ def test_trend_long_and_wide_provenance() -> None:
         read_trend_sheet(book)
 
 
-@pytest.mark.parametrize("sheet_name", ["趋势稳定性", "传递标准复测"])
+@pytest.mark.parametrize("sheet_name", ["传递标准复测"])
 def test_not_yet_connected_fails_closed(tmp_path, sheet_name: str) -> None:
     from openpyxl import load_workbook
 
