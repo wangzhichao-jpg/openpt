@@ -13,7 +13,7 @@ from openpyxl.utils import get_column_letter
 
 from ..errors import InputError
 from .excel import PARTICIPANT_OPTIONAL, SHEETS
-from .shape import insufficient_homogeneity_replicates
+from .shape import insufficient_homogeneity_replicates, insufficient_units
 
 MEASUREMENT_SHEETS = ("均匀性", "稳定性", "参加者结果")
 
@@ -71,6 +71,7 @@ def _check_rows(
     issues: list[Issue] = []
     seen: set[tuple[str, ...]] = set()
     homogeneity_units: dict[str, tuple[set[str], int, Any]] = {}
+    stability_units: dict[str, dict[str, tuple[set[str], int, Any]]] = {}
     unit: Any = None
     numeric = "值"
     formulas = formulas or set()
@@ -141,6 +142,15 @@ def _check_rows(
             repeats, _, _ = homogeneity_units.setdefault(uid, (set(), index, value("值")))
             if value("重复编号") not in (None, ""):
                 repeats.add(str(value("重复编号")))
+        if (
+            sheet == "稳定性"
+            and value("时间组") not in (None, "")
+            and value("单元编号") not in (None, "")
+        ):
+            group = stability_units.setdefault(str(value("时间组")), {})
+            repeats, _, _ = group.setdefault(str(value("单元编号")), (set(), index, value("值")))
+            if value("重复编号") not in (None, ""):
+                repeats.add(str(value("重复编号")))
     for uid, (repeats, row_number, original) in homogeneity_units.items():
         if insufficient_homogeneity_replicates(len(repeats)):
             cell = f"{get_column_letter(positions['值'] + 1)}{row_number}"
@@ -148,6 +158,21 @@ def _check_rows(
                 Issue(
                     "INSUFFICIENT_REPLICATES", sheet, cell, original, f"单元 {uid} 至少需要两次重复"
                 )
+            )
+    groups = {"均匀性": homogeneity_units} if homogeneity_units else {}
+    groups.update(stability_units)
+    for name, group in groups.items():
+        if insufficient_units(len(group)):
+            _, row_number, original = next(iter(group.values()))
+            cell = f"{get_column_letter(positions['值'] + 1)}{row_number}"
+            issues.append(
+                Issue("INSUFFICIENT_SAMPLES", sheet, cell, original, f"{name}至少需要两个单元")
+            )
+        if sheet == "稳定性" and len({len(repeats) for repeats, _, _ in group.values()}) > 1:
+            _, row_number, original = next(iter(group.values()))
+            cell = f"{get_column_letter(positions['值'] + 1)}{row_number}"
+            issues.append(
+                Issue("UNBALANCED_REPEATS", sheet, cell, original, f"{name}各单元重复次数须相同")
             )
     return issues
 

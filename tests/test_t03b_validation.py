@@ -45,7 +45,7 @@ def test_xlsx_issues_and_mapping(tmp_path: Path) -> None:
 def test_csv_encoding_and_cli(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """UTF-8 BOM 默认可读，GBK 必须明确声明。"""
     source = tmp_path / "input.csv"
-    text = "单元编号,重复编号,值,单位\n甲,1,1.5,毫克\n甲,2,1.6,毫克\n"
+    text = "单元编号,重复编号,值,单位\n甲,1,1.5,毫克\n甲,2,1.6,毫克\n乙,1,1.5,毫克\n乙,2,1.6,毫克\n"
     source.write_text(text, encoding="utf-8-sig")
     assert inspect_input(source) == []
     source.write_text(text, encoding="gbk")
@@ -64,6 +64,8 @@ def test_cross_sheet_units(tmp_path: Path) -> None:
     first.append(["单元编号", "重复编号", "值", "单位"])
     first.append(["A", 1, 1.0, "mg"])
     first.append(["A", 2, 1.1, "mg"])
+    first.append(["B", 1, 1.0, "mg"])
+    first.append(["B", 2, 1.1, "mg"])
     second = book.create_sheet("参加者结果")
     second.append(["参加者编号", "值", "单位"])
     second.append(["P1", 1.0, "g"])

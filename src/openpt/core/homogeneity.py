@@ -8,6 +8,7 @@ import numpy as np
 from scipy.stats import f as f_distribution
 
 from ..errors import InputError
+from ..io.shape import insufficient_homogeneity_replicates, insufficient_units
 from .decision import compare
 from .models import HomogeneityResult
 
@@ -18,8 +19,9 @@ def _anova(data: Any) -> dict[str, Any]:
         groups = [np.asarray(row, dtype=float) for row in data]
     except (ValueError, TypeError):
         raise InputError("均匀性数据须为数值序列") from None
-    if len(groups) < 2 or any(
-        row.ndim != 1 or len(row) < 2 or not np.isfinite(row).all() for row in groups
+    if insufficient_units(len(groups)) or any(
+        row.ndim != 1 or insufficient_homogeneity_replicates(len(row)) or not np.isfinite(row).all()
+        for row in groups
     ):
         raise InputError("至少需要两个单元、每单元两次有限数值")
     g = len(groups)

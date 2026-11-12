@@ -8,6 +8,7 @@ import numpy as np
 from scipy.stats import t as t_distribution
 
 from ..errors import InputError
+from ..io.shape import insufficient_units
 from .decision import compare
 from .models import StabilityResult
 
@@ -17,7 +18,7 @@ def _observations(data: Any, pooled_repeats: bool) -> Any:
         a = np.asarray(data, dtype=float)
     except (ValueError, TypeError):
         raise InputError("稳定性数据须为数值矩阵") from None
-    if a.ndim != 2 or a.shape[0] < 2 or a.shape[1] < 1 or not np.isfinite(a).all():
+    if a.ndim != 2 or insufficient_units(a.shape[0]) or a.shape[1] < 1 or not np.isfinite(a).all():
         raise InputError("稳定性至少需要两个单元及有限数值")
     with np.errstate(over="ignore", invalid="ignore"):
         observations = a.ravel() if pooled_repeats else a.mean(axis=1)
