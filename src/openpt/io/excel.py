@@ -89,6 +89,10 @@ def template(path: str | Path) -> None:
         ("算法S停止规则（algorithm_s_stop_rule）", "gl002"),
         ("算法S绝对容差（algorithm_s_tolerance）", 1e-12),
         ("算法S最大迭代次数（algorithm_s_max_iterations）", 1000),
+        ("判据标准模式（criterion_standard）", "gl003"),
+        ("基线均值标准不确定度（stability_u1）", ""),
+        ("后续均值标准不确定度（stability_u2）", ""),
+        ("报告采用标准模式（report_standard）", ""),
     ]:
         book["方法配置"].append(config_row)
     for cell, options in [
@@ -102,6 +106,8 @@ def template(path: str | Path) -> None:
         ("B15", '"启用,关闭"'),
         ("B17", '"z,zprime,zeta,En,D,D%,all"'),
         ("B18", '"gl002,absolute"'),
+        ("B21", '"gl003,gbt28043"'),
+        ("B24", '"gl003,gbt28043"'),
     ]:
         validation = DataValidation(type="list", formula1=options)
         book["方法配置"].add_data_validation(validation)

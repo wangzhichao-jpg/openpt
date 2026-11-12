@@ -11,6 +11,8 @@ from zipfile import BadZipFile
 
 from . import __version__
 from .core.assigned import assign_value
+from .core.gbt28043 import homogeneity as gbt_homogeneity
+from .core.gbt28043 import stability as gbt_stability
 from .core.homogeneity import analyze as homogeneity
 from .core.robust import algorithm_a, algorithm_s, median_niqr
 from .core.scores import performance_score
@@ -158,7 +160,10 @@ def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]
     raw = cfg.get("sigma")
     sigma = float(raw) if raw not in (None, "") else None
     if cfg.get("gbt28043_extension"):
-        raise ValueError("GB/T 28043 扩展配置尚未实现")
+        raise ValueError("旧配置 gbt28043_extension 不支持；请使用 criterion_standard")
+    standard = _option(cfg, "criterion_standard", "gl003")
+    if standard not in ("gl003", "gbt28043"):
+        raise InputError("criterion_standard 应为 gl003 或 gbt28043")
     result = {}
     if data["homogeneity"]:
         strict = cfg.get("strict_homogeneity", False)
@@ -172,6 +177,8 @@ def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]
             _option(cfg, "sigma_source", None),
             _option(cfg, "sigma_stage", None),
         ).to_dict()
+        if standard == "gbt28043":
+            result["GB/T均匀性"] = gbt_homogeneity(data["homogeneity"], sigma)
     groups = data["stability"]
     method = cfg.get("stability_method") or "two_sample"
     if groups:
@@ -226,6 +233,20 @@ def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]
                 ).to_dict()
         if extra:
             result["其他稳定性"] = extra
+        if standard == "gbt28043":
+            if method != "two_sample":
+                raise InputError("GB/T 28043 稳定性模式需要两组样品")
+            u1_raw, u2_raw = cfg.get("stability_u1"), cfg.get("stability_u2")
+            u1 = float(u1_raw) if u1_raw not in (None, "") else None
+            u2 = float(u2_raw) if u2_raw not in (None, "") else None
+            independent = design_options["design"] == "independent"
+            result["GB/T稳定性"] = {
+                name: gbt_stability(
+                    groups["基线"], observations, sigma, u1=u1, u2=u2, independent=independent
+                )
+                for name, observations in groups.items()
+                if name != "基线"
+            }
     if data["participants"]:
         result.update(_participant_results(data, sigma))
     if data.get("assigned_config", {}).get("method"):
@@ -240,6 +261,8 @@ def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]
         ).to_dict()
     if not result:
         raise ValueError("没有可计算的数据")
+    if standard == "gbt28043":
+        result["标准模式"] = standard
     return result
 
 

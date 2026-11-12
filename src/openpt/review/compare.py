@@ -7,6 +7,8 @@ from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
+from ..core.gbt28043 import homogeneity as gbt_homogeneity
+from ..core.gbt28043 import stability as gbt_stability
 from ..core.robust import algorithm_a
 from ..core.stability import analyze as stability
 from ..core.stability import summary_t
@@ -69,11 +71,85 @@ def _t_reproduction(
     return (recommended if model == "recommended" else None), recommended, ""
 
 
+def _standard_value(
+    data: dict[str, Any], result: dict[str, Any], claim: dict[str, Any], mode: str
+) -> Any:
+    """按选定模式重算可比中间量；标准未提供的扩展限值返回空。"""
+    cfg = data.get("config", {})
+    name = claim["name"]
+    group = claim.get("timegroup") or "稳定期"
+    if mode == "gl003":
+        h = result.get("均匀性", {})
+        s = (
+            result.get("稳定性", {})
+            if group == "稳定期"
+            else result.get("其他稳定性", {}).get(group, {})
+        )
+        return {
+            "Ss": h.get("Ss"),
+            "均匀性基本限值": h.get("threshold"),
+            "稳定性均值差": s.get("difference"),
+            "稳定性基本限值": s.get("threshold"),
+        }.get(name)
+    sigma = float(cfg["sigma"]) if cfg.get("sigma") not in (None, "") else None
+    if name in ("Ss", "均匀性基本限值", "均匀性扩展限值") and data.get("homogeneity"):
+        h = gbt_homogeneity(data["homogeneity"], sigma)
+        return h[
+            {"Ss": "ss", "均匀性基本限值": "basic_limit", "均匀性扩展限值": "extended_limit"}[name]
+        ]
+    groups = data.get("stability", {})
+    if (
+        name in ("稳定性均值差", "稳定性基本限值", "稳定性扩展限值")
+        and "基线" in groups
+        and group in groups
+    ):
+        u1 = float(cfg["stability_u1"]) if cfg.get("stability_u1") not in (None, "") else None
+        u2 = float(cfg["stability_u2"]) if cfg.get("stability_u2") not in (None, "") else None
+        s = gbt_stability(
+            groups["基线"],
+            groups[group],
+            sigma,
+            u1=u1,
+            u2=u2,
+            independent=(cfg.get("stability_design") or "independent") == "independent",
+        )
+        return s[
+            {
+                "稳定性均值差": "difference",
+                "稳定性基本限值": "basic_limit",
+                "稳定性扩展限值": "extended_limit",
+            }[name]
+        ]
+    return None
+
+
 def _values(
     data: dict[str, Any], result: dict[str, Any], claim: dict[str, Any]
 ) -> tuple[Any, Any, str]:
     name = claim["name"]
     cfg = data["config"]
+    standard_names = (
+        "Ss",
+        "均匀性基本限值",
+        "均匀性扩展限值",
+        "稳定性均值差",
+        "稳定性基本限值",
+        "稳定性扩展限值",
+    )
+    model = claim.get("model")
+    if name in standard_names and (
+        model in ("gl003", "gbt28043") or name != "Ss" or cfg.get("report_standard")
+    ):
+        selected = cfg.get("criterion_standard") or "gl003"
+        report_mode = (
+            model if model in ("gl003", "gbt28043") else cfg.get("report_standard") or selected
+        )
+        try:
+            report_value = _standard_value(data, result, claim, report_mode)
+            recommended_value = _standard_value(data, result, claim, selected)
+        except ValueError:
+            return None, None, "标准模式所需数据或实验设计不适用"
+        return report_value, recommended_value, f"报告标准模式={report_mode}；推荐模式={selected}"
     if name in ("F", "Ss"):
         value = result.get("均匀性", {}).get(name)
         return value, value, ""
@@ -428,6 +504,30 @@ def review(
     mapping = mapping or {"homogeneity": "均匀性与稳定性评估", "performance": "能力统计量计算"}
     models = {c.get("model") for c in data["claims"] if c.get("name") == "t"}
     rows = []
+    cfg = data.get("config", {})
+    report_standard = cfg.get("report_standard")
+    selected = cfg.get("criterion_standard") or "gl003"
+    if report_standard not in (None, "", "gl003", "gbt28043"):
+        raise ValueError("report_standard 应为 gl003 或 gbt28043")
+    if report_standard and report_standard != selected:
+        rows.append(
+            {
+                "统计量": "标准模式",
+                "声称值": report_standard,
+                "来源": "方法配置",
+                "显示小数位": None,
+                "按报告模型复现值": report_standard,
+                "按推荐模型重算值": selected,
+                "按报告显示值": report_standard,
+                "按推荐显示值": selected,
+                "显示一致": True,
+                "推荐一致": False,
+                "状态": "NOTE",
+                "差异类型": "STANDARD_MODE",
+                "评分条目": _mapping_item(mapping, "标准模式", "homogeneity"),
+                "说明": "报告模式与推荐模式不同；差异不自动认定为报告错误。",
+            }
+        )
     for claim in data["claims"]:
         rows.extend(_review_claim(data, result, claim, models, mapping))
     composite = _composite_row(data, result, mapping)

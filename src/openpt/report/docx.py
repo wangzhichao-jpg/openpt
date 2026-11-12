@@ -330,6 +330,56 @@ def _stability_table(doc: Any, name: str, s: dict[str, Any], sig: int) -> None:
         doc.add_paragraph("设计提示：" + warning)
 
 
+def _gbt_results(doc: Any, result: dict[str, Any], sig: int) -> None:
+    """显示 GB/T 模式的中间量、各项判据及人工设计提示。"""
+    doc.add_heading("GB/T 28043-2019 标准模式（主评价）", 1)
+    doc.add_paragraph("以下分别给出基本和扩展判据；选择及处置由授权人员决定。")
+    h = result.get("GB/T均匀性")
+    if h:
+        doc.add_paragraph("均匀性：B.2.2 式(B.1)、B.2.3、B.3 式(B.10)。")
+        items = [
+            ("样品数 g", "g"),
+            ("重复数 m", "m"),
+            ("总均值", "mean"),
+            ("样品均值标准差 sx", "sx"),
+            ("样品内标准差 sw", "sw"),
+            ("原始方差分量", "variance_raw"),
+            ("样品间标准差 ss", "ss"),
+            ("σ_pt", "sigma"),
+            ("基本限值", "basic_limit"),
+            ("基本判据", "basic_pass"),
+            ("F1", "f1"),
+            ("F2 或 Fm", "f2_or_fm"),
+            ("c", "c"),
+            ("扩展限值 √c", "extended_limit"),
+            ("扩展判据", "extended_pass"),
+            ("重复性检查", "repeatability_check"),
+        ]
+        _table(doc, ["项目", "结果"], [[label, _shown(h.get(key), sig)] for label, key in items])
+        doc.add_paragraph("ss=√max(0,sx²-sw²/m)；c=F1(0.3σ_pt)²+F2或Fm·sw²。")
+        for warning in h["warnings"]:
+            doc.add_paragraph("提示：" + warning)
+    for name, s in result.get("GB/T稳定性", {}).items():
+        doc.add_paragraph(f"稳定性 {name}：B.5.1 式(B.17)、B.5.2 式(B.18)。")
+        items = [
+            ("基线均值", "mean1"),
+            ("后续均值", "mean2"),
+            ("均值差", "difference"),
+            ("σ_pt", "sigma"),
+            ("基本限值", "basic_limit"),
+            ("基本判据", "basic_pass"),
+            ("基线均值标准不确定度", "u1"),
+            ("后续均值标准不确定度", "u2"),
+            ("扩展限值", "extended_limit"),
+            ("扩展判据", "extended_pass"),
+        ]
+        _table(doc, ["项目", "结果"], [[label, _shown(s.get(key), sig)] for label, key in items])
+        doc.add_paragraph("扩展限值=0.3σ_pt+2√(u₁²+u₂²)，假设两均值独立。")
+        for warning in s["warnings"]:
+            doc.add_paragraph("提示：" + warning)
+    doc.add_paragraph("以下 GL003 计算仅为参考，不作为本次选定标准的主评价。")
+
+
 def _other_results(
     doc: Any,
     data: dict[str, Any],
@@ -731,6 +781,10 @@ def make_report(
         )
     doc.add_heading("原始数据", 1)
     _raw_tables(doc, data)
+    if result.get("标准模式") == "gbt28043":
+        _gbt_results(doc, result, sig)
+    else:
+        doc.add_paragraph("标准模式：gl003；GB/T 28043 扩展未作为主评价。")
     _homogeneity(doc, result, mean_places, sig, ss_places, float(cfg.get("alpha") or 0.05))
     _other_results(doc, data, result, sig, mean_places, z_places)
     if differences is not None:
