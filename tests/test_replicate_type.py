@@ -65,6 +65,27 @@ def test_reject_single_with_multiple_repeats(tmp_path: Path) -> None:
         read_workbook(path)
 
 
+def test_gbt_stability_with_single_homogeneity_baseline(tmp_path: Path) -> None:
+    path = tmp_path / "input.xlsx"
+    _workbook(path, "single")
+    book = load_workbook(path)
+    book["方法配置"].append(["criterion_standard", "gbt28043"])
+    book["方法配置"].append(["stability_method", "mean_difference"])
+    book["方法配置"].append(["stability_u1", 0.02])
+    book["方法配置"].append(["stability_u2", 0.03])
+    for uid in (1, 2, 3):
+        for rep in (1, 2):
+            book["稳定性"].append(["稳定期", uid, rep, 1.1, "mg"])
+    book.save(path)
+    assert not inspect_input(path)
+    result = calculate(read_workbook(path))
+    period = result["GB/T稳定性"]["稳定期"]
+    assert period["mean1"] == pytest.approx(1.1)
+    assert period["sw1"] is None and period["repeatability_exceeded"] is None
+    assert period["basic_pass"] is True and period["extended_pass"] is True
+    assert any("重复性未评价" in warning for warning in period["warnings"])
+
+
 def test_adjacent_warning(tmp_path: Path) -> None:
     path = tmp_path / "input.xlsx"
     _workbook(path, "adjacent_specimens")

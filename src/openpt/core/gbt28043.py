@@ -214,9 +214,26 @@ def stability(
     basis: str | None = None,
     independent: bool = True,
     kind: str = "storage",
+    allow_single_baseline: bool = False,
 ) -> dict[str, Any]:
     """按 B.5 评价；B.18 仅在提供两均值独立标准不确定度时计算。"""
-    x, y = _matrix(baseline, "稳定性基线"), _matrix(followup, "稳定性后续组")
+    if not isinstance(allow_single_baseline, bool):
+        raise InputError("单测基线选项必须是布尔值")
+    if allow_single_baseline:
+        try:
+            x = np.asarray(baseline, dtype=float)
+        except (TypeError, ValueError):
+            raise InputError("稳定性基线必须是平衡数值矩阵") from None
+        if (
+            x.ndim != 2
+            or insufficient_units(x.shape[0])
+            or x.shape[1] < 1
+            or not np.isfinite(x).all()
+        ):
+            raise InputError("稳定性基线需要至少两个样品及有限测量值")
+    else:
+        x = _matrix(baseline, "稳定性基线")
+    y = _matrix(followup, "稳定性后续组")
     basis, basic_limit = criterion_limit(sigma, delta_e, basis)
     if not isinstance(independent, bool):
         raise InputError("独立性必须为布尔值")
@@ -228,9 +245,11 @@ def stability(
     with np.errstate(over="ignore", invalid="ignore"):
         mean1, mean2 = float(x.mean()), float(y.mean())
         diff = abs(mean1 - mean2)
-        sw1 = float(np.sqrt(np.mean(np.var(x, axis=1, ddof=1))))
+        sw1 = float(np.sqrt(np.mean(np.var(x, axis=1, ddof=1)))) if x.shape[1] > 1 else None
         sw2 = float(np.sqrt(np.mean(np.var(y, axis=1, ddof=1))))
-    if not all(math.isfinite(v) for v in (mean1, mean2, diff, sw1, sw2)):
+    if not all(math.isfinite(v) for v in (mean1, mean2, diff, sw2)) or (
+        sw1 is not None and not math.isfinite(sw1)
+    ):
         raise InputError("稳定性均值或组内重复性数值溢出")
     basic = compare(diff, basic_limit) <= 0 if basic_limit is not None and independent else None
     extended_limit = (
@@ -252,9 +271,14 @@ def stability(
     if x.shape[0] != y.shape[0] or x.shape[1] != y.shape[1]:
         warnings.append("B.4.2.3-B.4.2.4：两组样品数或重复数不同；使用历史均匀性数据须人工确认")
     repeatability_limit = 0.5 * sigma if sigma is not None else None
-    repeatability_exceeded = (
-        compare(max(sw1, sw2), repeatability_limit) > 0 if repeatability_limit is not None else None
-    )
+    repeatability_exceeded = None
+    if repeatability_limit is not None:
+        if sw1 is not None:
+            repeatability_exceeded = compare(max(sw1, sw2), repeatability_limit) > 0
+        elif compare(sw2, repeatability_limit) > 0:
+            repeatability_exceeded = True
+    if sw1 is None:
+        warnings.append("基线为单测设计，基线组内重复性未评价；应选用重复性足够低的方法")
     if repeatability_exceeded:
         warnings.append("B.4.1.2：组内重复性超过0.5σ_pt，须评估增加样品或重复测量")
     if basis == "delta_e":

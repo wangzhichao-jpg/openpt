@@ -10,6 +10,7 @@ from typing import Any
 from ..config.catalog import ENUMS, HOMOGENEITY_CLAIM_NAMES
 from ..config.sigma import criterion_sigma
 from ..core.decision import compare
+from ..core.gbt28043 import criterion_limit as gbt_criterion_limit
 from ..core.gbt28043 import homogeneity as gbt_homogeneity
 from ..core.gbt28043 import period_options as gbt_period_options
 from ..core.gbt28043 import stability as gbt_stability
@@ -100,8 +101,19 @@ def _standard_value(
             "稳定性基本限值": s.get("threshold"),
         }.get(name)
     sigma = criterion_sigma(cfg)
+    delta_e = cfg.get("delta_e") if cfg.get("delta_e") not in (None, "") else None
+    basis = cfg.get("gbt_criterion_basis") or None
     if name in ("Ss", "均匀性基本限值", "均匀性扩展限值") and data.get("homogeneity"):
-        h = result.get("GB/T均匀性") or gbt_homogeneity(data["homogeneity"], sigma)
+        h = result.get("GB/T均匀性")
+        if not h and cfg.get("replicate_type") == "single":
+            _, limit = gbt_criterion_limit(sigma, delta_e, basis)
+            h = {
+                "ss": result.get("均匀性", {}).get("Ss"),
+                "basic_limit": limit,
+                "extended_limit": None,
+            }
+        if not h:
+            h = gbt_homogeneity(data["homogeneity"], sigma, delta_e=delta_e, basis=basis)
         return h[
             {"Ss": "ss", "均匀性基本限值": "basic_limit", "均匀性扩展限值": "extended_limit"}[name]
         ]
@@ -115,17 +127,24 @@ def _standard_value(
                 "稳定性扩展限值": "extended_limit",
             }[name]
         ]
+    source = cfg.get("baseline_source") or (
+        "homogeneity" if cfg.get("stability_method") == "mean_difference" else "baseline_group"
+    )
+    baseline = data.get("homogeneity") if source == "homogeneity" else groups.get("基线")
     if (
         name in ("稳定性均值差", "稳定性基本限值", "稳定性扩展限值")
-        and "基线" in groups
+        and baseline
         and group in groups
     ):
         settings = gbt_period_options(cfg, groups)
         s = gbt_stability(
-            groups["基线"],
+            baseline,
             groups[group],
             sigma,
+            delta_e=delta_e,
+            basis=basis,
             independent=(cfg.get("stability_design") or "independent") == "independent",
+            allow_single_baseline=source == "homogeneity" and cfg.get("replicate_type") == "single",
             **settings[group],
         )
         return s[

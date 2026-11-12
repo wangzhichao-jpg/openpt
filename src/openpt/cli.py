@@ -464,6 +464,7 @@ def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]
                     delta_e=delta_e,
                     basis=basis_option,
                     independent=independent,
+                    allow_single_baseline=source == "homogeneity" and replicate_type == "single",
                     **settings[name],
                 )
                 if name != "稳定期" and settings[name]["u2"] is None:

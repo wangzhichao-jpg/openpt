@@ -681,21 +681,6 @@ def inspect_input(
             sheet = "方法配置" if category in ("MISSING_CONFIG", "INVALID_CONFIG") else "稳定性"
             cell = config_cells.get(field, "B1") if sheet == "方法配置" else "A1"
             issues.append(Issue(category, sheet, cell, None, message))
-        if (
-            stability_groups
-            and config_values.get("criterion_standard") == "gbt28043"
-            and baseline_source == "homogeneity"
-            and replicate_type == "single"
-        ):
-            issues.append(
-                Issue(
-                    "INSUFFICIENT_REPLICATES",
-                    "均匀性",
-                    "A1",
-                    None,
-                    "当前 GB/T 稳定性基线需要每单元至少两次重复",
-                )
-            )
         if not calculation_data_present:
             issues.append(Issue("NO_DATA", "均匀性", "A1", None, "没有可计算的数据"))
         unique: list[Issue] = []
