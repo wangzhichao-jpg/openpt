@@ -597,6 +597,20 @@ def inspect_input(
         return separated_issues
     try:
         issues: list[Issue] = []
+        for pending in ("趋势稳定性", "传递标准复测"):
+            if pending in book.sheetnames and any(
+                any(value not in (None, "") for value in row)
+                for row in book[pending].iter_rows(min_row=2, values_only=True)
+            ):
+                issues.append(
+                    Issue(
+                        "NOT_IMPLEMENTED",
+                        pending,
+                        "A1",
+                        None,
+                        "该表尚未接入运行流程，不能忽略后继续计算",
+                    )
+                )
         replicate_type = "technical"
         layout = None
         config_values: dict[str, Any] = {}

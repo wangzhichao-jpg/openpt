@@ -594,6 +594,12 @@ def read_workbook(
         if sheet not in book.sheetnames:
             book.create_sheet(sheet).append(headers)
     info, config = _metadata(book)
+    for pending in ("趋势稳定性", "传递标准复测"):
+        if pending in book.sheetnames and any(
+            any(value not in (None, "") for value in row)
+            for row in book[pending].iter_rows(min_row=2, values_only=True)
+        ):
+            raise InputError(f"{pending}: 数据尚未接入运行流程，不能忽略后继续计算")
     separated = split_measurands(book, columns)
     if separated:
         if suffix == ".csv":

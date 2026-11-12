@@ -5,7 +5,9 @@ import pytest
 from openpyxl import Workbook
 
 from openpt.errors import InputError
+from openpt.io.excel import read_workbook, template
 from openpt.io.new_stability import read_transfer_sheet, read_trend_sheet
+from openpt.io.validation import inspect_input
 
 
 def test_trend_long_and_wide_provenance() -> None:
@@ -30,6 +32,27 @@ def test_trend_long_and_wide_provenance() -> None:
     sheet["D2"] = "=1+1"
     with pytest.raises(InputError, match="D2"):
         read_trend_sheet(book)
+
+
+@pytest.mark.parametrize("sheet_name", ["趋势稳定性", "传递标准复测"])
+def test_not_yet_connected_fails_closed(tmp_path, sheet_name: str) -> None:
+    from openpyxl import load_workbook
+
+    path = tmp_path / "input.xlsx"
+    template(path)
+    book = load_workbook(path)
+    book["项目信息"]["B2"] = "合成"
+    book["项目信息"]["B3"] = "V"
+    sheet = book.create_sheet(sheet_name)
+    sheet.append(["字段"])
+    sheet.append(["非空数据"])
+    book.save(path)
+    assert any(
+        issue.category == "NOT_IMPLEMENTED" and issue.sheet == sheet_name
+        for issue in inspect_input(path)
+    )
+    with pytest.raises(InputError, match="尚未接入运行流程"):
+        read_workbook(path)
 
 
 def test_transfer_stage_and_duplicates() -> None:
