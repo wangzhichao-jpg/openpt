@@ -104,10 +104,9 @@ def test_explicit_layout_and_measurand_fail_closed(tmp_path: Path) -> None:
     book["均匀性"]["E1"] = "被测量"
     book["均匀性"]["E2"] = "甲"
     book.save(path)
-    assert any(
-        i.category == "UNSUPPORTED_MEASURAND" and i.cell == "E2" for i in inspect_input(path)
-    )
-    with pytest.raises(InputError, match="被测量"):
+    with pytest.raises(InputError, match="被测量缺失"):
+        inspect_input(path)
+    with pytest.raises(InputError, match="被测量缺失"):
         read_workbook(path)
 
 

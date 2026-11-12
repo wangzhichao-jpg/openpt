@@ -116,6 +116,10 @@ def _calculate_snapshot(root: Path, config: dict[str, Any]) -> tuple[Any, Any, A
     data["config"] = config["expanded_config"]
     if "expanded_assigned_config" in config:
         data["assigned_config"] = config["expanded_assigned_config"]
+    for part in data.get("measurands", {}).values():
+        part["config"] = {**config["expanded_config"], **part["measurand_overrides"]}
+        if "expanded_assigned_config" in config:
+            part["assigned_config"] = config["expanded_assigned_config"]
     result = calculate(data, review_mode=config["command"] == "review")
     mapping_path = root / "input" / "mapping.json"
     mapping = _mapping(mapping_path) if mapping_path.exists() else None

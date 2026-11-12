@@ -594,6 +594,12 @@ def review(
     data: dict[str, Any], result: dict[str, Any], mapping: dict[str, Any] | None = None
 ) -> list[dict[str, Any]]:
     """比较 GL002 和 GL003 计算结果、报告模型和声称值。"""
+    if data.get("measurands"):
+        rows = []
+        for name, part in data["measurands"].items():
+            for row in review(part, result["被测量"][name], mapping):
+                rows.append({"被测量": name, **row})
+        return rows
     mapping = mapping or {"homogeneity": "均匀性与稳定性评估", "performance": "能力统计量计算"}
     models = {c.get("model") for c in data["claims"] if c.get("name") == "t"}
     rows = []
@@ -710,6 +716,8 @@ def write_csv(path: str | Path, rows: list[dict[str, Any]]) -> None:
         "评分条目",
         "说明",
     ]
+    if any("被测量" in row for row in rows):
+        fields.insert(0, "被测量")
     with open(path, "w", encoding="utf-8-sig", newline="") as f:
         w = csv.DictWriter(f, fieldnames=fields)
         w.writeheader()

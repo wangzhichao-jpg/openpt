@@ -40,8 +40,15 @@ def decide(
         result_bytes = (root / "result.json").read_bytes()
         result_hash = hashlib.sha256(result_bytes).hexdigest()
         original_result = json.loads(result_bytes)
-        available = sorted(original_result)
-        custom_item = item not in original_result
+        if isinstance(original_result.get("被测量"), dict):
+            available = sorted(
+                f"被测量:{name}/{key}"
+                for name, result in original_result["被测量"].items()
+                for key in result
+            )
+        else:
+            available = sorted(original_result)
+        custom_item = item not in available
         if custom_item and not allow_new_item:
             raise InputError("结果中不存在该条目；可用条目：" + "、".join(available))
         decisions_path = root / "decisions.jsonl"

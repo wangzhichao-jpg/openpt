@@ -825,9 +825,89 @@ def make_report(
     differences: list[dict[str, Any]] | None = None,
     input_sha256: str | None = None,
     decisions: list[dict[str, Any]] | None = None,
+    *,
+    _document: Any = None,
 ) -> None:
     """生成 GL003、GL002 计算书；附录保留未经修约的计算值。"""
-    doc = Document()
+    doc = Document() if _document is None else _document
+    if data.get("measurands") and _document is None:
+        doc.add_heading("计算结论（须经人工复核签字）", 0)
+        for name in data["measurands"]:
+            sub = result["被测量"][name]
+            h = sub.get("GB/T均匀性") or sub.get("均匀性") or {}
+            if not h:
+                doc.add_paragraph(f"被测量 {name}：未提供均匀性数据，本次未评价。")
+            elif "selected_rule" in h:
+                rule = h["selected_rule"]
+                clause = "B.1.2" if h.get("m") == 1 else "B.2.3" if rule == "extended" else "B.2.2"
+                doc.add_paragraph(
+                    f"被测量 {name}；均匀性（GB/T 28043 {clause}）：{_shown(h.get('conclusion'))}；"
+                    f"ss={_shown(h.get('ss'))}；限值={_shown(h.get(rule + '_limit'))}。"
+                )
+            else:
+                clause = "GB/T 28043 B.1.2" if h.get("method") == "single" else "GL003 4.3"
+                f_note = (
+                    ""
+                    if h.get("method") == "single"
+                    else f"；GL003 4.2 F={_shown(h.get('F'))}，"
+                    f"临界值={_shown(h.get('F_critical'))}（参考）"
+                )
+                doc.add_paragraph(
+                    f"被测量 {name}；均匀性（{clause}）：{_shown(h.get('Ss_pass'))}；"
+                    f"Ss={_shown(h.get('Ss'))}；限值={_shown(h.get('threshold'))}{f_note}。"
+                )
+            periods = sub.get("GB/T稳定性") or (
+                {"稳定期": sub["稳定性"], **sub.get("其他稳定性", {})} if sub.get("稳定性") else {}
+            )
+            if not periods:
+                doc.add_paragraph(f"被测量 {name}：未提供稳定性数据，本次未评价稳定性。")
+            for group, period in periods.items():
+                if "selected_rule" in period:
+                    rule = period["selected_rule"]
+                    clause = "B.5.2" if rule == "extended" else "B.5.1"
+                    doc.add_paragraph(
+                        f"被测量 {name}，稳定性 {group}（GB/T 28043 {clause}）："
+                        f"{_shown(period.get('conclusion'))}；均值差={_shown(period.get('difference'))}；"
+                        f"限值={_shown(period.get(rule + '_limit'))}。"
+                    )
+                elif period.get("method") == "mean_difference":
+                    doc.add_paragraph(
+                        f"被测量 {name}，稳定性 {group}（GL003 5.3）："
+                        f"{_shown(period.get('mean_difference_pass'))}；"
+                        f"均值差={_shown(period.get('difference'))}；0.3σ={_shown(period.get('threshold'))}。"
+                    )
+                else:
+                    doc.add_paragraph(
+                        f"被测量 {name}，稳定性 {group}（GL003 5.2）："
+                        f"{_shown(period.get('pass'))}；"
+                        f"t={_shown(period.get('t'))}；临界值={_shown(period.get('critical'))}；"
+                        f"5.3 均值差={_shown(period.get('difference'))}（参考）。"
+                    )
+        for name, part in data["measurands"].items():
+            doc.add_page_break()
+            doc.add_heading("被测量：" + name, 0)
+            selected_differences = (
+                [row for row in differences if row.get("被测量") == name]
+                if differences is not None
+                else None
+            )
+            prefix = f"被测量:{name}/"
+            selected_decisions = [
+                {**item, "item": str(item.get("item", ""))[len(prefix) :]}
+                for item in decisions or []
+                if str(item.get("item", "")).startswith(prefix)
+            ]
+            make_report(
+                path,
+                part,
+                result["被测量"][name],
+                selected_differences,
+                input_sha256,
+                selected_decisions,
+                _document=doc,
+            )
+        doc.save(str(path))
+        return
     section = doc.sections[0]
     section.page_width, section.page_height = Cm(21), Cm(29.7)
     section.left_margin, section.right_margin = Cm(1.5), Cm(1.5)
@@ -971,4 +1051,5 @@ def make_report(
             paragraph.add_run(line).font.name = "Consolas"
     doc.add_heading("附录：原始数据及单元格来源", 1)
     _raw_tables(doc, data)
-    doc.save(str(path))
+    if _document is None:
+        doc.save(str(path))

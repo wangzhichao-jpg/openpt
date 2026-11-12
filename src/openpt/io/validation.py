@@ -5,6 +5,7 @@ import csv
 import math
 import re
 from dataclasses import asdict, dataclass, replace
+from io import BytesIO
 from pathlib import Path
 from typing import Any
 
@@ -14,6 +15,7 @@ from openpyxl.utils.cell import column_index_from_string, coordinate_from_string
 from ..errors import InputError
 from .excel import PARTICIPANT_OPTIONAL, SHEETS
 from .layout import wide_to_long
+from .measurands import DATA_SHEETS, split_measurands
 from .shape import insufficient_homogeneity_replicates, insufficient_units
 
 MEASUREMENT_SHEETS = ("均匀性", "稳定性", "参加者结果")
@@ -320,16 +322,17 @@ def _check_numeric_config(
 
 
 def inspect_input(
-    path: str | Path,
+    path: str | Path | BytesIO,
     mapping: dict[str, Any] | None = None,
     *,
     encoding: str = "utf-8-sig",
     csv_sheet: str = "均匀性",
 ) -> list[Issue]:
     """只读检查测量表；CSV 按显式编码严格解码，默认兼容 UTF-8 BOM。"""
-    source = Path(path)
+    source = path if isinstance(path, BytesIO) else Path(path)
+    suffix = ".xlsx" if isinstance(source, BytesIO) else source.suffix.lower()
     mapping = mapping or {}
-    if source.suffix.lower() == ".csv":
+    if suffix == ".csv" and isinstance(source, Path):
         if csv_sheet not in MEASUREMENT_SHEETS:
             raise InputError("CSV 工作表类型无效")
         try:
@@ -346,10 +349,48 @@ def inspect_input(
                 for issue in _check_rows(csv_sheet, normalized, [], {}, csv_numbers=True)
             ]
         return measurand_issues + _check_rows(csv_sheet, rows, [], mapping, csv_numbers=True)
-    if source.suffix.lower() != ".xlsx":
+    if suffix != ".xlsx":
         raise InputError("只支持 XLSX 或 CSV")
-    book = load_workbook(source, data_only=False, read_only=True)
-    values = load_workbook(source, data_only=True, read_only=True)
+    if isinstance(source, BytesIO):
+        payload = source.getvalue()
+        book = load_workbook(BytesIO(payload), data_only=False, read_only=True)
+        values = load_workbook(BytesIO(payload), data_only=True, read_only=True)
+    else:
+        book = load_workbook(source, data_only=False, read_only=True)
+        values = load_workbook(source, data_only=True, read_only=True)
+    has_measurand = any(
+        _unsupported_measurand(
+            sheet, [list(row) for row in book[sheet].iter_rows(values_only=True)]
+        )
+        for sheet in DATA_SHEETS
+        if sheet in book.sheetnames
+    )
+    has_measurand_config = "被测量配置" in book.sheetnames and any(
+        any(value not in (None, "") for value in row)
+        for row in book["被测量配置"].iter_rows(min_row=2, values_only=True)
+    )
+    if has_measurand or has_measurand_config:
+        book.close()
+        values.close()
+        editable = load_workbook(BytesIO(payload) if isinstance(source, BytesIO) else source)
+        try:
+            separated = split_measurands(editable, mapping)
+        finally:
+            editable.close()
+        separated_issues = []
+        for item in separated:
+            for issue in inspect_input(BytesIO(item["bytes"]), mapping):
+                original = item["sources"].get(f"{issue.sheet}!{issue.cell}")
+                sheet, cell = original.split("!", 1) if original else (issue.sheet, issue.cell)
+                separated_issues.append(
+                    replace(
+                        issue,
+                        sheet=sheet,
+                        cell=cell,
+                        message=f"被测量 {item['name']}：{issue.message}",
+                    )
+                )
+        return separated_issues
     try:
         issues: list[Issue] = []
         replicate_type = "technical"

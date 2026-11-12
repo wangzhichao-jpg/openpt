@@ -8,6 +8,7 @@ from collections import defaultdict
 from collections.abc import Iterator
 from contextlib import suppress
 from decimal import Decimal
+from io import BytesIO
 from math import isfinite
 from pathlib import Path
 from typing import Any
@@ -18,6 +19,7 @@ from openpyxl.worksheet.datavalidation import DataValidation
 
 from ..errors import InputError
 from .layout import wide_to_long
+from .measurands import split_measurands
 from .shape import insufficient_homogeneity_replicates
 
 SHEETS = {
@@ -71,6 +73,7 @@ def template(path: str | Path) -> None:
         ("指定值与不确定度", "选填：需要指定值建模和不确定度评定时填写。"),
         ("算法S", "选填：需要稳健联合标准差或极差时填写。"),
         ("候选批次", "选填：需要记录候选批次时填写。"),
+        ("被测量配置", "选填：多个被测量分别登记单位、sigma 等；数据表和声称值的被测量列须对应。"),
         (
             "σ 与 σ_pt",
             "sigma 用于均匀性及稳定性判据；sigma_pt 是 z 等评价统计量的分母。"
@@ -110,6 +113,11 @@ def template(path: str | Path) -> None:
         ws.cell(1, 1).comment = Comment("示例不参与计算，请复制表头和数据到正式工作表。", "OpenPT")
     for col, header in enumerate(("标准不确定度u(x)", "扩展不确定度U(x)", "包含因子k"), 4):
         book["参加者结果"].cell(1, col, header)
+    for name in ("均匀性", "稳定性", "报告声称值"):
+        ws = book[name]
+        ws.cell(1, ws.max_column + 1, "被测量")
+    options_sheet = book.create_sheet("被测量配置")
+    options_sheet.append(["被测量", "字段", "值", "（选填）"])
     for name in set(SHEETS) - {"项目信息"}:
         ws = book[name]
         ws.cell(1, ws.max_column + 1, "（选填）")
@@ -502,7 +510,7 @@ def _batches(book: Any) -> list[dict[str, Any]]:
 
 
 def read_workbook(
-    path: str | Path,
+    path: str | Path | BytesIO,
     columns: dict[str, Any] | None = None,
     *,
     encoding: str = "utf-8-sig",
@@ -511,8 +519,9 @@ def read_workbook(
     project: str = "CSV 输入",
 ) -> dict[str, Any]:
     """读取 XLSX 或单测量表 CSV；CSV 单位必须由使用者明确登记。"""
-    source = Path(path)
-    if source.suffix.lower() == ".csv":
+    source = path if isinstance(path, BytesIO) else Path(path)
+    suffix = ".xlsx" if isinstance(source, BytesIO) else source.suffix.lower()
+    if suffix == ".csv" and isinstance(source, Path):
         if csv_sheet not in ("均匀性", "稳定性", "参加者结果") or not unit:
             raise InputError("CSV 导入须指定有效表类型和 --unit")
         try:
@@ -554,7 +563,9 @@ def read_workbook(
             for cell in row:
                 if cell.data_type == "f":
                     cell.data_type = "s"
-    elif source.suffix.lower() == ".xlsx":
+    elif suffix == ".xlsx":
+        if isinstance(source, BytesIO):
+            source.seek(0)
         book = load_workbook(source, data_only=False)
     else:
         raise InputError("只支持 XLSX 或 CSV")
@@ -565,15 +576,22 @@ def read_workbook(
     if missing:
         raise InputError("缺少工作表：" + ", ".join(sorted(missing)))
     info, config = _metadata(book)
-    for name in ("均匀性", "稳定性", "报告声称值"):
-        ws = book[name]
-        columns_with_measurand = [cell.column for cell in ws[1] if cell.value == "被测量"]
-        if columns_with_measurand and any(
-            ws.cell(row, column).value not in (None, "")
-            for column in columns_with_measurand
-            for row in range(2, ws.max_row + 1)
-        ):
-            raise InputError(f"{name}：当前版本尚不能按被测量分别计算，拒绝混合数据")
+    separated = split_measurands(book, columns)
+    if separated:
+        if suffix == ".csv":
+            raise InputError("CSV 多被测量输入不支持，请使用 XLSX")
+        subdata = {}
+        for item in separated:
+            part = read_workbook(BytesIO(item["bytes"]), columns)
+            for virtual, original in item["sources"].items():
+                if virtual in part["numeric_sources"]:
+                    part["numeric_sources"][original] = part["numeric_sources"].pop(virtual)
+            part["measurand_overrides"] = {
+                key: value for key, value in part["config"].items() if config.get(key) != value
+            }
+            subdata[item["name"]] = part
+        first = next(iter(subdata.values()))
+        return {**first, "info": info, "config": config, "measurands": subdata}
     precision: list[int] = []
     replicate_type = config.get("replicate_type") or "technical"
     if replicate_type not in ("technical", "adjacent_specimens", "other", "single"):

@@ -270,6 +270,13 @@ def _select_gbt_rule(result: dict[str, Any], rule: str) -> None:
 
 def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]:
     """根据输入选择 GL003 与 GL002 计算方法。"""
+    if data.get("measurands"):
+        return {
+            "被测量": {
+                name: calculate(part, review_mode=review_mode)
+                for name, part in data["measurands"].items()
+            }
+        }
     cfg = data["config"]
     alpha = float(_option(cfg, "alpha", 0.05))
     sigma = criterion_sigma(cfg)
