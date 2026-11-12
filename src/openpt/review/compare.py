@@ -82,7 +82,12 @@ def _t_reproduction(
                 (f"按报告修约中间值重算；报告 s1={cfg['s1']}，推荐模型 s1={selected.get('s1')}"),
             )
         return None, recommended, "报告显示汇总量不完整"
-    return (recommended if model == "recommended" else None), recommended, ""
+    note = (
+        "t 值仅供参考，不作为 GL003 5.3 均值差结论"
+        if selected.get("method") == "mean_difference"
+        else ""
+    )
+    return (recommended if model == "recommended" else None), recommended, note
 
 
 def _standard_value(
@@ -202,11 +207,7 @@ def _values(
             recommended_value = _standard_value(data, result, claim, selected)
         except ValueError:
             return None, None, "标准模式所需数据或实验设计不适用"
-        note = (
-            ""
-            if report_mode == selected and cfg.get("stability_method") == "mean_difference"
-            else f"报告标准模式={report_mode}；推荐模式={selected}"
-        )
+        note = "" if report_mode == selected else f"报告标准模式={report_mode}；推荐模式={selected}"
         if selected == "gbt28043" and name.endswith("限值"):
             rule_key = "gbt_hom_rule" if name.startswith("均匀性") else "gbt_stability_rule"
             primary = cfg.get(rule_key) or "basic"

@@ -180,7 +180,22 @@ def analyze(
             )
         if any(len(unit) != 2 for unit in followup):
             warnings.append("GL003 5.3 注：每个抽取样品重复测试2次；当前重复次数不全为2")
+        reference_t: dict[str, Any] = {}
+        if baseline is not None:
+            try:
+                reference_t = _two_sample(baseline, y, alpha, "unit_pooled")
+            except InputError:
+                # 5.2 参考计算不能阻断 5.3 主判据，也不附加 5.2 样本量提示。
+                reference_t = {}
         return StabilityResult(
+            t=reference_t.get("t"),
+            df=reference_t.get("df"),
+            p=reference_t.get("p"),
+            critical=reference_t.get("critical"),
+            se=reference_t.get("se", 0.0),
+            s1=reference_t.get("s1", 0.0),
+            s2=reference_t.get("s2"),
+            n1=reference_t.get("n1", 0),
             difference=difference,
             mean1=reference,
             mean2=mean,

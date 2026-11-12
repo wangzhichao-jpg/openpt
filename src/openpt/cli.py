@@ -442,6 +442,17 @@ def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]
                 ).to_dict()
         if extra:
             result["其他稳定性"] = extra
+        all_periods = [result["稳定性"], *extra.values()]
+        if (
+            method == "mean_difference"
+            and groups.get("基线")
+            and any(p.get("t") is not None for p in all_periods)
+        ):
+            baseline_mean = sum(sum(row) / len(row) for row in groups["基线"]) / len(groups["基线"])
+            for period in all_periods:
+                if period.get("t") is not None:
+                    period["t_reference_baseline_mean"] = baseline_mean
+                    period["t_reference_baseline_source"] = "稳定性表基线"
         if replicate_type == "adjacent_specimens" and method == "mean_difference":
             for period in [result["稳定性"], *extra.values()]:
                 period["design_warnings"].append(

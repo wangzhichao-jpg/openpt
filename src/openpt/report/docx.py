@@ -298,7 +298,12 @@ def _stability_table(doc: Any, name: str, s: dict[str, Any], sig: int) -> None:
     doc.add_paragraph("实验层级：" + str(s.get("observation_level", "unit_means")))
     doc.add_paragraph("按用户登记的独立设计计算；独立性未由软件自动验证。")
     if s.get("method") == "mean_difference":
-        doc.add_paragraph("采用 GL003 5.3 均值差法作为主判据；不进行 t 检验。")
+        doc.add_paragraph("采用 GL003 5.3 均值差法作为主判据。")
+        if s.get("t") is not None:
+            doc.add_paragraph(
+                f"按稳定性表基线组计算的两均值 t={_shown(s['t'], sig)}，"
+                f"临界值={_shown(s.get('critical'), sig)}；仅供参考，不作为 5.3 的结论。"
+            )
     names = [
         ("均值差", "difference"),
         ("t 值", "t"),

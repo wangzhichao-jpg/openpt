@@ -80,6 +80,20 @@ def test_chinese_f_aliases_and_spaced_threshold() -> None:
     assert all(row["评分条目"] == "均匀性与稳定性评估" for row in rows)
 
 
+def test_optional_t_is_reference_only() -> None:
+    data = _data()
+    baseline = [[1.0, 1.1], [2.0, 2.1], [3.0, 3.1]]
+    data["stability"]["基线"] = baseline
+    selected = calculate(data)["稳定性"]
+    reference = analyze(baseline, data["stability"]["稳定期"], 3.0)
+    assert selected["t"] == pytest.approx(reference.t)
+    assert selected["t_reference_baseline_mean"] == pytest.approx(reference.mean1)
+    assert selected["t_reference_baseline_source"] == "稳定性表基线"
+    assert selected["pass"] is None
+    assert selected["mean_difference_pass"] is True
+    assert not any("5.2" in warning for warning in selected["design_warnings"])
+
+
 def test_named_periods_without_reserved_followup_group() -> None:
     data = _data()
     data["stability"] = {"7月": data["stability"]["稳定期"], "6月": data["stability"]["后期"]}
