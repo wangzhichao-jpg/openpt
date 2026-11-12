@@ -159,11 +159,12 @@ def _raw_tables(doc: Any, data: dict[str, Any]) -> None:
     numeric_sources = data.get("numeric_sources", {})
     if numeric_sources:
         doc.add_paragraph("数值单元格追溯（未经修约）：")
-        _table(
-            doc,
-            ["工作表!单元格", "原始数值"],
-            [[location, str(value)] for location, value in numeric_sources.items()],
-        )
+        entries = [[location, str(value)] for location, value in numeric_sources.items()]
+        paired = [
+            entries[i] + (entries[i + 1] if i + 1 < len(entries) else ["", ""])
+            for i in range(0, len(entries), 2)
+        ]
+        _table(doc, ["工作表!单元格", "原始数值", "工作表!单元格", "原始数值"], paired)
 
 
 def _homogeneity(
@@ -903,8 +904,8 @@ def make_report(
                         f"5.3 均值差={_shown(period.get('difference'))}（参考）。"
                     )
         for name, part in data["measurands"].items():
-            doc.add_page_break()
-            doc.add_heading("被测量：" + name, 0)
+            heading = doc.add_heading("被测量：" + name, 0)
+            heading.paragraph_format.page_break_before = True
             selected_differences = (
                 [row for row in differences if row.get("被测量") == name]
                 if differences is not None
@@ -1082,8 +1083,8 @@ def make_report(
         )
     doc.add_paragraph("计算人：________________    日期：____________")
     doc.add_paragraph("复核人：________________    日期：____________")
-    doc.add_page_break()
-    doc.add_heading("附录：全精度记录", 1)
+    heading = doc.add_heading("附录：全精度记录", 1)
+    heading.paragraph_format.page_break_before = True
     doc.add_paragraph("软件版本：" + __version__)
     doc.add_paragraph("输入文件 SHA-256：" + (input_sha256 or "未提供"))
     doc.add_paragraph("生成时间：" + datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"))

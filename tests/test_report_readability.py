@@ -20,12 +20,31 @@ def test_unprovided_data_and_appendix(tmp_path: Path) -> None:
     assert "不会被评价，请确认没有应评而未填的项目" in text
     assert "放行" not in text
     assert paragraphs.index("附录：原始数据及单元格来源") > paragraphs.index("人工复核")
+    appendix = next(p for p in doc.paragraphs if p.text == "附录：全精度记录")
+    assert appendix.paragraph_format.page_break_before is True
     assert '  "示例": {' in paragraphs
     assert '    "value": 1.23456789' in paragraphs
     code = doc.paragraphs[paragraphs.index('    "value": 1.23456789')]
     assert code.paragraph_format.space_before.pt == 0
     assert code.paragraph_format.space_after.pt == 0
     assert code.paragraph_format.line_spacing == 1.0
+
+
+def test_provenance_two_up_keeps_every_value(tmp_path: Path) -> None:
+    path = tmp_path / "sources.docx"
+    data = {
+        "info": {},
+        "config": {},
+        "sources": ["均匀性!C2", "均匀性!C3"],
+        "numeric_sources": {"均匀性!C2": 1.2, "均匀性!C3": 1.3, "配置!B2": 0.2},
+    }
+    make_report(path, data, {})
+    cells = [
+        cell.text for table in Document(path).tables for row in table.rows for cell in row.cells
+    ]
+    assert all(
+        value in cells for value in ("均匀性!C2", "均匀性!C3", "配置!B2", "1.2", "1.3", "0.2")
+    )
 
 
 def test_gbt_summary_and_section_order(tmp_path: Path) -> None:
