@@ -134,6 +134,7 @@ def template(path: str | Path) -> None:
         ("independent", ""),
         ("known_components", ""),
         ("expert_values", ""),
+        ("hom_source", "manual"),
     ]:
         assigned.append(assigned_row)
     for cell, options in [
@@ -144,6 +145,7 @@ def template(path: str | Path) -> None:
         ("B15", '"TRUE,FALSE"'),
         ("B16", '"TRUE,FALSE"'),
         ("B19", '"TRUE,FALSE"'),
+        ("B22", '"manual,gbt_ss"'),
     ]:
         validation = DataValidation(type="list", formula1=options)
         assigned.add_data_validation(validation)

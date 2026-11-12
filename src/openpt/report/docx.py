@@ -497,6 +497,7 @@ def _assigned_table(doc: Any, result: dict[str, Any]) -> None:
         ("σ_pt 确定程序", "sigma_procedure"),
         ("评价标准差 σ′", "sigma_prime"),
         ("u_hom", "u_hom"),
+        ("均匀性分量来源", "hom_source"),
         ("均匀性分量映射", "hom_mapping"),
         ("基础值含均匀性分量", "hom_in_base"),
         ("u_stab", "u_stab"),

@@ -50,9 +50,35 @@ def test_homogeneity_zero_and_outside_table() -> None:
         homogeneity([[0, 0]] * 10, 1e308)
 
 
+@pytest.mark.parametrize("g, available", [(6, False), (7, True), (20, True), (21, False)])
+def test_extended_table_boundaries(g: int, available: bool) -> None:
+    result = homogeneity([[float(i), float(i)] for i in range(g)], 1)
+    assert (result["extended_pass"] is not None) is available
+    assert bool(result["f1"] is not None) is available
+
+
+def test_homogeneity_criterion_boundaries() -> None:
+    data = [[float(i), float(i)] for i in range(10)]
+    reference = homogeneity(data, 1)
+    ss = reference["ss"]
+    basic_sigma = ss / 0.3
+    assert homogeneity(data, basic_sigma * (1 - 1e-8))["basic_pass"] is False
+    assert homogeneity(data, basic_sigma)["basic_pass"] is True
+    assert homogeneity(data, basic_sigma * (1 + 1e-8))["basic_pass"] is True
+    extended_sigma = ss / (0.3 * math.sqrt(reference["f1"]))
+    assert homogeneity(data, extended_sigma * (1 - 1e-8))["extended_pass"] is False
+    assert homogeneity(data, extended_sigma)["extended_pass"] is True
+    assert homogeneity(data, extended_sigma * (1 + 1e-8))["extended_pass"] is True
+    repeat = 0.5 / math.sqrt(2)
+    assert homogeneity([[-repeat, repeat]] * 10, 1)["repeatability_check"] is False
+    assert homogeneity([[-repeat * 0.99, repeat * 0.99]] * 10, 1)["repeatability_check"] is True
+
+
 def test_homogeneity_multiple_repeats() -> None:
     result = homogeneity([[float(i), float(i + 1), float(i + 2)] for i in range(10)], 5)
     assert result["f2_or_fm"] == pytest.approx(f.ppf(0.95, 9, 20) / 3)
+    with pytest.raises(InputError):
+        homogeneity([[0.0]] * 10, 1)
 
 
 def test_stability_boundaries_and_independence() -> None:
@@ -64,6 +90,10 @@ def test_stability_boundaries_and_independence() -> None:
     assert r["basic_pass"] is False and r["extended_pass"] is True
     assert stability(a, b, 1, independent=False)["basic_pass"] is None
     assert stability(a, b, None)["extended_pass"] is None
+    limit = 0.3 + 2 * math.hypot(0.01, 0.01)
+    for factor, expected in ((1 - 1e-8, True), (1, True), (1 + 1e-8, False)):
+        followup = [[limit * factor] * 2] * 2
+        assert stability(a, followup, 1, u1=0.01, u2=0.01)["extended_pass"] is expected
     with pytest.raises(InputError):
         stability(a, b, 1, u1=-1)
 
@@ -108,6 +138,32 @@ def test_template_and_workflow(tmp_path: Path) -> None:
     text = "\n".join(p.text for p in Document(target).paragraphs)
     assert "GB/T 28043-2019 标准模式（主评价）" in text
     assert "GL003 计算仅为参考" in text
+
+    data["stability"]["运输期"] = [[0.1, 0.2], [0.2, 0.3], [0.3, 0.4]]
+    transported = calculate(data)["GB/T稳定性"]["运输期"]
+    assert transported["basic_pass"] is not None
+    assert transported["extended_pass"] is None
+    assert any("不复用" in warning for warning in transported["warnings"])
+
+    data["assigned_config"] = {
+        "method": "known",
+        "value": 10.0,
+        "uncertainty": 0.2,
+        "source": "合成",
+        "uncertainty_source": "合成预算",
+        "sigma_final": 2.0,
+        "sigma_procedure": "预设",
+        "hom_source": "gbt_ss",
+        "hom_mapping": "sigma_prime",
+    }
+    mapped = calculate(data)["指定值与不确定度"]
+    assert mapped["u_hom"] == pytest.approx(result["GB/T均匀性"]["ss"])
+    assert mapped["sigma_prime"] == pytest.approx(math.hypot(2, mapped["u_hom"]))
+    data["assigned_config"]["hom_in_base"] = True
+    assert calculate(data)["指定值与不确定度"]["status"] == "DESIGN_REVIEW"
+    data["assigned_config"]["u_hom"] = 0.1
+    with pytest.raises(InputError, match="不得同时"):
+        calculate(data)
 
 
 @pytest.mark.r

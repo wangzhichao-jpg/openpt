@@ -70,7 +70,7 @@ def _participant_results(data: dict[str, Any], sigma: float | None) -> dict[str,
     return result
 
 
-def _assigned_results(data: dict[str, Any]) -> dict[str, Any]:
+def _assigned_results(data: dict[str, Any], calculations: dict[str, Any]) -> dict[str, Any]:
     """执行指定值建模和 GL002 4.4.1.3 选定统计量。"""
     a = data.get("assigned_config", {})
     keys = (
@@ -90,6 +90,20 @@ def _assigned_results(data: dict[str, Any]) -> dict[str, Any]:
         "stab_in_base",
     )
     options = {key: a[key] for key in keys if key in a}
+    hom_source = a.get("hom_source") or "manual"
+    if hom_source not in ("manual", "gbt_ss"):
+        raise InputError("hom_source 应为 manual 或 gbt_ss")
+    if hom_source == "gbt_ss":
+        if _option(data["config"], "criterion_standard", "gl003") != "gbt28043":
+            raise InputError("从标准模式引用 ss 须选择 gbt28043")
+        h = calculations.get("GB/T均匀性")
+        if not h:
+            raise InputError("引用 ss 须提供均匀性数据")
+        if a.get("hom_mapping") not in ("assigned", "sigma_prime", "both"):
+            raise InputError("引用 ss 须明确登记分量映射")
+        if a.get("u_hom") not in (None, "", 0, 0.0):
+            raise InputError("引用 ss 时不得同时手工输入 u_hom")
+        options["u_hom"] = h["ss"]
     for key in ("known_components", "expert_values"):
         if a.get(key) not in (None, ""):
             if not isinstance(a[key], str):
@@ -102,6 +116,8 @@ def _assigned_results(data: dict[str, Any]) -> dict[str, Any]:
         a["method"], participants=[p["value"] for p in data["participants"]], **options
     )
     assigned_details = assigned.to_dict()
+    if hom_source == "gbt_ss":
+        assigned_details["hom_source"] = "GB/T 28043-2019 B.3 ss"
     assigned_details.update(
         {key: a.get(key) for key in ("U_assigned", "k_assigned", "independent")}
     )
@@ -240,17 +256,26 @@ def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]
             u1 = float(u1_raw) if u1_raw not in (None, "") else None
             u2 = float(u2_raw) if u2_raw not in (None, "") else None
             independent = design_options["design"] == "independent"
-            result["GB/T稳定性"] = {
-                name: gbt_stability(
-                    groups["基线"], observations, sigma, u1=u1, u2=u2, independent=independent
+            gbt_periods = {}
+            for name, observations in groups.items():
+                if name == "基线":
+                    continue
+                period = gbt_stability(
+                    groups["基线"],
+                    observations,
+                    sigma,
+                    u1=u1,
+                    u2=u2 if name == "稳定期" else None,
+                    independent=independent,
                 )
-                for name, observations in groups.items()
-                if name != "基线"
-            }
+                if name != "稳定期" and u2 is not None:
+                    period["warnings"].append("额外时点不复用稳定期均值不确定度；须分别评定")
+                gbt_periods[name] = period
+            result["GB/T稳定性"] = gbt_periods
     if data["participants"]:
         result.update(_participant_results(data, sigma))
     if data.get("assigned_config", {}).get("method"):
-        result.update(_assigned_results(data))
+        result.update(_assigned_results(data, result))
     if data.get("algorithm_s_values"):
         result["算法S"] = algorithm_s(
             data["algorithm_s_values"],

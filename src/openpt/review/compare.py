@@ -110,7 +110,7 @@ def _standard_value(
             groups[group],
             sigma,
             u1=u1,
-            u2=u2,
+            u2=u2 if group == "稳定期" else None,
             independent=(cfg.get("stability_design") or "independent") == "independent",
         )
         return s[
