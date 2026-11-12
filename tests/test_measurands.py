@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pytest
 from docx import Document
+from docx.oxml.ns import qn
+from docx.text.paragraph import Paragraph
 from openpyxl import load_workbook
 
 from openpt.cli import calculate, main
@@ -78,6 +80,19 @@ def test_multi_calculation_review_and_reproduction(tmp_path: Path) -> None:
         cell.text for table in revision.tables for row in table.rows for cell in row.cells
     )
     assert "需补充" in text
+    per_measurement: dict[str, str] = {"甲": "", "乙": ""}
+    current = ""
+    for element in revision.element.body:
+        if element.tag == qn("w:p"):
+            label = Paragraph(element, revision).text
+            if label.startswith("被测量："):
+                current = label.removeprefix("被测量：")
+        elif element.tag == qn("w:tbl") and current in per_measurement:
+            per_measurement[current] += " ".join(
+                node.text or "" for node in element.iter(qn("w:t"))
+            )
+    assert "需补充" in per_measurement["甲"]
+    assert "需补充" not in per_measurement["乙"]
     assert main(["pack", str(run), "-o", str(tmp_path / "audit.zip")]) == 0
     assert main(["verify", str(tmp_path / "audit.zip")]) == 0
 
