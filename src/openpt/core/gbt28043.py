@@ -48,11 +48,14 @@ def homogeneity(data: Any, sigma: float | None) -> dict[str, Any]:
     else:
         # 原文前言更正后 F_m：F 分位数除以 m，未减 1。
         f2 = float(f.ppf(0.95, g - 1, g * (m - 1)) / m)
-    c = (
-        f1 * limit**2 + f2 * sw2
-        if f1 is not None and f2 is not None and limit is not None
-        else None
-    )
+    try:
+        c = (
+            f1 * limit**2 + f2 * sw2
+            if f1 is not None and f2 is not None and limit is not None
+            else None
+        )
+    except OverflowError:
+        raise InputError("均匀性扩展限值数值溢出") from None
     if c is not None and not math.isfinite(c):
         raise InputError("均匀性扩展限值数值溢出")
     extended_limit = math.sqrt(c) if c is not None else None

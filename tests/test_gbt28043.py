@@ -46,6 +46,8 @@ def test_homogeneity_zero_and_outside_table() -> None:
     assert homogeneity([[0, 0]] * 10, None)["basic_pass"] is None
     with pytest.raises(InputError):
         homogeneity([[1, 2], [3]], 1)
+    with pytest.raises(InputError, match="溢出"):
+        homogeneity([[0, 0]] * 10, 1e308)
 
 
 def test_homogeneity_multiple_repeats() -> None:

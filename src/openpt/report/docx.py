@@ -330,10 +330,14 @@ def _stability_table(doc: Any, name: str, s: dict[str, Any], sig: int) -> None:
         doc.add_paragraph("设计提示：" + warning)
 
 
-def _gbt_results(doc: Any, result: dict[str, Any], sig: int) -> None:
+def _gbt_results(doc: Any, result: dict[str, Any], cfg: dict[str, Any], sig: int) -> None:
     """显示 GB/T 模式的中间量、各项判据及人工设计提示。"""
     doc.add_heading("GB/T 28043-2019 标准模式（主评价）", 1)
     doc.add_paragraph("以下分别给出基本和扩展判据；选择及处置由授权人员决定。")
+    doc.add_paragraph(
+        f"σ_pt 阶段：{cfg.get('sigma_stage') or '未登记'}；"
+        f"来源：{cfg.get('sigma_source') or '未登记'}。"
+    )
     h = result.get("GB/T均匀性")
     if h:
         doc.add_paragraph("均匀性：B.2.2 式(B.1)、B.2.3、B.3 式(B.10)。")
@@ -517,7 +521,7 @@ def _assigned_table(doc: Any, result: dict[str, Any]) -> None:
     doc.add_paragraph(assigned.get("formula", ""))
     doc.add_paragraph(
         "扩展方法：u(X)=√(u_base²+Σu分量²)，σ′=√(σ_pt²+Σu分量²)；"
-        "假定分量独立，σ′ 映射须经批准，ISO 13528 待核对条款号。"
+        "假定分量独立；均匀性 σ′ 见 GB/T 28043-2019 B.2.5 式(B.3)，多分量扩展须经批准。"
     )
     for warning in assigned.get("warnings", []):
         doc.add_paragraph("设计提示：" + warning)
@@ -782,7 +786,7 @@ def make_report(
     doc.add_heading("原始数据", 1)
     _raw_tables(doc, data)
     if result.get("标准模式") == "gbt28043":
-        _gbt_results(doc, result, sig)
+        _gbt_results(doc, result, cfg, sig)
     else:
         doc.add_paragraph("标准模式：gl003；GB/T 28043 扩展未作为主评价。")
     _homogeneity(doc, result, mean_places, sig, ss_places, float(cfg.get("alpha") or 0.05))
