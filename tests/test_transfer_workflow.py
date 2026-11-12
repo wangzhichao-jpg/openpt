@@ -74,6 +74,8 @@ def test_transfer_full_flow(tmp_path: Path) -> None:
     result = calculate(data)
     point = result["传递标准稳定性"]["STD1|P1"]
     assert point["delta_max"] == pytest.approx(0.3) and point["U_E"] == pytest.approx(0.6)
+    assert result["传递标准汇总"]["standards"]["STD1"]["conclusion"] is True
+    assert result["传递标准汇总"]["conclusion"] is True
     score = result["参加者统计量"]["P"]["En"]
     assert score["value"] == pytest.approx(1 / math.hypot(2, 1, 0.6))
     issue = next(row for row in review(data, result) if row["统计量"] == "Δmax")

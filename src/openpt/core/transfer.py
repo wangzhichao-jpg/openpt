@@ -129,8 +129,10 @@ def assess_point(
         "count": len(values) if summarized_delta is None else None,
         "delta_max": delta,
         "criteria": results,
-        "conclusion": all(r["pass"] is True for r in results)
-        if all(r["pass"] is not None for r in results)
+        "conclusion": False
+        if any(r["pass"] is False for r in results)
+        else True
+        if all(r["pass"] is True for r in results)
         else None,
     }
 
@@ -247,6 +249,28 @@ def assess_transfer(
             result["uncertainty_status"] = "NOT_EVALUATED"
         results[key] = result
     return results
+
+
+def summarize_transfer(points: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    """先按标准器汇总各校准点，再给出总体三态结论。"""
+    groups: dict[str, dict[str, Any]] = {}
+    for point in points.values():
+        standard = str(point["standard"])
+        groups.setdefault(standard, {})[str(point["point"])] = point["conclusion"]
+
+    def conclude(values: list[Any]) -> bool | None:
+        if any(value is False for value in values):
+            return False
+        return True if values and all(value is True for value in values) else None
+
+    grouped = {
+        key: {"points": values, "conclusion": conclude(list(values.values()))}
+        for key, values in groups.items()
+    }
+    return {
+        "standards": grouped,
+        "conclusion": conclude([entry["conclusion"] for entry in grouped.values()]),
+    }
 
 
 def en_with_stability(

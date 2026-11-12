@@ -1146,6 +1146,13 @@ def make_report(
     elif not result.get("传递标准稳定性"):
         doc.add_paragraph("未提供稳定性数据，本次未评价稳定性。")
     if result.get("传递标准稳定性"):
+        doc.add_paragraph(
+            "传递标准总体结论：" + _shown(result.get("传递标准汇总", {}).get("conclusion")) + "。"
+        )
+        for standard, summary in result.get("传递标准汇总", {}).get("standards", {}).items():
+            doc.add_paragraph(
+                f"传递标准 {standard} 各校准点汇总结论：{_shown(summary['conclusion'])}。"
+            )
         for name, point in result["传递标准稳定性"].items():
             doc.add_paragraph(
                 f"传递标准 {name}：{_shown(point['conclusion'])}；"

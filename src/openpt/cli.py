@@ -24,7 +24,7 @@ from .core.homogeneity import analyze_single as single_homogeneity
 from .core.robust import algorithm_a, algorithm_s, median_niqr
 from .core.scores import performance_score
 from .core.stability import analyze as stability
-from .core.transfer import assess_transfer
+from .core.transfer import assess_transfer, summarize_transfer
 from .core.trend import configured_uncertainty, fit_series
 from .core.zscore import zscore
 from .errors import InputError
@@ -408,6 +408,7 @@ def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]
         if not configs:
             raise InputError("传递标准设计须登记逐点配置")
         result["传递标准稳定性"] = assess_transfer(data.get("transfer_observations", []), configs)
+        result["传递标准汇总"] = summarize_transfer(result["传递标准稳定性"])
     elif data.get("transfer_observations") or data.get("transfer_config"):
         raise InputError("传递标准数据须选择 transfer_standard 设计")
     if data["homogeneity"]:
