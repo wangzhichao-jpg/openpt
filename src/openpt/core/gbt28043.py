@@ -74,7 +74,7 @@ def homogeneity(data: Any, sigma: float | None) -> dict[str, Any]:
         warnings.append("B.3：样品间方差估计为负，按零处理")
     if basic is False:
         warnings.append(
-            "B.2.5：考虑重新制备、将样品间差异计入σ′或指定值不确定度；须审核且防止重复计入"
+            "基本判据未满足；如预选主判据未通过，按 B.2.5 审核重新制备或分量处置并防止重复计入"
         )
     return {
         "standard": "gbt28043",
@@ -204,7 +204,7 @@ def stability(
     if not independent:
         warnings.append("相关或配对数据不适用独立样品模型，需人工审核")
     if basic is False:
-        warnings.append("B.5.3：评估不稳定性影响、改进制备储存或不进行能力评价")
+        warnings.append("基本判据未满足；如预选主判据未通过，按 B.5.3 审核不稳定性影响及处置")
     return {
         "standard": "gbt28043",
         "reference": "GB/T 28043-2019 B.5.1-B.5.2" + ("、B.6" if kind == "transport" else ""),

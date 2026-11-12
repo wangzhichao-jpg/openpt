@@ -132,7 +132,8 @@ def test_template_and_workflow(tmp_path: Path) -> None:
     book["方法配置"]["B22"] = 0.1
     book["方法配置"]["B23"] = 0.2
     book["方法配置"]["B24"] = "gl003"
-    assert any("B21" in str(v.sqref) for v in book["方法配置"].data_validations.dataValidation)
+    ranges = [str(v.sqref) for v in book["方法配置"].data_validations.dataValidation]
+    assert all(any(cell in r for r in ranges) for cell in ("B21", "B26", "B27"))
     for i in range(10):
         for j in range(2):
             book["均匀性"].append([str(i), str(j), i + j / 10, "mg"])
@@ -206,6 +207,43 @@ def test_template_and_workflow(tmp_path: Path) -> None:
     assert calculate(data)["指定值与不确定度"]["status"] == "DESIGN_REVIEW"
     data["assigned_config"]["u_hom"] = 0.1
     with pytest.raises(InputError, match="不得同时"):
+        calculate(data)
+
+
+def test_preselected_primary_rule_and_no_fallback(tmp_path: Path) -> None:
+    path = tmp_path / "data.xlsx"
+    template(path)
+    book = load_workbook(path)
+    book["项目信息"]["B2"] = "合成"
+    book["项目信息"]["B3"] = "mg"
+    book.save(path)
+    data = read_workbook(path)
+    data["config"].update({"criterion_standard": "gbt28043", "sigma": 10})
+    data["homogeneity"] = [[float(i), float(i)] for i in range(10)]
+    data["stability"] = {"基线": [[0, 0], [0, 0]], "稳定期": [[3.1, 3.1], [3.1, 3.1]]}
+    basic = calculate(data)
+    assert basic["GB/T均匀性"]["basic_pass"] is False
+    assert basic["GB/T均匀性"]["extended_pass"] is True
+    assert basic["GB/T均匀性"]["conclusion"] is False
+    assert basic["GB/T稳定性"]["稳定期"]["conclusion"] is False
+    data["config"].update({"gbt_hom_rule": "extended", "gbt_stability_rule": "extended"})
+    extended = calculate(data)
+    assert extended["主判据"]["homogeneity_selected_rule"] == "extended"
+    assert extended["GB/T均匀性"]["conclusion"] is True
+    assert extended["GB/T稳定性"]["稳定期"]["conclusion"] is None
+    target = tmp_path / "selected.docx"
+    make_report(target, data, extended)
+    table_text = "\n".join(
+        cell.text for table in Document(target).tables for row in table.rows for cell in row.cells
+    )
+    assert "预选主判据" in table_text and "主结论" in table_text
+    assert "未评价（未提供数据或无法计算）" in table_text
+    data["config"].update({"stability_u1": 0.1, "stability_u2": 0.1})
+    assert calculate(data)["GB/T稳定性"]["稳定期"]["conclusion"] is True
+    data["homogeneity"] = data["homogeneity"][:6]
+    assert calculate(data)["GB/T均匀性"]["conclusion"] is None
+    data["config"]["gbt_hom_rule"] = "invalid"
+    with pytest.raises(InputError, match="basic 或 extended"):
         calculate(data)
 
 

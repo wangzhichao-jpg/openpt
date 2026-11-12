@@ -174,6 +174,16 @@ def _assigned_results(data: dict[str, Any], calculations: dict[str, Any]) -> dic
     return result
 
 
+def _select_gbt_rule(result: dict[str, Any], rule: str) -> None:
+    """记录预选判据；缺少数据时不静默切换到另一判据。"""
+    result["selected_rule"] = rule
+    result["conclusion"] = result[f"{rule}_pass"]
+    if result["conclusion"] is None:
+        result["warnings"].append("预选主判据未评价，不得视为通过；须补足数据或审核设计")
+    elif result["conclusion"] is False:
+        result["warnings"].append("预选主判据未通过，须由授权人员审核并记录处置")
+
+
 def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]:
     """根据输入选择 GL003 与 GL002 计算方法。"""
     cfg = data["config"]
@@ -185,6 +195,12 @@ def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]
     standard = _option(cfg, "criterion_standard", "gl003")
     if standard not in ("gl003", "gbt28043"):
         raise InputError("criterion_standard 应为 gl003 或 gbt28043")
+    hom_rule = _option(cfg, "gbt_hom_rule", "basic")
+    stab_rule = _option(cfg, "gbt_stability_rule", "basic")
+    if standard == "gbt28043" and (
+        hom_rule not in ("basic", "extended") or stab_rule not in ("basic", "extended")
+    ):
+        raise InputError("GB/T 判据应为 basic 或 extended")
     result = {}
     if data["homogeneity"]:
         strict = cfg.get("strict_homogeneity", False)
@@ -199,7 +215,9 @@ def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]
             _option(cfg, "sigma_stage", None),
         ).to_dict()
         if standard == "gbt28043":
-            result["GB/T均匀性"] = gbt_homogeneity(data["homogeneity"], sigma)
+            gbt_hom = gbt_homogeneity(data["homogeneity"], sigma)
+            _select_gbt_rule(gbt_hom, hom_rule)
+            result["GB/T均匀性"] = gbt_hom
     groups = data["stability"]
     method = cfg.get("stability_method") or "two_sample"
     if groups:
@@ -268,6 +286,7 @@ def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]
                 )
                 if name != "稳定期" and settings[name]["u2"] is None:
                     period["warnings"].append("额外时点不复用稳定期均值不确定度；须分别评定")
+                _select_gbt_rule(period, stab_rule)
                 gbt_periods[name] = period
             result["GB/T稳定性"] = gbt_periods
     if data["participants"]:
@@ -297,8 +316,15 @@ def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]
             "standard": standard,
             "homogeneity_basic": h.get("basic_pass"),
             "homogeneity_extended": h.get("extended_pass"),
+            "homogeneity_selected_rule": hom_rule,
+            "homogeneity_conclusion": h.get("conclusion"),
             "stability": {
-                name: {"basic": s["basic_pass"], "extended": s["extended_pass"]}
+                name: {
+                    "basic": s["basic_pass"],
+                    "extended": s["extended_pass"],
+                    "selected_rule": s["selected_rule"],
+                    "conclusion": s["conclusion"],
+                }
                 for name, s in result.get("GB/T稳定性", {}).items()
             },
         }

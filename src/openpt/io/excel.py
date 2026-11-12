@@ -94,6 +94,8 @@ def template(path: str | Path) -> None:
         ("后续均值标准不确定度（stability_u2）", ""),
         ("报告采用标准模式（report_standard）", ""),
         ("逐时点设置JSON（stability_period_options）", ""),
+        ("均匀性预选判据（gbt_hom_rule）", "basic"),
+        ("稳定性预选判据（gbt_stability_rule）", "basic"),
     ]:
         book["方法配置"].append(config_row)
     for cell, options in [
@@ -109,6 +111,8 @@ def template(path: str | Path) -> None:
         ("B18", '"gl002,absolute"'),
         ("B21", '"gl003,gbt28043"'),
         ("B24", '"gl003,gbt28043"'),
+        ("B26", '"basic,extended"'),
+        ("B27", '"basic,extended"'),
     ]:
         validation = DataValidation(type="list", formula1=options)
         book["方法配置"].add_data_validation(validation)

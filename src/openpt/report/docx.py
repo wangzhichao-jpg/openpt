@@ -333,7 +333,9 @@ def _stability_table(doc: Any, name: str, s: dict[str, Any], sig: int) -> None:
 def _gbt_results(doc: Any, result: dict[str, Any], cfg: dict[str, Any], sig: int) -> None:
     """显示 GB/T 模式的中间量、各项判据及人工设计提示。"""
     doc.add_heading("GB/T 28043-2019 标准模式（主评价）", 1)
-    doc.add_paragraph("以下分别给出基本和扩展判据；选择及处置由授权人员决定。")
+    doc.add_paragraph(
+        "基本和扩展判据均供核查；主判据须在试验前选定，另一结果仅供参考，处置由授权人员决定。"
+    )
     doc.add_paragraph(
         f"σ_pt 阶段：{cfg.get('sigma_stage') or '未登记'}；"
         f"来源：{cfg.get('sigma_source') or '未登记'}。"
@@ -357,6 +359,8 @@ def _gbt_results(doc: Any, result: dict[str, Any], cfg: dict[str, Any], sig: int
             ("c", "c"),
             ("扩展限值 √c", "extended_limit"),
             ("扩展判据", "extended_pass"),
+            ("预选主判据", "selected_rule"),
+            ("主结论", "conclusion"),
             ("重复性检查", "repeatability_check"),
         ]
         _table(doc, ["项目", "结果"], [[label, _shown(h.get(key), sig)] for label, key in items])
@@ -377,6 +381,8 @@ def _gbt_results(doc: Any, result: dict[str, Any], cfg: dict[str, Any], sig: int
             ("后续均值标准不确定度", "u2"),
             ("扩展限值", "extended_limit"),
             ("扩展判据", "extended_pass"),
+            ("预选主判据", "selected_rule"),
+            ("主结论", "conclusion"),
         ]
         _table(doc, ["项目", "结果"], [[label, _shown(s.get(key), sig)] for label, key in items])
         doc.add_paragraph("扩展限值=0.3σ_pt+2√(u₁²+u₂²)，假设两均值独立。")
