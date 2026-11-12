@@ -110,3 +110,8 @@ def test_transfer_a_and_duplicate_protection(tmp_path: Path) -> None:
     assert result["参加者统计量"]["P"]["En"]["status"] == "OK"
     data["assigned_config"]["stab_in_base"] = True
     assert calculate(data)["参加者统计量"]["P"]["En"]["status"] == "DESIGN_REVIEW"
+    data["assigned_config"]["stab_in_base"] = False
+    data["transfer_config"]["STD1|P1"]["uncertainty"]["U_E"] = 0.3
+    mixed = calculate(data)
+    assert mixed["传递标准稳定性"]["STD1|P1"]["uncertainty_status"] == "DESIGN_REVIEW"
+    assert mixed["参加者统计量"]["P"]["En"]["status"] == "DESIGN_REVIEW"

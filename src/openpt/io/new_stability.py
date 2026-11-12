@@ -30,10 +30,17 @@ def _value(cell: Any, *, numeric: bool = False) -> Any:
     value = cell.value
     if value is None or value == "":
         raise InputError(f"{cell.parent.title}!{cell.coordinate}: 必填值缺失")
-    if numeric and (
-        isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value)
-    ):
-        raise InputError(f"{cell.parent.title}!{cell.coordinate}: 须为有限数")
+    if numeric:
+        try:
+            valid = (
+                not isinstance(value, bool)
+                and isinstance(value, (int, float))
+                and math.isfinite(value)
+            )
+        except OverflowError:
+            valid = False
+        if not valid:
+            raise InputError(f"{cell.parent.title}!{cell.coordinate}: 须为有限数")
     return float(value) if numeric else value
 
 
@@ -166,6 +173,8 @@ def read_transfer_config(book: Any) -> dict[str, dict[str, Any]]:
             else {}
         )
         source = str(_value(cells["出处"]))
+        if not source.strip():
+            raise InputError(f"传递标准配置!{cells['出处'].coordinate}: 出处不能为空")
         summary = cells["汇总变差"]
         result[key] = {
             "standard": standard,
