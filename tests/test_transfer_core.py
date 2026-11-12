@@ -39,6 +39,20 @@ def test_single_and_two_sample_t() -> None:
     ]
     result = assess_point(rows, criteria)
     assert all(rule["pass"] is True for rule in result["criteria"])
+    overridden = assess_point(
+        rows,
+        [
+            {
+                "kind": "one_sample",
+                "reference": 1.15,
+                "critical_override": 2.0,
+                "critical_source": "报告",
+            }
+        ],
+    )
+    assert overridden["criteria"][0]["limit"] == 2.0
+    with pytest.raises(InputError, match="来源"):
+        assess_point(rows, [{"kind": "one_sample", "reference": 1.15, "critical_override": 2.0}])
     with pytest.raises(InputError):
         assess_point([], criteria, summarized_delta=0.2)
 

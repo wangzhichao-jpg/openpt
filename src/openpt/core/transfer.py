@@ -85,6 +85,13 @@ def assess_point(
                     method="two_sample",
                 )
             t, critical = result.t, result.critical
+            if rule.get("critical_override") is not None:
+                critical = _number(rule["critical_override"], "报告临界值", positive=True)
+                if (
+                    not isinstance(rule.get("critical_source"), str)
+                    or not rule["critical_source"].strip()
+                ):
+                    raise InputError("采用报告临界值时须登记来源")
             passed = (
                 None
                 if t is None or critical is None
@@ -97,6 +104,9 @@ def assess_point(
                     "kind": kind,
                     "value": t,
                     "limit": critical,
+                    "critical_source": rule.get("critical_source")
+                    if rule.get("critical_override") is not None
+                    else "GL003 两侧 t 分位数",
                     "inclusive": inclusive,
                     "pass": passed,
                     "detail": result.to_dict(),
