@@ -55,6 +55,60 @@ def _anova(data: Any) -> dict[str, Any]:
     }
 
 
+def analyze_single(data: Any, sigma: float | None = None) -> dict[str, Any]:
+    """B.1.2：不可重复测量时，用单测样本标准差保守估计不均匀性。"""
+    try:
+        groups = [np.asarray(row, dtype=float) for row in data]
+    except (ValueError, TypeError):
+        raise InputError("均匀性数据须为数值序列") from None
+    if insufficient_units(len(groups)) or any(
+        row.ndim != 1 or len(row) != 1 or not np.isfinite(row).all() for row in groups
+    ):
+        raise InputError("单测设计至少需要两个单元且每单元恰好一次有限测量")
+    if sigma is not None and (not math.isfinite(sigma) or sigma <= 0):
+        raise InputError("sigma 必须为正有限数")
+    with np.errstate(over="ignore", invalid="ignore"):
+        values = np.asarray([row[0] for row in groups])
+        mean, sx = float(values.mean()), float(values.std(ddof=1))
+    if not math.isfinite(mean) or not math.isfinite(sx):
+        raise InputError("数据范围导致数值溢出")
+    threshold = 0.3 * sigma if sigma is not None else None
+    passed = compare(sx, threshold) <= 0 if threshold is not None else None
+    return {
+        "method": "single",
+        "status": "OK",
+        "design_status": "DESIGN_WARNING",
+        "design_warnings": ["GB/T 28043-2019 B.1.2：选用重复性标准差足够低的测量方法"],
+        "warnings": ["单测标准差含测量误差，以其代替样品间标准差的结论偏保守"],
+        "g": len(groups),
+        "m": 1,
+        "counts": [1] * len(groups),
+        "n0": None,
+        "means": values.tolist(),
+        "mean": mean,
+        "SS_between": None,
+        "SS_within": None,
+        "df_between": len(groups) - 1,
+        "df_within": None,
+        "MS_between": None,
+        "MS_within": None,
+        "F": None,
+        "F_critical": None,
+        "p": None,
+        "variance_raw": None,
+        "Ss": sx,
+        "sigma": sigma,
+        "threshold": threshold,
+        "F_pass": None,
+        "Ss_pass": passed,
+        "Ss_status": "OK" if sigma is not None else "NOT_EVALUATED",
+        "strict": False,
+        "conclusion": passed,
+        "sigma_source": None,
+        "sigma_stage": None,
+    }
+
+
 def analyze(
     data: Any,
     sigma: float | None = None,

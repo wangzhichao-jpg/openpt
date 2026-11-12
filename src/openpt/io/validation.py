@@ -63,6 +63,7 @@ def _check_rows(
     *,
     csv_numbers: bool = False,
     formulas: set[str] | None = None,
+    replicate_type: str = "technical",
 ) -> list[Issue]:
     """检查缺失、单位、编号、非数值和没有缓存的公式。"""
     if not rows:
@@ -152,13 +153,18 @@ def _check_rows(
             if value("重复编号") not in (None, ""):
                 repeats.add(str(value("重复编号")))
     for uid, (repeats, row_number, original) in homogeneity_units.items():
-        if insufficient_homogeneity_replicates(len(repeats)):
+        bad_single = replicate_type == "single" and len(repeats) != 1
+        bad_repeats = replicate_type != "single" and insufficient_homogeneity_replicates(
+            len(repeats)
+        )
+        if bad_single or bad_repeats:
             cell = f"{get_column_letter(positions['值'] + 1)}{row_number}"
-            issues.append(
-                Issue(
-                    "INSUFFICIENT_REPLICATES", sheet, cell, original, f"单元 {uid} 至少需要两次重复"
-                )
+            message = (
+                f"单元 {uid} 单测设计须恰好测量一次"
+                if bad_single
+                else f"单元 {uid} 至少需要两次重复"
             )
+            issues.append(Issue("INSUFFICIENT_REPLICATES", sheet, cell, original, message))
     groups = {"均匀性": homogeneity_units} if homogeneity_units else {}
     groups.update(stability_units)
     for name, group in groups.items():
@@ -307,6 +313,37 @@ def inspect_input(
     values = load_workbook(source, data_only=True, read_only=True)
     try:
         issues: list[Issue] = []
+        replicate_type = "technical"
+        if "方法配置" in book.sheetnames:
+            config_rows = [list(row) for row in book["方法配置"].iter_rows(values_only=True)]
+            if config_rows:
+                positions = _positions(config_rows[0], "方法配置", mapping)
+                for index, row in enumerate(config_rows[1:], 2):
+                    key = row[positions["字段"]] if positions["字段"] < len(row) else None
+                    match = re.search(r"（([a-zA-Z_][a-zA-Z_0-9]*)）$", str(key))
+                    if (match.group(1) if match else str(key)) != "replicate_type":
+                        continue
+                    col = positions["值"]
+                    value = row[col] if col < len(row) else None
+                    if value not in (
+                        None,
+                        "",
+                        "technical",
+                        "adjacent_specimens",
+                        "other",
+                        "single",
+                    ):
+                        issues.append(
+                            Issue(
+                                "INVALID_CONFIG",
+                                "方法配置",
+                                f"{get_column_letter(col + 1)}{index}",
+                                value,
+                                "重复性质无效",
+                            )
+                        )
+                    else:
+                        replicate_type = value or "technical"
         project_unit: Any = None
         if "项目信息" in book.sheetnames:
             for row in book["项目信息"].iter_rows(min_row=2, values_only=True):
@@ -322,7 +359,11 @@ def inspect_input(
             rows = [[cell.value for cell in row] for row in cells]
             formulas = {cell.coordinate for row in cells for cell in row if cell.data_type == "f"}
             cached = [list(row) for row in values[sheet].iter_rows(values_only=True)]
-            issues.extend(_check_rows(sheet, rows, cached, mapping, formulas=formulas))
+            issues.extend(
+                _check_rows(
+                    sheet, rows, cached, mapping, formulas=formulas, replicate_type=replicate_type
+                )
+            )
             if rows:
                 position = _positions(rows[0], sheet, mapping)["单位"]
                 for index, row in enumerate(rows[1:], 2):

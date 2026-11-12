@@ -95,7 +95,7 @@ def _standard_value(
         }.get(name)
     sigma = float(cfg["sigma"]) if cfg.get("sigma") not in (None, "") else None
     if name in ("Ss", "均匀性基本限值", "均匀性扩展限值") and data.get("homogeneity"):
-        h = gbt_homogeneity(data["homogeneity"], sigma)
+        h = result.get("GB/T均匀性") or gbt_homogeneity(data["homogeneity"], sigma)
         return h[
             {"Ss": "ss", "均匀性基本限值": "basic_limit", "均匀性扩展限值": "extended_limit"}[name]
         ]
@@ -638,6 +638,23 @@ def review(
                 "差异类型": "MODEL_SWITCH",
                 "评分条目": _mapping_item(mapping, "稳定性方法", "homogeneity"),
                 "说明": "报告声明的方法与配置不同，须按报告实际方法重新配置并复核。",
+            }
+        )
+    if cfg.get("replicate_type") == "adjacent_specimens" and data.get("homogeneity"):
+        rows.append(
+            {
+                "统计量": "重复性质设计",
+                "声称值": None,
+                "来源": "方法配置",
+                "显示小数位": None,
+                "按报告模型复现值": None,
+                "按推荐模型重算值": None,
+                "显示一致": None,
+                "推荐一致": None,
+                "状态": "NOTE",
+                "差异类型": "DESIGN_WARNING|DESTRUCTIVE_ADJACENT",
+                "评分条目": _mapping_item(mapping, "重复性质设计", "homogeneity"),
+                "说明": "扩展提示：组内方差包含相邻试件之间的差异，可能低估样品间不均匀性。",
             }
         )
     for claim in data["claims"]:

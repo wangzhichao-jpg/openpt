@@ -11,11 +11,13 @@ from zipfile import BadZipFile
 
 from . import __version__
 from .core.assigned import AssignedResult, assign_value
+from .core.decision import compare
 from .core.gbt28043 import criterion_limit as gbt_criterion_limit
 from .core.gbt28043 import homogeneity as gbt_homogeneity
 from .core.gbt28043 import period_options as gbt_period_options
 from .core.gbt28043 import stability as gbt_stability
 from .core.homogeneity import analyze as homogeneity
+from .core.homogeneity import analyze_single as single_homogeneity
 from .core.robust import algorithm_a, algorithm_s, median_niqr
 from .core.scores import performance_score
 from .core.stability import analyze as stability
@@ -197,7 +199,11 @@ def _assigned_results(
     ):
         assigned_details["consensus_algorithm_rule"] = calculations["算法A"]["rule"]
     if hom_source == "gbt_ss":
-        assigned_details["hom_source"] = "GB/T 28043-2019 B.3 ss"
+        assigned_details["hom_source"] = (
+            "GB/T 28043-2019 B.1.2 单测标准差"
+            if calculations.get("GB/T均匀性", {}).get("m") == 1
+            else "GB/T 28043-2019 B.3 ss"
+        )
     assigned_details.update(
         {key: a.get(key) for key in ("U_assigned", "k_assigned", "independent")}
     )
@@ -284,23 +290,63 @@ def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]
         hom_rule not in ("basic", "extended") or stab_rule not in ("basic", "extended")
     ):
         raise InputError("GB/T 判据应为 basic 或 extended")
+    replicate_type = _option(cfg, "replicate_type", "technical")
+    if replicate_type not in ("technical", "adjacent_specimens", "other", "single"):
+        raise InputError("replicate_type 应为 technical、adjacent_specimens、other 或 single")
     result: dict[str, Any] = {}
     if data["homogeneity"]:
         strict = cfg.get("strict_homogeneity", False)
         if not isinstance(strict, bool):
             raise ValueError("strict_homogeneity 必须是布尔值")
-        result["均匀性"] = homogeneity(
-            data["homogeneity"],
-            sigma,
-            alpha,
-            strict,
-            _option(cfg, "sigma_source", None),
-            _option(cfg, "sigma_stage", None),
-        ).to_dict()
-        if standard == "gbt28043":
-            gbt_hom = gbt_homogeneity(
-                data["homogeneity"], sigma, delta_e=delta_e, basis=basis_option
+        if replicate_type == "single":
+            if strict:
+                raise InputError("单测设计不能使用要求 F 检验的严格配置")
+            if not 0 < alpha < 1:
+                raise InputError("alpha 必须在 0 和 1 之间")
+            stage = _option(cfg, "sigma_stage", None)
+            if stage not in (None, "temporary", "final"):
+                raise InputError("sigma 阶段应为 temporary 或 final")
+            result["均匀性"] = single_homogeneity(data["homogeneity"], sigma)
+            result["均匀性"]["sigma_source"] = _option(cfg, "sigma_source", None)
+            result["均匀性"]["sigma_stage"] = stage if sigma is not None else None
+            if sigma is not None and stage == "temporary":
+                result["均匀性"]["Ss_status"] = "PROVISIONAL"
+        else:
+            result["均匀性"] = homogeneity(
+                data["homogeneity"],
+                sigma,
+                alpha,
+                strict,
+                _option(cfg, "sigma_source", None),
+                _option(cfg, "sigma_stage", None),
+            ).to_dict()
+        if replicate_type == "adjacent_specimens":
+            result["均匀性"]["warnings"].append(
+                "扩展提示：组内方差包含相邻试件之间的差异，可能低估样品间不均匀性"
             )
+        if standard == "gbt28043":
+            if replicate_type == "single":
+                _, limit = gbt_criterion_limit(sigma, delta_e, basis_option)
+                sx = result["均匀性"]["Ss"]
+                gbt_hom = {
+                    "g": len(data["homogeneity"]),
+                    "m": 1,
+                    "mean": result["均匀性"]["mean"],
+                    "sx": sx,
+                    "ss": sx,
+                    "sigma": sigma,
+                    "basic_limit": limit,
+                    "basic_pass": compare(sx, limit) <= 0 if limit is not None else None,
+                    "extended_limit": None,
+                    "extended_pass": None,
+                    "warnings": [
+                        "B.1.2：单测标准差含测量误差，须选择重复性足够好的方法；扩展判据未评价"
+                    ],
+                }
+            else:
+                gbt_hom = gbt_homogeneity(
+                    data["homogeneity"], sigma, delta_e=delta_e, basis=basis_option
+                )
             _select_gbt_rule(gbt_hom, hom_rule)
             result["GB/T均匀性"] = gbt_hom
     groups = data["stability"]
@@ -374,6 +420,12 @@ def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]
                 ).to_dict()
         if extra:
             result["其他稳定性"] = extra
+        if replicate_type == "adjacent_specimens" and method == "mean_difference":
+            for period in [result["稳定性"], *extra.values()]:
+                period["design_warnings"].append(
+                    "GL003 5.3 注要求每个样品重复测试2次；相邻试件是破坏性检测的替代设计，须审核"
+                )
+                period["design_status"] = "DESIGN_WARNING"
         if standard == "gbt28043":
             if method not in ("two_sample", "mean_difference"):
                 raise InputError("GB/T 28043 稳定性模式需要两组样品")

@@ -180,6 +180,14 @@ def _homogeneity(
     if not h:
         doc.add_paragraph("未提供均匀性数据。")
         return
+    if h.get("method") == "single":
+        doc.add_paragraph("GB/T 28043-2019 B.1.2：不能重复测量时，以单测结果标准差作为 s_s。")
+        doc.add_paragraph(
+            f"单测标准差 s_x={_shown(h['Ss'], sig)}；限值 0.3σ={_shown(h['threshold'], sig)}；"
+            f"结论：{_shown(h['Ss_pass'])}。不进行 F 检验。"
+        )
+        doc.add_paragraph("s_x 中含有测量误差，因此结论偏保守；应选用重复性标准差足够低的方法。")
+        return
     _table(
         doc,
         ["变异来源", "自由度", "平方和", "均方", "F", "F 临界值", "p"],
@@ -374,14 +382,17 @@ def _gbt_results(doc: Any, result: dict[str, Any], cfg: dict[str, Any], sig: int
             ("重复性检查", "repeatability_check"),
         ]
         _table(doc, ["项目", "结果"], [[label, _shown(h.get(key), sig)] for label, key in items])
-        doc.add_paragraph(
-            "ss=√max(0,sx²-sw²/m)；基本限值="
-            + (
-                "0.1δ_E。扩展判据未评价。"
-                if basis == "delta_e"
-                else "0.3σ_pt；c=F1(0.3σ_pt)²+F2或Fm·sw²。"
+        if h.get("m") == 1:
+            doc.add_paragraph("B.1.2：以单测标准差 s_x 作为 s_s；s_x 含测量误差，结论偏保守。")
+        else:
+            doc.add_paragraph(
+                "ss=√max(0,sx²-sw²/m)；基本限值="
+                + (
+                    "0.1δ_E。扩展判据未评价。"
+                    if basis == "delta_e"
+                    else "0.3σ_pt；c=F1(0.3σ_pt)²+F2或Fm·sw²。"
+                )
             )
-        )
         for warning in h["warnings"]:
             doc.add_paragraph("提示：" + warning)
     for name, s in result.get("GB/T稳定性", {}).items():
@@ -676,7 +687,12 @@ def _project_methods(doc: Any, data: dict[str, Any], cfg: dict[str, Any]) -> Non
         doc,
         ["项目", "选择与依据"],
         [
-            ["均匀性方法", "单因子方差分析：CNAS-GL003:2018 4.2"],
+            [
+                "均匀性方法",
+                "单测标准差：GB/T 28043-2019 B.1.2"
+                if cfg.get("replicate_type") == "single"
+                else "单因子方差分析：CNAS-GL003:2018 4.2",
+            ],
             ["并列用途判据", "样品间标准差判据：CNAS-GL003:2018 4.3"],
             ["稳定性方法", method + "；均值差：5.3"],
             ["稳健统计方法", "算法 A：CNAS-GL002:2018 附录 A.2"],
@@ -832,7 +848,12 @@ def make_report(
         raise ValueError("输出精度配置超出范围，z 小数位须为 0 至 12 的整数")
     doc.add_heading("计算结论（须经人工复核签字）", 0)
     h = result.get("均匀性")
-    if h:
+    if h and h.get("method") == "single" and result.get("标准模式") != "gbt28043":
+        doc.add_paragraph(
+            f"均匀性（GB/T 28043-2019 B.1.2）：{_shown(h.get('Ss_pass'))}；"
+            f"s_x={_shown(h.get('Ss'), sig)}，0.3σ={_shown(h.get('threshold'), sig)}。"
+        )
+    elif h:
         doc.add_paragraph(
             f"均匀性（GL003 4.3）：{_shown(h.get('Ss_pass'))}；"
             f"Ss={_shown(h.get('Ss'), sig)}，0.3σ={_shown(h.get('threshold'), sig)}；"

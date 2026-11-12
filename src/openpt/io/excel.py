@@ -101,6 +101,7 @@ def template(path: str | Path) -> None:
         ("GB/T 判据依据（gbt_criterion_basis）", ""),
         ("稳定性均值基线来源（baseline_source）", ""),
         ("报告声明的稳定性方法（report_stability_method）", ""),
+        ("重复性质（replicate_type）", "technical"),
     ]:
         book["方法配置"].append(config_row)
     for cell, options in [
@@ -121,6 +122,7 @@ def template(path: str | Path) -> None:
         ("B29", '"sigma_pt,delta_e"'),
         ("B30", '"homogeneity,baseline_group"'),
         ("B31", '"one_sample,two_sample,mean_difference"'),
+        ("B32", '"technical,adjacent_specimens,other,single"'),
     ]:
         validation = DataValidation(type="list", formula1=options)
         book["方法配置"].add_data_validation(validation)
@@ -269,7 +271,12 @@ def _precision(cell: Any) -> int:
 
 
 def _observations(
-    book: Any, name: str, unit: str, precision: list[int], stability: bool = False
+    book: Any,
+    name: str,
+    unit: str,
+    precision: list[int],
+    stability: bool = False,
+    replicate_type: str = "technical",
 ) -> tuple[dict[str, Any], list[str], dict[str, list[str]]]:
     """读取包装单元和重复测量，记录单元格位置。"""
     grouped: dict[tuple[str, str], dict[str, float]] = defaultdict(dict)
@@ -295,7 +302,13 @@ def _observations(
     groups: dict[str, list[list[float]]] = defaultdict(list)
     unit_ids: dict[str, list[str]] = defaultdict(list)
     for (group, uid), values in grouped.items():
-        if not stability and insufficient_homogeneity_replicates(len(values)):
+        if not stability and replicate_type == "single" and len(values) != 1:
+            raise InputError(f"{unit_sources[(group, uid)]}: 单测设计每单元须恰好测量一次")
+        if (
+            not stability
+            and replicate_type != "single"
+            and insufficient_homogeneity_replicates(len(values))
+        ):
             raise InputError(f"{unit_sources[(group, uid)]}: 单元 {uid} 至少需要两次重复")
         groups[group].append(list(values.values()))
         unit_ids[group].append(uid)
@@ -462,7 +475,12 @@ def read_workbook(
         raise InputError("缺少工作表：" + ", ".join(sorted(missing)))
     info, config = _metadata(book)
     precision: list[int] = []
-    hom, hs, hom_ids = _observations(book, "均匀性", info["单位"], precision)
+    replicate_type = config.get("replicate_type") or "technical"
+    if replicate_type not in ("technical", "adjacent_specimens", "other", "single"):
+        raise InputError("replicate_type 应为 technical、adjacent_specimens、other 或 single")
+    hom, hs, hom_ids = _observations(
+        book, "均匀性", info["单位"], precision, replicate_type=replicate_type
+    )
     stab, ss, stab_ids = _observations(book, "稳定性", info["单位"], precision, True)
     assigned = {}
     if "指定值与不确定度" in book.sheetnames:
