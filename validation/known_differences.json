@@ -1,0 +1,230 @@
+[
+  {
+    "case": "负方差",
+    "statistic": "MS_between",
+    "reason": "理论组间均方为零，R 线性模型运算产生极小舍入残差。",
+    "condition": "openpt_zero_r_abs_lt_1e-12"
+  },
+  {
+    "case": "负方差",
+    "statistic": "F",
+    "reason": "理论 F 为零，R 组间均方的舍入残差传递到 F。",
+    "condition": "openpt_zero_r_abs_lt_1e-12"
+  },
+  {
+    "case": "全部相同",
+    "statistic": "F,p",
+    "reason": "理论 F 为 0/0，R 线性模型的近零均方可产生不可靠的有限 F 和 p；openpt 标记不可判定。",
+    "condition": "indeterminate_zero_variance_r_residual_lt_1e-12"
+  },
+  {
+    "case": "case_012",
+    "statistic": "MS_between",
+    "reason": "固定随机输入的理论零值与 R 线性模型极小舍入残差。",
+    "condition": "openpt_zero_r_abs_lt_1e-12",
+    "input_sha256": "a98a64051e916ecf19e29d3227fde55e7ff3179e494c25f8ec6ff8eb8183d3b5"
+  },
+  {
+    "case": "case_012",
+    "statistic": "F",
+    "reason": "固定随机输入的理论零值与 R 线性模型极小舍入残差。",
+    "condition": "openpt_zero_r_abs_lt_1e-12",
+    "input_sha256": "a98a64051e916ecf19e29d3227fde55e7ff3179e494c25f8ec6ff8eb8183d3b5"
+  },
+  {
+    "case": "case_015",
+    "statistic": "MS_between",
+    "reason": "固定随机输入的理论零值与 R 线性模型极小舍入残差。",
+    "condition": "openpt_zero_r_abs_lt_1e-12",
+    "input_sha256": "57cc03f5007fe783e4ac29af9b873cf4f005e9a39192a5c7aaf3523024749da4"
+  },
+  {
+    "case": "case_015",
+    "statistic": "F",
+    "reason": "固定随机输入的理论零值与 R 线性模型极小舍入残差。",
+    "condition": "openpt_zero_r_abs_lt_1e-12",
+    "input_sha256": "57cc03f5007fe783e4ac29af9b873cf4f005e9a39192a5c7aaf3523024749da4"
+  },
+  {
+    "case": "case_024",
+    "statistic": "MS_between",
+    "reason": "固定随机输入的理论零值与 R 线性模型极小舍入残差。",
+    "condition": "openpt_zero_r_abs_lt_1e-12",
+    "input_sha256": "67385eea06fd2d461f9a5023b82c63faf805c6f755437e075647e79f97726a4d"
+  },
+  {
+    "case": "case_024",
+    "statistic": "F",
+    "reason": "固定随机输入的理论零值与 R 线性模型极小舍入残差。",
+    "condition": "openpt_zero_r_abs_lt_1e-12",
+    "input_sha256": "67385eea06fd2d461f9a5023b82c63faf805c6f755437e075647e79f97726a4d"
+  },
+  {
+    "case": "case_040",
+    "statistic": "MS_between",
+    "reason": "固定随机输入的理论零值与 R 线性模型极小舍入残差。",
+    "condition": "openpt_zero_r_abs_lt_1e-12",
+    "input_sha256": "fa54d6ec2618e4b0820486ceedc9e5c22ab4b892f5f25fb87d5bf4b42d22ce73"
+  },
+  {
+    "case": "case_040",
+    "statistic": "F",
+    "reason": "固定随机输入的理论零值与 R 线性模型极小舍入残差。",
+    "condition": "openpt_zero_r_abs_lt_1e-12",
+    "input_sha256": "fa54d6ec2618e4b0820486ceedc9e5c22ab4b892f5f25fb87d5bf4b42d22ce73"
+  },
+  {
+    "case": "case_042",
+    "statistic": "MS_between",
+    "reason": "固定随机输入的理论零值与 R 线性模型极小舍入残差。",
+    "condition": "openpt_zero_r_abs_lt_1e-12",
+    "input_sha256": "30d13cbd7cc8cb0a28f3d40b0a03d6c651dbee6c0a3c5dd337bfab265a4d198e"
+  },
+  {
+    "case": "case_042",
+    "statistic": "F",
+    "reason": "固定随机输入的理论零值与 R 线性模型极小舍入残差。",
+    "condition": "openpt_zero_r_abs_lt_1e-12",
+    "input_sha256": "30d13cbd7cc8cb0a28f3d40b0a03d6c651dbee6c0a3c5dd337bfab265a4d198e"
+  },
+  {
+    "case": "case_051",
+    "statistic": "MS_between",
+    "reason": "固定随机输入的理论零值与 R 线性模型极小舍入残差。",
+    "condition": "openpt_zero_r_abs_lt_1e-12",
+    "input_sha256": "fde109dd1acaae3c691b91a07daad5de0e07a06676de9d775746d052f4878b88"
+  },
+  {
+    "case": "case_051",
+    "statistic": "F",
+    "reason": "固定随机输入的理论零值与 R 线性模型极小舍入残差。",
+    "condition": "openpt_zero_r_abs_lt_1e-12",
+    "input_sha256": "fde109dd1acaae3c691b91a07daad5de0e07a06676de9d775746d052f4878b88"
+  },
+  {
+    "case": "case_063",
+    "statistic": "MS_between",
+    "reason": "固定随机输入的理论零值与 R 线性模型极小舍入残差。",
+    "condition": "openpt_zero_r_abs_lt_1e-12",
+    "input_sha256": "c231fff49b58c8a5a924c1f95e4f1a755740e21e1ab1100e2b7b505014c63e05"
+  },
+  {
+    "case": "case_063",
+    "statistic": "F",
+    "reason": "固定随机输入的理论零值与 R 线性模型极小舍入残差。",
+    "condition": "openpt_zero_r_abs_lt_1e-12",
+    "input_sha256": "c231fff49b58c8a5a924c1f95e4f1a755740e21e1ab1100e2b7b505014c63e05"
+  },
+  {
+    "case": "case_072",
+    "statistic": "MS_between",
+    "reason": "固定随机输入的理论零值与 R 线性模型极小舍入残差。",
+    "condition": "openpt_zero_r_abs_lt_1e-12",
+    "input_sha256": "019b619c54a1208757a10ee102a107eefceaef744c149c19d3987fc3c6264520"
+  },
+  {
+    "case": "case_072",
+    "statistic": "F",
+    "reason": "固定随机输入的理论零值与 R 线性模型极小舍入残差。",
+    "condition": "openpt_zero_r_abs_lt_1e-12",
+    "input_sha256": "019b619c54a1208757a10ee102a107eefceaef744c149c19d3987fc3c6264520"
+  },
+  {
+    "case": "case_075",
+    "statistic": "MS_between",
+    "reason": "固定随机输入的理论零值与 R 线性模型极小舍入残差。",
+    "condition": "openpt_zero_r_abs_lt_1e-12",
+    "input_sha256": "aa34aa9b8a0a3a32db7554bbf171d0e8bee97fdc136c8aebf5f238bc82249160"
+  },
+  {
+    "case": "case_075",
+    "statistic": "F",
+    "reason": "固定随机输入的理论零值与 R 线性模型极小舍入残差。",
+    "condition": "openpt_zero_r_abs_lt_1e-12",
+    "input_sha256": "aa34aa9b8a0a3a32db7554bbf171d0e8bee97fdc136c8aebf5f238bc82249160"
+  },
+  {
+    "case": "case_119",
+    "statistic": "MS_between",
+    "reason": "固定随机输入的理论零值与 R 线性模型极小舍入残差。",
+    "condition": "openpt_zero_r_abs_lt_1e-12",
+    "input_sha256": "0d7b7eca5e35d467c1d591708048af89154aedcccc9cd2e667b62d979fa8467c"
+  },
+  {
+    "case": "case_119",
+    "statistic": "F",
+    "reason": "固定随机输入的理论零值与 R 线性模型极小舍入残差。",
+    "condition": "openpt_zero_r_abs_lt_1e-12",
+    "input_sha256": "0d7b7eca5e35d467c1d591708048af89154aedcccc9cd2e667b62d979fa8467c"
+  },
+  {
+    "case": "case_121",
+    "statistic": "MS_between",
+    "reason": "固定随机输入的理论零值与 R 线性模型极小舍入残差。",
+    "condition": "openpt_zero_r_abs_lt_1e-12",
+    "input_sha256": "057c47ce95e81e087f536523a1be47e66c6ee1807a43ee7c37465b07e72de0e6"
+  },
+  {
+    "case": "case_121",
+    "statistic": "F",
+    "reason": "固定随机输入的理论零值与 R 线性模型极小舍入残差。",
+    "condition": "openpt_zero_r_abs_lt_1e-12",
+    "input_sha256": "057c47ce95e81e087f536523a1be47e66c6ee1807a43ee7c37465b07e72de0e6"
+  },
+  {
+    "case": "case_146",
+    "statistic": "MS_between",
+    "reason": "固定随机输入的理论零值与 R 线性模型极小舍入残差。",
+    "condition": "openpt_zero_r_abs_lt_1e-12",
+    "input_sha256": "a86c1a8ff4db35cb2b4673349200d4aac35ee257851a6ca6ffcdc34f401baf8c"
+  },
+  {
+    "case": "case_146",
+    "statistic": "F",
+    "reason": "固定随机输入的理论零值与 R 线性模型极小舍入残差。",
+    "condition": "openpt_zero_r_abs_lt_1e-12",
+    "input_sha256": "a86c1a8ff4db35cb2b4673349200d4aac35ee257851a6ca6ffcdc34f401baf8c"
+  },
+  {
+    "case": "case_151",
+    "statistic": "MS_between",
+    "reason": "固定随机输入的理论零值与 R 线性模型极小舍入残差。",
+    "condition": "openpt_zero_r_abs_lt_1e-12",
+    "input_sha256": "e032d9d2e380556769ecc390d7739c62daa1b19c5367ac6b12d7626e7946650d"
+  },
+  {
+    "case": "case_151",
+    "statistic": "F",
+    "reason": "固定随机输入的理论零值与 R 线性模型极小舍入残差。",
+    "condition": "openpt_zero_r_abs_lt_1e-12",
+    "input_sha256": "e032d9d2e380556769ecc390d7739c62daa1b19c5367ac6b12d7626e7946650d"
+  },
+  {
+    "case": "case_183",
+    "statistic": "MS_between",
+    "reason": "固定随机输入的理论零值与 R 线性模型极小舍入残差。",
+    "condition": "openpt_zero_r_abs_lt_1e-12",
+    "input_sha256": "4ba94168f0fb71adea256ce58baf39930e109288099802d004841fb5afc4c40f"
+  },
+  {
+    "case": "case_183",
+    "statistic": "F",
+    "reason": "固定随机输入的理论零值与 R 线性模型极小舍入残差。",
+    "condition": "openpt_zero_r_abs_lt_1e-12",
+    "input_sha256": "4ba94168f0fb71adea256ce58baf39930e109288099802d004841fb5afc4c40f"
+  },
+  {
+    "case": "case_192",
+    "statistic": "MS_between",
+    "reason": "固定随机输入的理论零值与 R 线性模型极小舍入残差。",
+    "condition": "openpt_zero_r_abs_lt_1e-12",
+    "input_sha256": "f151784fddc12afb3451e3ed95328631a400d03f7d5bb2dd28f2dea211bbce8c"
+  },
+  {
+    "case": "case_192",
+    "statistic": "F",
+    "reason": "固定随机输入的理论零值与 R 线性模型极小舍入残差。",
+    "condition": "openpt_zero_r_abs_lt_1e-12",
+    "input_sha256": "f151784fddc12afb3451e3ed95328631a400d03f7d5bb2dd28f2dea211bbce8c"
+  }
+]
