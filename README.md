@@ -1,4 +1,4 @@
-# OpenPT 0.2.0.dev1（封闭内测，未公开发布）
+# OpenPT 0.2.0.dev2（封闭内测，未公开发布）
 
 能力验证统计工作台原型，提供单因子 ANOVA、Ss、稳定性 t 检验、算法 A 和 S、中位数与 NIQR、指定值及不确定度、D、D%、z、z′、ζ、En、Excel 模板、复核差异表与 DOCX。计算结果供具备资质的人员复核使用；方法依据为 CNAS-GL003:2018、CNAS-GL002:2018，用户可配置。**当前尚未通过全部验收，不得用于正式评价或直接发布。**
 
@@ -38,7 +38,7 @@ python -m pytest -m "not internal"
 
 ![公开示例计算书截图](docs/计算书截图.png)
 
-填入项目名称、统一单位和均匀性表，每个包装单元每次重复一行；支持平衡及不平衡重复，不平衡属于待审核扩展方法。稳定性表的时间组使用 `基线` 和 `稳定期`。参考输入 `examples/GL003_A1.xlsx`。所有输入必须是实际值，不接受公式。复核声称值需填写统计量、数值、显示小数位及来源。报告模型可填 `recommended`、`repeats_pooled`、`repeats_welch`、`displayed_summary`。最后一种还需在配置表输入 `mean1`、`mean2`、`s1`、`s2`、`n1`、`n2`；多时点复核需在声称值表的“时间组”列指定时点。评分映射通过 `--mapping` 加载。差异清单按 `DIFFERENCE`、`NOTE`、`MATCH` 分组排序；报告模型能复现时，推荐模型不同只记为提示，不直接认定报告错误。`REPORT_RULE_UNKNOWN` 表示绝对容差仅作候选，原报告停止规则尚待确认；`STOP_RULE_SENSITIVITY` 表示停止规则影响显示结果。无更具体类别的提示使用 `REVIEW_NOTE`，待核查差异使用 `REVIEW_REQUIRED`。
+填入项目名称、单位和所需测量表；均匀性与稳定性可使用长表或宽表，技术重复默认每单元至少两次；不能重复测量时可显式选择 `replicate_type=single`。支持平衡及不平衡重复，不平衡属于待审核扩展方法。稳定性可选择 GL003 5.3 均值差法及多个时间组。多个被测量的单位、配置和复核按量隔离，见 ADR-006。参考输入 `examples/GL003_A1.xlsx`。所有输入必须是实际值，不接受公式。复核声称值需填写统计量、数值、显示小数位及来源。报告模型可填 `recommended`、`repeats_pooled`、`repeats_welch`、`displayed_summary`。最后一种还需在配置表输入 `mean1`、`mean2`、`s1`、`s2`、`n1`、`n2`；多时点复核需在声称值表的“时间组”列指定时点。评分映射通过 `--mapping` 加载。差异清单按 `DIFFERENCE`、`NOTE`、`MATCH` 分组排序；报告模型能复现时，推荐模型不同只记为提示，不直接认定报告错误。`REPORT_RULE_UNKNOWN` 表示绝对容差仅作候选，原报告停止规则尚待确认；`STOP_RULE_SENSITIVITY` 表示停止规则影响显示结果。无更具体类别的提示使用 `REVIEW_NOTE`，待核查差异使用 `REVIEW_REQUIRED`。
 
 ## 候选批次
 
@@ -48,7 +48,7 @@ python -m pytest -m "not internal"
 
 `openpt validate input.xlsx [--columns columns.json]` 只读检查已有的均匀性、稳定性和参加者测量表，输出 JSON 问题列表。列映射 JSON 格式示例：`{"均匀性": {"单元编号": "样品", "值": "读数"}}`，即标准字段映射到原表头；未列出的字段使用标准表头。CSV 用 `openpt validate input.csv --sheet 均匀性 --encoding utf-8-sig` 检查；GBK 文件须显式指定 `--encoding gbk`。有问题返回码为 1，输入错误返回码为 2。
 
-这是独立的预检查，不会修改输入、不会创建快照。`run`/`review` 也支持 `--columns columns.json`，或用 `--unit mg --encoding utf-8-sig --csv-sheet 均匀性` 导入单测量表 CSV。CSV 的工作表名是所选类型，列号和行号对应原文件；项目名称可通过 `--project` 指定。检查范围限上述测量表；单位与项目单位比较，未登记项目单位时比较首个非空单位。当前模板只支持项目统一单位，不能表达多测量对象的不同单位，也不检查其他工作表或补全缺失工作表。公式即使有缓存，现有计算器仍不接受；原始输入和列映射会保存到运行快照。
+这是独立的预检查，不会修改输入、不会创建快照。`run`/`review` 也支持 `--columns columns.json`，或用 `--unit mg --encoding utf-8-sig --csv-sheet 均匀性` 导入单测量表 CSV。CSV 的工作表名是所选类型，列号和行号对应原文件；项目名称可通过 `--project` 指定。检查包括测量表、报告声称值、候选批次、指定数值配置及部分数据结构；不能替代实验设计审查。均匀性和稳定性支持长表及宽表，多个被测量可在“被测量配置”中分别登记单位和方法参数；多被测量的参加者结果尚不支持混合导入。选填工作表缺失时以内存空表处理。公式即使有缓存，现有计算器仍不接受；原始输入和列映射会保存到运行快照。
 
 ## 随机抽样
 
