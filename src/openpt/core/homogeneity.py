@@ -89,7 +89,7 @@ def analyze_single(data: Any, sigma: float | None = None) -> dict[str, Any]:
         "SS_between": None,
         "SS_within": None,
         "df_between": len(groups) - 1,
-        "df_within": None,
+        "df_within": 0,
         "MS_between": None,
         "MS_within": None,
         "F": None,

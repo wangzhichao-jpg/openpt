@@ -40,7 +40,7 @@ def test_single_workbook_and_report(tmp_path: Path) -> None:
     result = calculate(data)
     h = result["均匀性"]
     assert h["Ss"] == pytest.approx(0.1)
-    assert h["Ss_pass"] is True and h["F"] is None
+    assert h["Ss_pass"] is True and h["F"] is None and h["df_within"] == 0
     doc = tmp_path / "report.docx"
     make_report(doc, data, result)
     text = "\n".join(p.text for p in Document(doc).paragraphs)
