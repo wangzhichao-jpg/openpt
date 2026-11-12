@@ -61,6 +61,23 @@ def template(path: str | Path) -> None:
     instructions.append(
         ["长表与宽表", "示例工作表仅供参考，不参与计算；复制相应表头到均匀性或稳定性表后填写数据。"]
     )
+    for title, note in [
+        ("项目信息", "必填：项目名称和单位。"),
+        ("方法配置", "选填：需要修改默认方法或提供判据参数时填写。"),
+        ("均匀性", "选填：需评价均匀性时填写；至少填写一张可计算的数据表。"),
+        ("稳定性", "选填：需评价稳定性时填写；不填写则不会评价。"),
+        ("参加者结果", "选填：需进行参加者评价或稳健统计时填写。"),
+        ("报告声称值", "选填：需要复核报告数值时填写。"),
+        ("指定值与不确定度", "选填：需要指定值建模和不确定度评定时填写。"),
+        ("算法S", "选填：需要稳健联合标准差或极差时填写。"),
+        ("候选批次", "选填：需要记录候选批次时填写。"),
+        (
+            "σ 与 σ_pt",
+            "sigma 用于均匀性及稳定性判据；sigma_pt 是 z 等评价统计量的分母。"
+            "只填一个时自动沿用，均填写时分别使用。",
+        ),
+    ]:
+        instructions.append([title, note])
     instructions.column_dimensions["A"].width = 22
     instructions.column_dimensions["B"].width = 80
     for name, headers in SHEETS.items():
@@ -93,16 +110,19 @@ def template(path: str | Path) -> None:
         ws.cell(1, 1).comment = Comment("示例不参与计算，请复制表头和数据到正式工作表。", "OpenPT")
     for col, header in enumerate(("标准不确定度u(x)", "扩展不确定度U(x)", "包含因子k"), 4):
         book["参加者结果"].cell(1, col, header)
+    for name in set(SHEETS) - {"项目信息"}:
+        ws = book[name]
+        ws.cell(1, ws.max_column + 1, "（选填）")
     for row in [("项目名称", ""), ("单位", "")]:
         book["项目信息"].append(row)
     for config_row in [
         ("显著性水平（alpha）", 0.05),
-        ("均匀性目标标准差（sigma）", ""),
+        ("均匀性/稳定性判据标准差（sigma）", ""),
         ("严格均匀性配置（strict_homogeneity）", False),
         ("稳定性方法（stability_method）", "two_sample"),
         ("单均值参考值（reference）", ""),
         ("指定值（assigned）", ""),
-        ("能力评定标准差（sigma_pt）", ""),
+        ("z等评价标准差（sigma_pt）", ""),
         ("算法A停止规则（algorithm_a_rule）", "gl002"),
         ("z 值显示小数位（display_z_decimals）", 2),
         ("σ 来源（sigma_source）", ""),

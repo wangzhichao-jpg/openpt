@@ -679,6 +679,16 @@ def _project_methods(doc: Any, data: dict[str, Any], cfg: dict[str, Any]) -> Non
         "判据比较采用相对容差 1e-12，容差内按相等处理；原始计算值未修约。"
         "严格小于的判据在相等时不通过，接近边界的结果应人工复核。"
     )
+    sigma_given = cfg.get("sigma") not in (None, "")
+    sigma_pt_given = cfg.get("sigma_pt") not in (None, "")
+    if sigma_given and not sigma_pt_given:
+        doc.add_paragraph("仅填写判据标准差 sigma；z 等评价分母 sigma_pt 自动沿用该值。")
+    elif sigma_pt_given and not sigma_given:
+        doc.add_paragraph(
+            "仅填写评价标准差 sigma_pt；均匀性和稳定性判据标准差 sigma 自动沿用该值。"
+        )
+    elif sigma_given and sigma_pt_given:
+        doc.add_paragraph("判据标准差 sigma 与评价标准差 sigma_pt 均已提供，分别使用。")
     method = {
         "one_sample": "单均值 t 检验：CNAS-GL003:2018 5.2.1",
         "mean_difference": "均值差法：CNAS-GL003:2018 5.3",

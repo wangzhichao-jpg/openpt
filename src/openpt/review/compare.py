@@ -7,6 +7,7 @@ from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
+from ..config.sigma import criterion_sigma
 from ..core.decision import compare
 from ..core.gbt28043 import homogeneity as gbt_homogeneity
 from ..core.gbt28043 import period_options as gbt_period_options
@@ -93,7 +94,7 @@ def _standard_value(
             "稳定性均值差": s.get("difference"),
             "稳定性基本限值": s.get("threshold"),
         }.get(name)
-    sigma = float(cfg["sigma"]) if cfg.get("sigma") not in (None, "") else None
+    sigma = criterion_sigma(cfg)
     if name in ("Ss", "均匀性基本限值", "均匀性扩展限值") and data.get("homogeneity"):
         h = result.get("GB/T均匀性") or gbt_homogeneity(data["homogeneity"], sigma)
         return h[
@@ -527,16 +528,17 @@ def _composite_row(
 ) -> dict[str, Any] | None:
     """核查声称的标准差合成及其稳定性用途。"""
     cfg = data["config"]
-    if cfg.get("sigma_composite") in (None, "") or cfg.get("sigma") in (None, ""):
+    sigma = criterion_sigma(cfg)
+    if cfg.get("sigma_composite") in (None, "") or sigma is None:
         return None
     ss = cfg.get("sigma_ss")
     if ss in (None, ""):
         ss = result.get("均匀性", {}).get("Ss")
-    composite = math.hypot(float(cfg["sigma"]), float(ss)) if ss is not None else None
+    composite = math.hypot(sigma, float(ss)) if ss is not None else None
     reported_sigma = cfg.get("reported_stability_sigma")
     if reported_sigma == cfg["sigma_composite"]:
         source_note = "稳定性报告使用合成标准差"
-    elif reported_sigma == cfg["sigma"]:
+    elif reported_sigma == sigma:
         source_note = "稳定性报告使用原标准差"
     else:
         source_note = "稳定性所用标准差待确认"

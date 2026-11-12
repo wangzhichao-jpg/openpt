@@ -10,6 +10,7 @@ from typing import Any
 from zipfile import BadZipFile
 
 from . import __version__
+from .config.sigma import criterion_sigma
 from .core.assigned import AssignedResult, assign_value
 from .core.decision import compare
 from .core.gbt28043 import criterion_limit as gbt_criterion_limit
@@ -271,8 +272,7 @@ def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]
     """根据输入选择 GL003 与 GL002 计算方法。"""
     cfg = data["config"]
     alpha = float(_option(cfg, "alpha", 0.05))
-    raw = cfg.get("sigma")
-    sigma = float(raw) if raw not in (None, "") else None
+    sigma = criterion_sigma(cfg)
     if cfg.get("gbt28043_extension"):
         raise ValueError("旧配置 gbt28043_extension 不支持；请使用 criterion_standard")
     standard = _option(cfg, "criterion_standard", "gl003")
