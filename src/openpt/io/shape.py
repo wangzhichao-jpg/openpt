@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """导入与只读检查共用的数据形态规则。"""
 
+import json
 from collections.abc import Collection
 from typing import Any
 
@@ -54,6 +55,33 @@ def enum_problem(field: str, value: Any, *, assigned: bool = False) -> str | Non
     elif isinstance(value, str) and value in ENUMS[key]:
         return None
     return f"{field} 配置无效，可选值：" + "、".join(ENUMS[key])
+
+
+def period_enum_problem(value: Any) -> str | None:
+    """即使未选择 GB/T 模式，也不得静默接受非法的逐时点枚举。"""
+    if value in (None, ""):
+        return None
+
+    def pairs(items: list[tuple[str, Any]]) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for key, item in items:
+            if key in result:
+                raise ValueError("重复键")
+            result[key] = item
+        return result
+
+    try:
+        periods = json.loads(value, object_pairs_hook=pairs) if isinstance(value, str) else value
+    except (ValueError, TypeError):
+        return "逐时点配置须为有效 JSON 且不得重复键"
+    if not isinstance(periods, dict) or not all(
+        isinstance(k, str) and isinstance(v, dict) for k, v in periods.items()
+    ):
+        return "逐时点配置须为对象，且每个时间组须为对象"
+    for entry in periods.values():
+        if "kind" in entry and enum_problem("stability_period_options.kind", entry["kind"]):
+            return "逐时点 kind 应为 storage 或 transport"
+    return None
 
 
 def insufficient_units(count: int) -> bool:

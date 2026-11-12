@@ -13,6 +13,22 @@ from openpt.io.excel import template
 from openpt.io.validation import inspect_input
 
 
+def test_nested_period_enum_is_checked_in_any_standard(tmp_path: Path) -> None:
+    path = tmp_path / "input.xlsx"
+    template(path)
+    book = load_workbook(path)
+    book["项目信息"]["B2"] = "合成"
+    book["项目信息"]["B3"] = "mg"
+    book["方法配置"]["B25"] = '{"时间组":{"kind":"invalid"}}'
+    for unit in (1, 2):
+        for repeat in (1, 2):
+            book["均匀性"].append([unit, repeat, unit + repeat / 10, "mg"])
+    book.save(path)
+    assert any(i.category == "INVALID_CONFIG" and i.cell == "B25" for i in inspect_input(path))
+    assert main(["run", str(path), "--runs-dir", str(tmp_path / "runs")]) == 2
+    assert main(["review", str(path), "--runs-dir", str(tmp_path / "reviews")]) == 2
+
+
 @settings(max_examples=25, deadline=None)
 @given(
     st.sampled_from(

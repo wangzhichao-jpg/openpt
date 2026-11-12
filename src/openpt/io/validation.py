@@ -26,6 +26,7 @@ from .shape import (
     enum_problem,
     insufficient_homogeneity_replicates,
     insufficient_units,
+    period_enum_problem,
     stability_structure_problem,
 )
 
@@ -634,7 +635,11 @@ def inspect_input(
                         value = value in ("启用", "TRUE")
                     config_values[field] = value
                     config_cells[field] = f"{get_column_letter(col + 1)}{index}"
-                    invalid_enum = enum_problem(field, value)
+                    invalid_enum = (
+                        period_enum_problem(value)
+                        if field == "stability_period_options"
+                        else enum_problem(field, value)
+                    )
                     if invalid_enum:
                         issues.append(
                             Issue(

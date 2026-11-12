@@ -23,7 +23,12 @@ from ..errors import InputError
 from .layout import wide_to_long
 from .measurands import split_measurands
 from .new_stability import read_transfer_config, read_transfer_sheet, read_trend_sheet
-from .shape import STABILITY_METHOD_ALIASES, enum_problem, insufficient_homogeneity_replicates
+from .shape import (
+    STABILITY_METHOD_ALIASES,
+    enum_problem,
+    insufficient_homogeneity_replicates,
+    period_enum_problem,
+)
 
 SHEETS = {
     "项目信息": ["字段", "值"],
@@ -376,7 +381,11 @@ def _metadata(book: Any) -> tuple[dict[str, Any], dict[str, Any]]:
         match = re.search(r"（([a-zA-Z_][a-zA-Z_0-9]*)）$", label)
         key = match.group(1) if match else label
         value = row[1].value
-        problem = enum_problem(key, value)
+        problem = (
+            period_enum_problem(value)
+            if key == "stability_period_options"
+            else enum_problem(key, value)
+        )
         if problem:
             raise InputError(f"方法配置!{row[1].coordinate}: {problem}")
         if (
