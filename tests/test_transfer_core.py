@@ -1,0 +1,61 @@
+# SPDX-License-Identifier: Apache-2.0
+"""传递标准各类判据和 En 防重复计入。"""
+
+import math
+
+import pytest
+
+from openpt.core.transfer import assess_point, en_with_stability
+from openpt.errors import InputError
+
+
+def test_transfer_window_and_boundary() -> None:
+    rows = [
+        {"stage": "传递前", "value": -5.0},
+        {"stage": "传递中", "value": -0.2},
+        {"stage": "传递后", "value": 0.3},
+    ]
+    rules = [
+        {"kind": "fixed", "value": 0.5, "inclusive": True},
+        {"kind": "mpev", "value": 1.5, "k": 3, "inclusive": False},
+    ]
+    result = assess_point(rows, rules, window="transfer_only")
+    assert result["delta_max"] == pytest.approx(0.5)
+    assert [r["pass"] for r in result["criteria"]] == [True, False]
+    assert assess_point(rows, rules, window="all")["delta_max"] == pytest.approx(5.3)
+    summary = assess_point(
+        [], [{"kind": "u_ref", "value": 1, "k": 2, "inclusive": True}], summarized_delta=0.5
+    )
+    assert summary["conclusion"] is True and summary["count"] is None
+    with pytest.raises(InputError):
+        assess_point(rows, rules, summarized_delta=0.5)
+
+
+def test_single_and_two_sample_t() -> None:
+    rows = [{"stage": "传递中", "value": n} for n in (1.0, 1.1, 1.2, 1.3)]
+    criteria = [
+        {"kind": "one_sample", "reference": 1.15},
+        {"kind": "two_sample", "baseline": [1.0, 1.1, 1.2, 1.3]},
+    ]
+    result = assess_point(rows, criteria)
+    assert all(rule["pass"] is True for rule in result["criteria"])
+    with pytest.raises(InputError):
+        assess_point([], criteria, summarized_delta=0.2)
+
+
+def test_en_mechanisms_and_review() -> None:
+    a = en_with_stability(1.0, 1.0, 1.0, mechanism="A", delta=0.6)
+    assert a["u_stab"] == pytest.approx(0.3 / math.sqrt(3))
+    assert a["En"] == pytest.approx(1 / math.hypot(1, a["U_ref"]))
+    b = en_with_stability(1.0, 1.0, 1.0, mechanism="B", delta=0.2, u_e_multiplier=2)
+    assert b["U_E"] == pytest.approx(0.4)
+    assert b["En"] == pytest.approx(1 / math.hypot(1, 1, 0.4))
+    assert (
+        en_with_stability(1, 1, 1, mechanism="A", delta=0.2, u_e=0.4)["status"] == "DESIGN_REVIEW"
+    )
+    assert (
+        en_with_stability(1, 1, 1, mechanism="B", u_e=0.4, ref_includes_stability=True)["status"]
+        == "DESIGN_REVIEW"
+    )
+    assert en_with_stability(1, 1, 1, mechanism="C")["status"] == "DESIGN_REVIEW"
+    assert en_with_stability(1, 1, 1, mechanism="C", ignore_condition=True)["status"] == "OK"
