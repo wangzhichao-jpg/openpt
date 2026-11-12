@@ -185,6 +185,10 @@ def test_template_and_workflow(tmp_path: Path) -> None:
         }
     ]
     row = next(r for r in review(data, calculate(data)) if r["统计量"] == "稳定性扩展限值")
+    assert row["显示一致"] and row["推荐一致"] is None
+    assert "非预选主判据" in row["说明"]
+    data["config"]["gbt_stability_rule"] = "extended"
+    row = next(r for r in review(data, calculate(data)) if r["统计量"] == "稳定性扩展限值")
     assert row["显示一致"] and row["推荐一致"]
     make_report(target, data, calculate(data))
     assert any("运输稳定性（B.6） 运输期" in p.text for p in Document(target).paragraphs)

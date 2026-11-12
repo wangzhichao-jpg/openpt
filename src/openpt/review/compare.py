@@ -148,7 +148,16 @@ def _values(
             recommended_value = _standard_value(data, result, claim, selected)
         except ValueError:
             return None, None, "标准模式所需数据或实验设计不适用"
-        return report_value, recommended_value, f"报告标准模式={report_mode}；推荐模式={selected}"
+        note = f"报告标准模式={report_mode}；推荐模式={selected}"
+        if selected == "gbt28043" and name.endswith("限值"):
+            rule_key = "gbt_hom_rule" if name.startswith("均匀性") else "gbt_stability_rule"
+            primary = cfg.get(rule_key) or "basic"
+            requested = "extended" if "扩展" in name else "basic"
+            note += f"；预选主判据={primary}"
+            if requested != primary:
+                recommended_value = None
+                note += "；此限值非预选主判据，仅供参考"
+        return report_value, recommended_value, note
     if name in ("F", "Ss"):
         value = result.get("均匀性", {}).get(name)
         return value, value, ""
