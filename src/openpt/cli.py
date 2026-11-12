@@ -88,6 +88,9 @@ def _assigned_results(data: dict[str, Any], calculations: dict[str, Any]) -> dic
         "stab_mapping",
         "hom_in_base",
         "stab_in_base",
+        "u_trans",
+        "trans_mapping",
+        "trans_in_base",
     )
     options = {key: a[key] for key in keys if key in a}
     hom_source = a.get("hom_source") or "manual"

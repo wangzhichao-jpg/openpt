@@ -503,9 +503,12 @@ def _assigned_table(doc: Any, result: dict[str, Any]) -> None:
         ("u_stab", "u_stab"),
         ("稳定性分量映射", "stab_mapping"),
         ("基础值含稳定性分量", "stab_in_base"),
+        ("运输不确定度 u_trans", "u_trans"),
+        ("运输分量映射", "trans_mapping"),
+        ("基础值含运输分量", "trans_in_base"),
         ("状态", "status"),
     ]
-    boolean_keys = {"independent", "hom_in_base", "stab_in_base"}
+    boolean_keys = {"independent", "hom_in_base", "stab_in_base", "trans_in_base"}
     _table(
         doc,
         ["项目", "结果"],
@@ -522,7 +525,8 @@ def _assigned_table(doc: Any, result: dict[str, Any]) -> None:
     doc.add_paragraph(assigned.get("formula", ""))
     doc.add_paragraph(
         "扩展方法：u(X)=√(u_base²+Σu分量²)，σ′=√(σ_pt²+Σu分量²)；"
-        "假定分量独立；均匀性 σ′ 见 GB/T 28043-2019 B.2.5 式(B.3)，多分量扩展须经批准。"
+        "假定分量独立；运输分量可映射至指定值不确定度，见 GB/T 28043-2019 7.2.2 式(3)。"
+        "均匀性 σ′ 见 B.2.5 式(B.3)，多分量扩展须经批准。"
     )
     for warning in assigned.get("warnings", []):
         doc.add_paragraph("设计提示：" + warning)

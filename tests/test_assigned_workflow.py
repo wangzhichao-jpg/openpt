@@ -96,6 +96,29 @@ def test_single_participant_en(tmp_path: Path) -> None:
     assert result["稳健统计状态"].startswith("NOT_EVALUATED")
 
 
+def test_transport_uncertainty_workbook(tmp_path: Path) -> None:
+    """运输分量可追溯地进入 u(X)，重复声明时阻断评价。"""
+    path = tmp_path / "transport.xlsx"
+    make_input(path)
+    book = load_workbook(path)
+    sheet = book["指定值与不确定度"]
+    fields = {sheet.cell(row, 1).value: row for row in range(2, sheet.max_row + 1)}
+    sheet.cell(fields["u_trans"], 2, 2.0)
+    sheet.cell(fields["trans_mapping"], 2, "assigned")
+    book.save(path)
+    assert main(["run", str(path)]) == 0
+    result = json.loads((tmp_path / "transport_结果.json").read_text(encoding="utf-8"))
+    assert result["指定值与不确定度"]["u"] == 5**0.5
+    assert result["指定值与不确定度"]["trans_mapping"] == "assigned"
+    book = load_workbook(path)
+    book["指定值与不确定度"].cell(fields["trans_in_base"], 2, "TRUE")
+    book.save(path)
+    assert main(["run", str(path)]) == 0
+    result = json.loads((tmp_path / "transport_结果.json").read_text(encoding="utf-8"))
+    assert result["指定值与不确定度"]["status"] == "DESIGN_REVIEW"
+    assert all(score["value"] is None for score in result["参加者统计量"]["P1"].values())
+
+
 def test_duplicate_blocks_all_scores(tmp_path: Path) -> None:
     """重复分配时不能输出任何能力评价结论。"""
     path = tmp_path / "input.xlsx"

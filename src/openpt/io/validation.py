@@ -214,6 +214,7 @@ def _check_numeric_config(
         "sigma_final",
         "u_hom",
         "u_stab",
+        "u_trans",
         "U_assigned",
         "k_assigned",
     }

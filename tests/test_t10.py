@@ -69,6 +69,23 @@ def test_participant_and_component_mapping() -> None:
         assert bad.status == "DESIGN_REVIEW" and bad.u is None
 
 
+def test_transport_component_and_duplicate_controls() -> None:
+    """运输分量进入指定值不确定度，已有分量不能再次合成。"""
+    options = dict(method="known", value=1, uncertainty=0.3, source="s", uncertainty_source="u")
+    result = assign_value(**options, u_trans=0.4, trans_mapping="assigned")
+    assert result.status == "OK" and result.u == pytest.approx(0.5)
+    assert result.u_trans == 0.4 and result.trans_mapping == "assigned"
+    duplicated = assign_value(**options, u_trans=0.4, trans_mapping="assigned", trans_in_base=True)
+    assert duplicated.status == "DESIGN_REVIEW" and duplicated.u is None
+    omitted = assign_value(**options, u_trans=0.4)
+    assert omitted.status == "NOT_EVALUATED" and omitted.u is None
+    included = assign_value(**options, u_trans=0.4, trans_in_base=True)
+    assert included.status == "OK" and included.u == pytest.approx(0.3)
+    for kwargs in ({"u_trans": -1}, {"trans_mapping": "sigma_prime"}, {"trans_in_base": "TRUE"}):
+        with pytest.raises(InputError):
+            assign_value(**options, **kwargs)
+
+
 def test_missing_uncertainty_and_procedure() -> None:
     """不得用未披露的外部定值不确定度或未登记程序代替。"""
     with pytest.raises(InputError):
