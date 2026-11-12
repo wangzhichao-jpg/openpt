@@ -157,13 +157,45 @@ def analyze(
         )
     if model not in ("unit_pooled", "repeats_pooled", "repeats_welch"):
         raise InputError("未知稳定性模型")
-    if method not in ("one_sample", "two_sample"):
+    if method not in ("one_sample", "two_sample", "mean_difference"):
         raise InputError("未知稳定性方法")
     if not 0 < alpha < 1:
         raise InputError("alpha 无效")
     if sigma is not None and (not math.isfinite(sigma) or sigma <= 0):
         raise InputError("sigma 无效")
-    y = _observations(followup, model != "unit_pooled")
+    y = _observations(followup, model != "unit_pooled" and method != "mean_difference")
+    if method == "mean_difference":
+        if reference is None or not math.isfinite(reference):
+            raise InputError("均值差法需要有限的基线均值")
+        mean = float(y.mean())
+        difference = abs(reference - mean)
+        if not math.isfinite(difference):
+            raise InputError("稳定性均值差数值溢出")
+        warnings = []
+        if len(followup) < 3:
+            warnings.append(
+                f"GL003 5.3 注：抽样数≥3；当前{group_name}为 {len(followup)} 个包装单元"
+            )
+        if any(len(unit) != 2 for unit in followup):
+            warnings.append("GL003 5.3 注：每个抽取样品重复测试2次；当前重复次数不全为2")
+        return StabilityResult(
+            difference=difference,
+            mean1=reference,
+            mean2=mean,
+            n2=len(y),
+            status="OK" if sigma is not None else "NOT_EVALUATED",
+            reference=reference,
+            reference_source=reference_source,
+            model="unit_pooled",
+            method=method,
+            threshold=0.3 * sigma if sigma is not None else None,
+            mean_difference_pass=compare(difference, 0.3 * sigma) <= 0
+            if sigma is not None
+            else None,
+            mean_difference_status="OK" if sigma is not None else "NOT_EVALUATED",
+            design_status="DESIGN_WARNING" if warnings else "OK",
+            design_warnings=warnings,
+        )
     result = (
         _one_sample(y, reference, alpha)
         if method == "one_sample"

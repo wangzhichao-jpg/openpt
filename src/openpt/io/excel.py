@@ -99,11 +99,13 @@ def template(path: str | Path) -> None:
         ("稳定性预选判据（gbt_stability_rule）", "basic"),
         ("最大允许偏差（delta_e）", ""),
         ("GB/T 判据依据（gbt_criterion_basis）", ""),
+        ("稳定性均值基线来源（baseline_source）", ""),
+        ("报告声明的稳定性方法（report_stability_method）", ""),
     ]:
         book["方法配置"].append(config_row)
     for cell, options in [
         ("B4", '"启用,关闭"'),
-        ("B5", '"两均值,单均值"'),
+        ("B5", '"两均值,单均值,均值差法（GL003 5.3）"'),
         ("B9", '"gl002,gbt28043,absolute,simplified"'),
         ("B11", '"标准方法精密度,经验值,稳健标准差,其他"'),
         ("B12", '"temporary,final"'),
@@ -117,6 +119,8 @@ def template(path: str | Path) -> None:
         ("B26", '"basic,extended"'),
         ("B27", '"basic,extended"'),
         ("B29", '"sigma_pt,delta_e"'),
+        ("B30", '"homogeneity,baseline_group"'),
+        ("B31", '"one_sample,two_sample,mean_difference"'),
     ]:
         validation = DataValidation(type="list", formula1=options)
         book["方法配置"].add_data_validation(validation)
@@ -245,8 +249,12 @@ def _metadata(book: Any) -> tuple[dict[str, Any], dict[str, Any]]:
             "关闭",
         ):
             value = value == "启用"
-        if key == "stability_method" and value in ("两均值", "单均值"):
-            value = {"两均值": "two_sample", "单均值": "one_sample"}[value]
+        if key == "stability_method" and value in ("两均值", "单均值", "均值差法（GL003 5.3）"):
+            value = {
+                "两均值": "two_sample",
+                "单均值": "one_sample",
+                "均值差法（GL003 5.3）": "mean_difference",
+            }[value]
         config[key] = value
     return info, config
 

@@ -289,6 +289,8 @@ def _stability_table(doc: Any, name: str, s: dict[str, Any], sig: int) -> None:
         doc.add_paragraph("参考值来源：" + str(s["reference_source"]))
     doc.add_paragraph("实验层级：" + str(s.get("observation_level", "unit_means")))
     doc.add_paragraph("按用户登记的独立设计计算；独立性未由软件自动验证。")
+    if s.get("method") == "mean_difference":
+        doc.add_paragraph("采用 GL003 5.3 均值差法作为主判据；不进行 t 检验。")
     names = [
         ("均值差", "difference"),
         ("t 值", "t"),
@@ -298,6 +300,10 @@ def _stability_table(doc: Any, name: str, s: dict[str, Any], sig: int) -> None:
         ("t 检验结论", "pass"),
         ("均值差判据", "mean_difference_pass"),
     ]
+    if s.get("method") == "mean_difference":
+        names = [
+            (label, key) for label, key in names if key in ("difference", "mean_difference_pass")
+        ]
     rows = []
     for label, key in names:
         value = s.get(key)
@@ -309,9 +315,9 @@ def _stability_table(doc: Any, name: str, s: dict[str, Any], sig: int) -> None:
             shown = _shown(value, sig)
         rows.append([label, shown])
     _table(doc, ["项目", "结果"], rows)
-    if s.get("t") is None:
+    if s.get("method") != "mean_difference" and s.get("t") is None:
         doc.add_paragraph("t 检验未评价：标准误为零或统计量不可计算。")
-    else:
+    elif s.get("method") != "mean_difference":
         relation = "<" if s.get("pass") else "≥"
         conclusion = "未发现显著变化" if s.get("pass") else "存在显著变化"
         doc.add_paragraph(
@@ -662,11 +668,10 @@ def _project_methods(doc: Any, data: dict[str, Any], cfg: dict[str, Any]) -> Non
         "判据比较采用相对容差 1e-12，容差内按相等处理；原始计算值未修约。"
         "严格小于的判据在相等时不通过，接近边界的结果应人工复核。"
     )
-    method = (
-        "单均值 t 检验：CNAS-GL003:2018 5.2.1"
-        if cfg.get("stability_method") == "one_sample"
-        else "两均值 t 检验：CNAS-GL003:2018 5.2.2"
-    )
+    method = {
+        "one_sample": "单均值 t 检验：CNAS-GL003:2018 5.2.1",
+        "mean_difference": "均值差法：CNAS-GL003:2018 5.3",
+    }.get(cfg.get("stability_method") or "", "两均值 t 检验：CNAS-GL003:2018 5.2.2")
     _table(
         doc,
         ["项目", "选择与依据"],
@@ -842,7 +847,8 @@ def make_report(
     if periods and result.get("标准模式") != "gbt28043":
         for name, period in periods.items():
             doc.add_paragraph(
-                f"稳定性 {name}（GL003 5.3，参考判据）："
+                f"稳定性 {name}（GL003 5.3，"
+                f"{'主判据' if period.get('method') == 'mean_difference' else '参考判据'}）："
                 f"{_shown(period.get('mean_difference_pass'))}；"
                 f"均值差={_shown(period.get('difference'), sig)}，"
                 f"0.3σ={_shown(period.get('threshold'), sig)}。"

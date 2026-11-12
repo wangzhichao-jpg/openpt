@@ -7,6 +7,7 @@ from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
+from ..core.decision import compare
 from ..core.gbt28043 import homogeneity as gbt_homogeneity
 from ..core.gbt28043 import period_options as gbt_period_options
 from ..core.gbt28043 import stability as gbt_stability
@@ -99,6 +100,15 @@ def _standard_value(
             {"Ss": "ss", "均匀性基本限值": "basic_limit", "均匀性扩展限值": "extended_limit"}[name]
         ]
     groups = data.get("stability", {})
+    gbt_period = result.get("GB/T稳定性", {}).get(group)
+    if gbt_period and name in ("稳定性均值差", "稳定性基本限值", "稳定性扩展限值"):
+        return gbt_period[
+            {
+                "稳定性均值差": "difference",
+                "稳定性基本限值": "basic_limit",
+                "稳定性扩展限值": "extended_limit",
+            }[name]
+        ]
     if (
         name in ("稳定性均值差", "稳定性基本限值", "稳定性扩展限值")
         and "基线" in groups
@@ -127,6 +137,29 @@ def _values(
 ) -> tuple[Any, Any, str]:
     name = claim["name"]
     cfg = data["config"]
+    aliases = {
+        "均值差": "稳定性均值差",
+        "|x̄-ȳ|": "稳定性均值差",
+        "F值": "F",
+        "方差分析F值": "F",
+        "0.3σ": "稳定性基本限值",
+        "0.3σ阈值": "稳定性基本限值",
+    }
+    canonical = aliases.get(name, name)
+    group = claim.get("timegroup") or "稳定期"
+    period = (
+        result.get("稳定性", {})
+        if group == "稳定期"
+        else result.get("其他稳定性", {}).get(group, {})
+    )
+    if name in ("x̄", "xbar", "均匀性总平均值"):
+        value = result.get("均匀性", {}).get("mean")
+        return value, value, ""
+    if name in ("ȳ", "ȳ", "ybar", "稳定性时间组平均值"):
+        value = period.get("mean2")
+        return value, value, ""
+    if canonical != name:
+        return _values(data, result, {**claim, "name": canonical})
     standard_names = (
         "Ss",
         "均匀性基本限值",
@@ -148,7 +181,11 @@ def _values(
             recommended_value = _standard_value(data, result, claim, selected)
         except ValueError:
             return None, None, "标准模式所需数据或实验设计不适用"
-        note = f"报告标准模式={report_mode}；推荐模式={selected}"
+        note = (
+            ""
+            if report_mode == selected and cfg.get("stability_method") == "mean_difference"
+            else f"报告标准模式={report_mode}；推荐模式={selected}"
+        )
         if selected == "gbt28043" and name.endswith("限值"):
             rule_key = "gbt_hom_rule" if name.startswith("均匀性") else "gbt_stability_rule"
             primary = cfg.get(rule_key) or "basic"
@@ -413,6 +450,22 @@ def _review_claim(
     except (ValueError, TypeError, OverflowError):
         raise ValueError("报告声称值显示小数位须为0至12的整数") from None
     reproduced, rec, note = _values(data, result, claim)
+    if name in ("x̄", "xbar", "均匀性总平均值") and rec is not None:
+        group = claim.get("timegroup") or "稳定期"
+        period = (
+            result.get("稳定性", {})
+            if group == "稳定期"
+            else result.get("其他稳定性", {}).get(group, {})
+        )
+        if display(claim["value"], digits) != display(rec, digits):
+            mean, threshold = period.get("mean2"), period.get("threshold")
+            note = f"报告 x̄={claim['value']}；均匀性总平均值={rec}"
+            if mean is not None and threshold is not None:
+                stated_pass = compare(abs(claim["value"] - mean), threshold) <= 0
+                correct_pass = compare(abs(rec - mean), threshold) <= 0
+                note += "；结论不受影响" if stated_pass == correct_pass else "；结论受影响"
+            else:
+                note += "；结论影响未评价"
     types = []
     if name in ("x*", "s*") and model == "absolute":
         types.append("REPORT_RULE_UNKNOWN")
@@ -501,7 +554,9 @@ def _composite_row(
     )
 
 
-def _design_rows(result: dict[str, Any], mapping: dict[str, Any]) -> list[dict[str, Any]]:
+def _design_rows(
+    result: dict[str, Any], mapping: dict[str, Any], *, suppress_t_sample_warning: bool = False
+) -> list[dict[str, Any]]:
     """将稳定性抽样设计提示单独列入复核清单。"""
     periods = []
     if result.get("稳定性"):
@@ -510,6 +565,8 @@ def _design_rows(result: dict[str, Any], mapping: dict[str, Any]) -> list[dict[s
     rows = []
     for name, values in periods:
         warnings = values.get("design_warnings", [])
+        if suppress_t_sample_warning:
+            warnings = [warning for warning in warnings if "GL003 5.2." not in warning]
         if not warnings:
             continue
         rows.append(
@@ -562,12 +619,40 @@ def review(
                 "说明": "报告模式与推荐模式不同；差异不自动认定为报告错误。",
             }
         )
+    report_method = cfg.get("report_stability_method")
+    selected_method = cfg.get("stability_method") or "two_sample"
+    if report_method not in (None, "", "one_sample", "two_sample", "mean_difference"):
+        raise ValueError("report_stability_method 无效")
+    if report_method and report_method != selected_method:
+        rows.append(
+            {
+                "统计量": "稳定性方法",
+                "声称值": report_method,
+                "来源": "方法配置",
+                "显示小数位": None,
+                "按报告模型复现值": report_method,
+                "按推荐模型重算值": selected_method,
+                "显示一致": True,
+                "推荐一致": False,
+                "状态": "NOTE",
+                "差异类型": "MODEL_SWITCH",
+                "评分条目": _mapping_item(mapping, "稳定性方法", "homogeneity"),
+                "说明": "报告声明的方法与配置不同，须按报告实际方法重新配置并复核。",
+            }
+        )
     for claim in data["claims"]:
         rows.extend(_review_claim(data, result, claim, models, mapping))
     composite = _composite_row(data, result, mapping)
     if composite is not None:
         rows.append(composite)
-    rows.extend(_design_rows(result, mapping))
+    rows.extend(
+        _design_rows(
+            result,
+            mapping,
+            suppress_t_sample_warning=report_method == "mean_difference"
+            and selected_method != "mean_difference",
+        )
+    )
     for row in rows:
         if row["状态"] in ("NOTE", "DIFFERENCE") and not row["差异类型"]:
             row["差异类型"] = "REVIEW_NOTE" if row["状态"] == "NOTE" else "REVIEW_REQUIRED"

@@ -306,10 +306,25 @@ def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]
     groups = data["stability"]
     method = cfg.get("stability_method") or "two_sample"
     if groups:
+        source = _option(
+            cfg,
+            "baseline_source",
+            "homogeneity" if method == "mean_difference" else "baseline_group",
+        )
+        if source not in ("homogeneity", "baseline_group"):
+            raise InputError("baseline_source 应为 homogeneity 或 baseline_group")
         if "稳定期" not in groups or (method == "two_sample" and "基线" not in groups):
             raise ValueError("稳定性须指定基线及稳定期组")
+        baseline_data = data["homogeneity"] if source == "homogeneity" else groups.get("基线")
+        if (method == "mean_difference" or standard == "gbt28043") and not baseline_data:
+            raise InputError("所选基线来源没有数据")
         raw = cfg.get("reference")
         reference = float(raw) if raw not in (None, "") else None
+        if method == "mean_difference":
+            if source == "homogeneity":
+                reference = result["均匀性"]["mean"]
+            else:
+                reference = sum(sum(row) / len(row) for row in baseline_data) / len(baseline_data)
         level = _option(cfg, "observation_level", "unit_means")
         if level not in ("unit_means", "all_repeats"):
             raise ValueError("未知实验层级")
@@ -320,7 +335,9 @@ def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]
             "reference_uncertainty_negligible": _option(
                 cfg, "reference_uncertainty_negligible", True
             ),
-            "reference_source": _option(cfg, "reference_source", None),
+            "reference_source": source
+            if method == "mean_difference"
+            else _option(cfg, "reference_source", None),
         }
         result["稳定性"] = stability(
             groups.get("基线"),
@@ -358,7 +375,7 @@ def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]
         if extra:
             result["其他稳定性"] = extra
         if standard == "gbt28043":
-            if method != "two_sample":
+            if method not in ("two_sample", "mean_difference"):
                 raise InputError("GB/T 28043 稳定性模式需要两组样品")
             settings = gbt_period_options(cfg, groups)
             independent = design_options["design"] == "independent"
@@ -367,7 +384,7 @@ def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]
                 if name == "基线":
                     continue
                 period = gbt_stability(
-                    groups["基线"],
+                    baseline_data,
                     observations,
                     sigma,
                     delta_e=delta_e,
