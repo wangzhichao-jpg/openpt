@@ -1,4 +1,4 @@
-# OpenPT 0.1.0（本地发布准备，未公开发布）
+# OpenPT 0.2.0.dev1（封闭内测，未公开发布）
 
 能力验证统计工作台原型，提供单因子 ANOVA、Ss、稳定性 t 检验、算法 A 和 S、中位数与 NIQR、指定值及不确定度、D、D%、z、z′、ζ、En、Excel 模板、复核差异表与 DOCX。计算结果供具备资质的人员复核使用；方法依据为 CNAS-GL003:2018、CNAS-GL002:2018，用户可配置。**当前尚未通过全部验收，不得用于正式评价或直接发布。**
 
@@ -14,7 +14,7 @@ py -m pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -e ".[test]"
 `py -m openpt run input.xlsx` 等命令。可选 Wine 测试及其局限见
 [Windows 兼容性测试](docs/Windows兼容性测试.md)。
 
-Linux/macOS：
+Linux（用于开发和持续集成，不提供 macOS 支持承诺）：
 
 ```sh
 python -m pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -e '.[test]'

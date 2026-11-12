@@ -2,7 +2,7 @@ cff-version: 1.2.0
 title: OpenPT
 message: 请引用此软件的具体版本。
 type: software
-version: 0.1.0
+version: 0.2.0.dev1
 license: Apache-2.0
 authors:
   - name: OpenPT contributors
