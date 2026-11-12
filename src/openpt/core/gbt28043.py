@@ -10,7 +10,7 @@ from scipy.stats import chi2, f
 
 from ..config.catalog import ENUMS
 from ..errors import InputError
-from ..io.shape import insufficient_units
+from ..io.shape import insufficient_replicates, insufficient_units
 from .decision import compare
 
 
@@ -23,7 +23,7 @@ def _matrix(data: Any, label: str, *, minimum_repeats: int = 2) -> Any:
     if (
         a.ndim != 2
         or insufficient_units(a.shape[0])
-        or a.shape[1] < minimum_repeats
+        or insufficient_replicates(a.shape[1], minimum_repeats)
         or not np.isfinite(a).all()
     ):
         raise InputError(f"{label}需要至少两个样品、每样至少{minimum_repeats}次有限测量")

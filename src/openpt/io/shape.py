@@ -52,6 +52,11 @@ def stability_structure_problem(
     return None
 
 
+def insufficient_replicates(count: int, minimum: int) -> bool:
+    """工作表校验和矩阵计算使用同一最小重复数判断。"""
+    return count < minimum
+
+
 def insufficient_homogeneity_replicates(count: int) -> bool:
     """常规方差分析要求每个均匀性单元至少两次重复。"""
-    return count < 2
+    return insufficient_replicates(count, 2)
