@@ -144,6 +144,8 @@ def split_measurands(book: Any, mapping: dict[str, Any] | None = None) -> list[d
             del clone["被测量配置"]
         unit = options[name].get("单位")
         if unit is not None:
+            if "项目信息" not in clone.sheetnames:
+                raise InputError("缺少工作表：项目信息")
             if not isinstance(unit, str) or not unit.strip():
                 raise InputError(f"{option_sources[name]['单位']}: 单位须为非空文字")
             ws = clone["项目信息"]
@@ -162,6 +164,8 @@ def split_measurands(book: Any, mapping: dict[str, Any] | None = None) -> list[d
                 raise InputError("项目信息：缺少单位字段")
         appended = {}
         if options[name]:
+            if "方法配置" not in clone.sheetnames:
+                clone.create_sheet("方法配置").append(["字段", "值"])
             ws = clone["方法配置"]
             aliases = mapping.get("方法配置", {})
             key_col = _field_column(ws, aliases.get("字段", "字段"))

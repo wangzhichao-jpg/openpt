@@ -20,7 +20,7 @@ from openpyxl.worksheet.datavalidation import DataValidation
 from ..errors import InputError
 from .layout import wide_to_long
 from .measurands import split_measurands
-from .shape import insufficient_homogeneity_replicates
+from .shape import STABILITY_METHOD_ALIASES, insufficient_homogeneity_replicates
 
 SHEETS = {
     "项目信息": ["字段", "值"],
@@ -306,12 +306,8 @@ def _metadata(book: Any) -> tuple[dict[str, Any], dict[str, Any]]:
             "关闭",
         ):
             value = value == "启用"
-        if key == "stability_method" and value in ("两均值", "单均值", "均值差法（GL003 5.3）"):
-            value = {
-                "两均值": "two_sample",
-                "单均值": "one_sample",
-                "均值差法（GL003 5.3）": "mean_difference",
-            }[value]
+        if key == "stability_method" and value in STABILITY_METHOD_ALIASES:
+            value = STABILITY_METHOD_ALIASES[value]
         config[key] = value
     return info, config
 
@@ -572,9 +568,11 @@ def read_workbook(
     if columns and set(columns) - set(SHEETS):
         raise InputError("列映射包含未知工作表")
     book._openpt_columns = columns or {}
-    missing = set(SHEETS) - {"指定值与不确定度", "算法S", "候选批次"} - set(book.sheetnames)
-    if missing:
-        raise InputError("缺少工作表：" + ", ".join(sorted(missing)))
+    if "项目信息" not in book.sheetnames:
+        raise InputError("缺少工作表：项目信息")
+    for sheet, headers in SHEETS.items():
+        if sheet not in book.sheetnames:
+            book.create_sheet(sheet).append(headers)
     info, config = _metadata(book)
     separated = split_measurands(book, columns)
     if separated:

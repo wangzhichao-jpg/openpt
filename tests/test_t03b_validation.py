@@ -38,6 +38,7 @@ def test_xlsx_issues_and_mapping(tmp_path: Path) -> None:
         ("INSUFFICIENT_REPLICATES", "均匀性", "C2", 1.2),
         ("INSUFFICIENT_REPLICATES", "均匀性", "C4", "=1+2"),
         ("INSUFFICIENT_REPLICATES", "均匀性", "C5", None),
+        ("MISSING_SHEET", "项目信息", "A1", None),
     }
     assert hashlib.sha256(path.read_bytes()).digest() == original
 
@@ -71,9 +72,10 @@ def test_cross_sheet_units(tmp_path: Path) -> None:
     second.append(["P1", 1.0, "g"])
     book.save(path)
     issues = inspect_input(path)
-    assert [(i.category, i.sheet, i.cell, i.original) for i in issues] == [
-        ("UNIT_MISMATCH", "参加者结果", "C2", "g")
+    assert ("UNIT_MISMATCH", "参加者结果", "C2", "g") in [
+        (i.category, i.sheet, i.cell, i.original) for i in issues
     ]
+    assert any(i.category == "MISSING_SHEET" and i.sheet == "项目信息" for i in issues)
 
 
 def test_non_measurement_issues(tmp_path: Path) -> None:

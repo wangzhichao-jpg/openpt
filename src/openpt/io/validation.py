@@ -16,7 +16,12 @@ from ..errors import InputError
 from .excel import PARTICIPANT_OPTIONAL, SHEETS
 from .layout import wide_to_long
 from .measurands import DATA_SHEETS, split_measurands
-from .shape import insufficient_homogeneity_replicates, insufficient_units
+from .shape import (
+    STABILITY_METHOD_ALIASES,
+    insufficient_homogeneity_replicates,
+    insufficient_units,
+    stability_structure_problem,
+)
 
 MEASUREMENT_SHEETS = ("均匀性", "稳定性", "参加者结果")
 
@@ -97,6 +102,7 @@ def _check_rows(
     csv_numbers: bool = False,
     formulas: set[str] | None = None,
     replicate_type: str = "technical",
+    standard: str = "gl003",
 ) -> list[Issue]:
     """检查缺失、单位、编号、非数值和没有缓存的公式。"""
     if not rows:
@@ -207,6 +213,30 @@ def _check_rows(
             issues.append(
                 Issue("INSUFFICIENT_SAMPLES", sheet, cell, original, f"{name}至少需要两个单元")
             )
+        if (
+            sheet == "均匀性"
+            and standard == "gbt28043"
+            and replicate_type != "single"
+            and len({len(repeats) for repeats, _, _ in group.values()}) > 1
+        ):
+            _, row_number, original = next(iter(group.values()))
+            cell = f"{get_column_letter(positions['值'] + 1)}{row_number}"
+            issues.append(
+                Issue("UNBALANCED_REPEATS", sheet, cell, original, "GB/T 模式需要平衡重复")
+            )
+        if sheet == "稳定性" and standard == "gbt28043":
+            for uid, (repeats, row_number, original) in group.items():
+                if insufficient_homogeneity_replicates(len(repeats)):
+                    cell = f"{get_column_letter(positions['值'] + 1)}{row_number}"
+                    issues.append(
+                        Issue(
+                            "INSUFFICIENT_REPLICATES",
+                            sheet,
+                            cell,
+                            original,
+                            f"GB/T 模式中单元 {uid} 至少需要两次重复",
+                        )
+                    )
         if sheet == "稳定性" and len({len(repeats) for repeats, _, _ in group.values()}) > 1:
             _, row_number, original = next(iter(group.values()))
             cell = f"{get_column_letter(positions['值'] + 1)}{row_number}"
@@ -227,9 +257,12 @@ def _check_numeric_table(
     required = ("统计量", "声称值", "来源") if sheet == "报告声称值" else tuple(SHEETS[sheet])
     numeric = ("声称值", "显示小数位") if sheet == "报告声称值" else tuple(SHEETS[sheet])
     issues = []
+    populated_rows = []
+    previous_df: float | None = None
     for number, row in enumerate(rows[1:], 2):
         if not any(value not in (None, "") for value in row):
             continue
+        populated_rows.append(number)
         for field in dict.fromkeys((*required, *numeric)):
             column = positions[field]
             value = row[column] if column < len(row) else None
@@ -248,6 +281,49 @@ def _check_numeric_table(
                     valid = False
                 if not valid:
                     issues.append(Issue("NON_NUMERIC", sheet, cell, value, "数值必须为有限数"))
+        if sheet == "算法S":
+            for field in SHEETS[sheet]:
+                column = positions[field]
+                value = row[column] if column < len(row) else None
+                cell = f"{get_column_letter(column + 1)}{number}"
+                if (
+                    cell in formulas
+                    or isinstance(value, bool)
+                    or not isinstance(value, (int, float))
+                ):
+                    continue
+                try:
+                    if not math.isfinite(value):
+                        continue
+                except OverflowError:
+                    continue
+                if field == "标准差或极差" and value < 0:
+                    issues.append(
+                        Issue("INVALID_VALUE", sheet, cell, value, "标准差或极差不得为负")
+                    )
+                if field == "自由度":
+                    if (
+                        value != int(value)
+                        or not 1 <= value <= 10
+                        or (previous_df is not None and value != previous_df)
+                    ):
+                        issues.append(
+                            Issue("INVALID_DF", sheet, cell, value, "自由度须为 1 至 10 的相同整数")
+                        )
+                    previous_df = float(value)
+    if sheet == "算法S" and populated_rows and insufficient_units(len(populated_rows)):
+        column = positions["标准差或极差"]
+        number = populated_rows[0]
+        row = rows[number - 1]
+        issues.append(
+            Issue(
+                "INSUFFICIENT_SAMPLES",
+                sheet,
+                f"{get_column_letter(column + 1)}{number}",
+                row[column] if column < len(row) else None,
+                "算法 S 需要至少两个结果",
+            )
+        )
     return issues
 
 
@@ -395,6 +471,11 @@ def inspect_input(
         issues: list[Issue] = []
         replicate_type = "technical"
         layout = None
+        config_values: dict[str, Any] = {}
+        config_cells: dict[str, str] = {}
+        stability_groups: set[str] = set()
+        homogeneity_present = False
+        calculation_data_present = False
         if "方法配置" in book.sheetnames:
             config_rows = [list(row) for row in book["方法配置"].iter_rows(values_only=True)]
             if config_rows:
@@ -405,6 +486,15 @@ def inspect_input(
                     field = match.group(1) if match else str(key)
                     col = positions["值"]
                     value = row[col] if col < len(row) else None
+                    if field == "stability_method" and value in STABILITY_METHOD_ALIASES:
+                        value = STABILITY_METHOD_ALIASES[value]
+                    if field in (
+                        "strict_homogeneity",
+                        "reference_uncertainty_negligible",
+                    ) and value in ("启用", "关闭"):
+                        value = value == "启用"
+                    config_values[field] = value
+                    config_cells[field] = f"{get_column_letter(col + 1)}{index}"
                     if field == "layout":
                         if value not in (None, "", "long", "wide"):
                             issues.append(
@@ -441,11 +531,25 @@ def inspect_input(
                     else:
                         replicate_type = value or "technical"
         project_unit: Any = None
-        if "项目信息" in book.sheetnames:
-            for row in book["项目信息"].iter_rows(min_row=2, values_only=True):
-                if len(row) >= 2 and row[0] == "单位" and row[1] not in (None, ""):
-                    project_unit = row[1]
-                    break
+        if "项目信息" not in book.sheetnames:
+            issues.append(Issue("MISSING_SHEET", "项目信息", "A1", None, "缺少项目信息工作表"))
+        else:
+            metadata_rows = [list(row) for row in book["项目信息"].iter_rows(values_only=True)]
+            if not metadata_rows:
+                raise InputError("项目信息：缺少表头")
+            pos = _positions(metadata_rows[0], "项目信息", mapping)
+            fields: dict[str, tuple[Any, int]] = {}
+            for number, row in enumerate(metadata_rows[1:], 2):
+                key = row[pos["字段"]] if pos["字段"] < len(row) else None
+                if key:
+                    value = row[pos["值"]] if pos["值"] < len(row) else None
+                    fields[str(key)] = (value, number)
+            for name in ("项目名称", "单位"):
+                value, number = fields.get(name, (None, 1))
+                if not value:
+                    cell = f"{get_column_letter(pos['值'] + 1)}{number}" if number != 1 else "A1"
+                    issues.append(Issue("MISSING", "项目信息", cell, value, f"{name}必填"))
+            project_unit = fields.get("单位", (None, 1))[0]
         if not set(MEASUREMENT_SHEETS).intersection(book.sheetnames):
             raise InputError("缺少可检查的测量工作表")
         for sheet in MEASUREMENT_SHEETS:
@@ -490,7 +594,19 @@ def inspect_input(
                 effective_mapping,
                 formulas=formulas,
                 replicate_type=replicate_type,
+                standard=config_values.get("criterion_standard") or "gl003",
             )
+            populated = [row for row in rows[1:] if any(value not in (None, "") for value in row)]
+            calculation_data_present |= bool(populated)
+            if sheet == "均匀性":
+                homogeneity_present = bool(populated)
+            elif sheet == "稳定性" and rows:
+                group_col = _positions(rows[0], sheet, effective_mapping)["时间组"]
+                stability_groups.update(
+                    str(row[group_col])
+                    for row in populated
+                    if group_col < len(row) and row[group_col] not in (None, "")
+                )
             issues.extend(_restore_origin(issue, origins, original_rows) for issue in found)
             if rows:
                 position = _positions(rows[0], sheet, effective_mapping)["单位"]
@@ -526,8 +642,15 @@ def inspect_input(
                 if sheet in ("报告声称值", "算法S"):
                     if sheet == "报告声称值":
                         issues.extend(_unsupported_measurand(sheet, rows))
+                    elif any(any(value not in (None, "") for value in row) for row in rows[1:]):
+                        calculation_data_present = True
                     issues.extend(_check_numeric_table(sheet, rows, mapping, formulas))
                 else:
+                    if sheet == "指定值与不确定度":
+                        calculation_data_present |= any(
+                            len(row) >= 2 and row[0] == "method" and row[1] not in (None, "")
+                            for row in rows[1:]
+                        )
                     issues.extend(_check_numeric_config(sheet, rows, mapping, formulas))
             for row in book[sheet].iter_rows():
                 for cell in row:
@@ -537,6 +660,44 @@ def inspect_input(
                     category = "FORMULA_NO_CACHE" if cached is None else "FORMULA"
                     message = "公式没有缓存值" if cached is None else "现有计算器不接受公式"
                     issues.append(Issue(category, sheet, cell.coordinate, cell.value, message))
+        method = config_values.get("stability_method") or "two_sample"
+        baseline_source = config_values.get("baseline_source") or (
+            "homogeneity" if method == "mean_difference" else "baseline_group"
+        )
+        problem = stability_structure_problem(
+            stability_groups,
+            method,
+            baseline_source,
+            homogeneity_present,
+            config_values.get("reference"),
+            config_values.get("criterion_standard") or "gl003",
+            requires_reference=(config_values.get("stability_design") or "independent")
+            == "independent"
+            and config_values.get("reference_uncertainty_negligible", True) is not False,
+        )
+        if problem:
+            category, message = problem
+            field = "reference" if category == "MISSING_CONFIG" else "stability_method"
+            sheet = "方法配置" if category in ("MISSING_CONFIG", "INVALID_CONFIG") else "稳定性"
+            cell = config_cells.get(field, "B1") if sheet == "方法配置" else "A1"
+            issues.append(Issue(category, sheet, cell, None, message))
+        if (
+            stability_groups
+            and config_values.get("criterion_standard") == "gbt28043"
+            and baseline_source == "homogeneity"
+            and replicate_type == "single"
+        ):
+            issues.append(
+                Issue(
+                    "INSUFFICIENT_REPLICATES",
+                    "均匀性",
+                    "A1",
+                    None,
+                    "当前 GB/T 稳定性基线需要每单元至少两次重复",
+                )
+            )
+        if not calculation_data_present:
+            issues.append(Issue("NO_DATA", "均匀性", "A1", None, "没有可计算的数据"))
         unique: list[Issue] = []
         for issue in issues:
             if issue not in unique:

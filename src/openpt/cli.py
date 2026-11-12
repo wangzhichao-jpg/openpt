@@ -25,6 +25,7 @@ from .core.stability import analyze as stability
 from .core.zscore import zscore
 from .errors import InputError
 from .io.excel import template
+from .io.shape import stability_structure_problem
 from .report.docx import make_report
 
 
@@ -364,14 +365,20 @@ def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]
             "baseline_source",
             "homogeneity" if method == "mean_difference" else "baseline_group",
         )
-        if source not in ("homogeneity", "baseline_group"):
-            raise InputError("baseline_source 应为 homogeneity 或 baseline_group")
-        if "稳定期" not in groups or (method == "two_sample" and "基线" not in groups):
-            raise ValueError("稳定性须指定基线及稳定期组")
-        baseline_data = data["homogeneity"] if source == "homogeneity" else groups.get("基线")
-        if (method == "mean_difference" or standard == "gbt28043") and not baseline_data:
-            raise InputError("所选基线来源没有数据")
         raw = cfg.get("reference")
+        problem = stability_structure_problem(
+            groups,
+            method,
+            source,
+            bool(data["homogeneity"]),
+            raw,
+            standard,
+            requires_reference=_option(cfg, "stability_design", "independent") == "independent"
+            and _option(cfg, "reference_uncertainty_negligible", True) is True,
+        )
+        if problem:
+            raise InputError(problem[1])
+        baseline_data = data["homogeneity"] if source == "homogeneity" else groups.get("基线")
         reference = float(raw) if raw not in (None, "") else None
         if method == "mean_difference":
             if source == "homogeneity":

@@ -8,6 +8,7 @@ from typing import Any
 import numpy as np
 
 from ..errors import InputError
+from ..io.shape import insufficient_units
 from .models import AlgorithmAResult, AlgorithmSResult, MedianIqrResult
 
 # CNAS-GL002:2018 附录 A.2，式 A.2、A.3、A.6。
@@ -190,7 +191,12 @@ def algorithm_s(
         data = np.asarray(values, dtype=float)
     except (ValueError, TypeError):
         raise InputError("算法 S 数据必须为有限数") from None
-    if data.ndim != 1 or len(data) < 2 or not np.isfinite(data).all() or (data < 0).any():
+    if (
+        data.ndim != 1
+        or insufficient_units(len(data))
+        or not np.isfinite(data).all()
+        or (data < 0).any()
+    ):
         raise InputError("算法 S 需要至少两个非负有限标准差或极差")
     if isinstance(df, bool) or not isinstance(df, int) or not 1 <= df <= 10:
         raise InputError("算法 S 自由度必须为 1 至 10")

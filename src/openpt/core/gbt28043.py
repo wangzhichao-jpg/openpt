@@ -9,6 +9,7 @@ import numpy as np
 from scipy.stats import chi2, f
 
 from ..errors import InputError
+from ..io.shape import insufficient_homogeneity_replicates, insufficient_units
 from .decision import compare
 
 
@@ -18,7 +19,12 @@ def _matrix(data: Any, label: str) -> Any:
         a = np.asarray(data, dtype=float)
     except (TypeError, ValueError):
         raise InputError(f"{label}必须是平衡数值矩阵") from None
-    if a.ndim != 2 or a.shape[0] < 2 or a.shape[1] < 2 or not np.isfinite(a).all():
+    if (
+        a.ndim != 2
+        or insufficient_units(a.shape[0])
+        or insufficient_homogeneity_replicates(a.shape[1])
+        or not np.isfinite(a).all()
+    ):
         raise InputError(f"{label}需要至少两个样品、每样至少两次有限重复测量")
     return a
 
