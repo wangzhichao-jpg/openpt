@@ -50,7 +50,10 @@ def criterion_limit(
         raise InputError("gbt_criterion_basis 应为 sigma_pt 或 delta_e")
     if not basis:
         if sigma is not None and delta_e is not None:
-            raise InputError("同时输入 sigma 和 delta_e 时须选择 gbt_criterion_basis")
+            raise InputError(
+                "同时输入 sigma 和 delta_e 时须选择 gbt_criterion_basis；"
+                "请清空其中一个，或明确选择 sigma_pt 或 delta_e 作为依据"
+            )
         basis = "delta_e" if delta_e is not None else "sigma_pt"
     elif (basis == "sigma_pt" and sigma is None) or (basis == "delta_e" and delta_e is None):
         raise InputError("所选 gbt_criterion_basis 缺少对应输入")

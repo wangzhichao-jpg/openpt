@@ -39,6 +39,8 @@ def _table(doc: Any, headers: list[str], rows: list[list[Any]]) -> None:
     table.style = "Table Grid"
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
     widths = [1.45, 1.35, 1.55, 1.55, 1.35, 2.5, 4.0, 2.0] if len(headers) == 8 else None
+    if len(headers) == 9 and "适用标准" in headers:
+        widths = [1.25, 1.3, 1.15, 1.35, 1.35, 1.2, 1.6, 5.1, 2.2]
     if headers == ["时间（UTC）", "条目", "决定", "人员", "备注", "结果 SHA-256"]:
         widths = [3.9, 1.7, 1.5, 2.0, 3.1, 5.8]
     if widths:
@@ -371,6 +373,18 @@ def _gbt_homogeneity_results(
         "基本和扩展判据均供核查；主判据须在试验前选定，另一结果仅供参考，处置由授权人员决定。"
     )
     basis = result.get("主判据", {}).get("criterion_basis", "sigma_pt")
+    sigma_field = (
+        "sigma"
+        if cfg.get("sigma") not in (None, "")
+        else "sigma_pt"
+        if cfg.get("sigma_pt") not in (None, "")
+        else None
+    )
+    doc.add_paragraph(
+        f"本次 GB/T 判据使用的 σ_pt 取自配置字段 {sigma_field}。"
+        if sigma_field
+        else "本次 GB/T 判据未提供 σ_pt。"
+    )
     doc.add_paragraph(
         f"基本判据依据：{basis}；δ_E={_shown(cfg.get('delta_e'), sig)}；"
         f"σ_pt 阶段：{cfg.get('sigma_stage') or '未登记'}；"
@@ -745,6 +759,7 @@ def _difference_table(doc: Any, differences: list[dict[str, Any]]) -> None:
     doc.add_heading("报告复核差异", 1)
     headers = [
         "统计量",
+        "适用标准",
         "声称值",
         "报告模型",
         "推荐模型",
@@ -774,6 +789,7 @@ def _difference_table(doc: Any, differences: list[dict[str, Any]]) -> None:
             rows.append(
                 [
                     row.get("统计量", ""),
+                    row.get("适用标准", "通用"),
                     not_applicable if design else _shown(row.get("声称值"), places=claim_places),
                     not_applicable if design else _shown(row.get("按报告模型复现值")),
                     not_applicable if design else _shown(row.get("按推荐模型重算值")),

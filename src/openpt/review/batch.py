@@ -56,6 +56,7 @@ def write_xlsx(path: str | Path, rows: list[dict[str, Any]]) -> None:
         "项目",
         "输入文件",
         "统计量",
+        "适用标准",
         "声称值",
         "来源",
         "计算数据来源",

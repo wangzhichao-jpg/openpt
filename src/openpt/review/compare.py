@@ -686,6 +686,24 @@ def _design_rows(
     return rows
 
 
+def _applicable_standard(name: str, note: str, selected: str) -> str:
+    """按统计量和复核模式标注标准；跨标准比较明确标出两者。"""
+    if (
+        name in ("F", "F值", "方差分析F值", "t", "s1", "稳定性方法", "GL003均匀性主判据")
+        or (name.endswith("设计") and name != "重复性质设计")
+    ):
+        return "GL003"
+    base = name.removesuffix("（推荐基线）")
+    if base in HOMOGENEITY_CLAIM_NAMES:
+        if (
+            "报告标准模式=gl003；推荐模式=gbt28043" in note
+            or "报告标准模式=gbt28043；推荐模式=gl003" in note
+        ):
+            return "GL003/GB/T"
+        return "GB/T" if selected == "gbt28043" else "GL003"
+    return "通用"
+
+
 def review(
     data: dict[str, Any], result: dict[str, Any], mapping: dict[str, Any] | None = None
 ) -> list[dict[str, Any]]:
@@ -803,6 +821,9 @@ def review(
         )
     )
     for row in rows:
+        row["适用标准"] = _applicable_standard(
+            str(row.get("统计量", "")), str(row.get("说明", "")), selected
+        )
         if row["状态"] in ("NOTE", "DIFFERENCE") and not row["差异类型"]:
             row["差异类型"] = "REVIEW_NOTE" if row["状态"] == "NOTE" else "REVIEW_REQUIRED"
         name = row.get("统计量", "")
@@ -825,6 +846,7 @@ def write_csv(path: str | Path, rows: list[dict[str, Any]]) -> None:
     """将复核明细写入 UTF-8 CSV。"""
     fields = [
         "统计量",
+        "适用标准",
         "声称值",
         "来源",
         "计算数据来源",
