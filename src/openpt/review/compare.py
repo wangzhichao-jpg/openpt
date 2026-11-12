@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from ..core.gbt28043 import homogeneity as gbt_homogeneity
+from ..core.gbt28043 import period_options as gbt_period_options
 from ..core.gbt28043 import stability as gbt_stability
 from ..core.robust import algorithm_a
 from ..core.stability import analyze as stability
@@ -103,15 +104,13 @@ def _standard_value(
         and "基线" in groups
         and group in groups
     ):
-        u1 = float(cfg["stability_u1"]) if cfg.get("stability_u1") not in (None, "") else None
-        u2 = float(cfg["stability_u2"]) if cfg.get("stability_u2") not in (None, "") else None
+        settings = gbt_period_options(cfg, groups)
         s = gbt_stability(
             groups["基线"],
             groups[group],
             sigma,
-            u1=u1,
-            u2=u2 if group == "稳定期" else None,
             independent=(cfg.get("stability_design") or "independent") == "independent",
+            **settings[group],
         )
         return s[
             {

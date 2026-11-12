@@ -93,6 +93,7 @@ def template(path: str | Path) -> None:
         ("基线均值标准不确定度（stability_u1）", ""),
         ("后续均值标准不确定度（stability_u2）", ""),
         ("报告采用标准模式（report_standard）", ""),
+        ("逐时点设置JSON（stability_period_options）", ""),
     ]:
         book["方法配置"].append(config_row)
     for cell, options in [

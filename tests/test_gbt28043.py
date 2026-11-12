@@ -15,7 +15,7 @@ from openpyxl import load_workbook
 from scipy.stats import chi2, f
 
 from openpt.cli import calculate
-from openpt.core.gbt28043 import homogeneity, stability
+from openpt.core.gbt28043 import homogeneity, period_options, stability
 from openpt.errors import InputError
 from openpt.io.excel import read_workbook, template
 from openpt.report.docx import make_report
@@ -98,6 +98,29 @@ def test_stability_boundaries_and_independence() -> None:
         stability(a, b, 1, u1=-1)
 
 
+def test_period_configuration_validation() -> None:
+    groups = {"基线": [], "稳定期": [], "运输期": []}
+    config = {
+        "stability_u1": 0.01,
+        "stability_u2": 0.02,
+        "stability_period_options": '{"运输期":{"kind":"transport","u2":0.03}}',
+    }
+    settings = period_options(config, groups)
+    assert settings["稳定期"] == {"kind": "storage", "u1": 0.01, "u2": 0.02}
+    assert settings["运输期"] == {"kind": "transport", "u1": 0.01, "u2": 0.03}
+    for raw in (
+        '{"运输期":{"u2":0.1,"u2":0.2}}',
+        '{"不存在":{"kind":"transport"}}',
+        '{"运输期":{"kind":"unknown"}}',
+        '{"运输期":{"u2":true}}',
+        '{"运输期":{"u2":-1}}',
+        '{"运输期":{"unexpected":1}}',
+        '{"稳定期":{"u2":0.1}}',
+    ):
+        with pytest.raises(InputError):
+            period_options({**config, "stability_period_options": raw}, groups)
+
+
 def test_template_and_workflow(tmp_path: Path) -> None:
     path = tmp_path / "data.xlsx"
     template(path)
@@ -144,6 +167,26 @@ def test_template_and_workflow(tmp_path: Path) -> None:
     assert transported["basic_pass"] is not None
     assert transported["extended_pass"] is None
     assert any("不复用" in warning for warning in transported["warnings"])
+    data["config"]["stability_period_options"] = '{"运输期":{"kind":"transport","u2":0.03}}'
+    transported = calculate(data)["GB/T稳定性"]["运输期"]
+    assert transported["kind"] == "transport"
+    assert transported["u2"] == 0.03 and transported["extended_pass"] is not None
+    assert "B.6" in transported["reference"]
+    assert any("未运输对照组" in warning for warning in transported["warnings"])
+    data["claims"] = [
+        {
+            "name": "稳定性扩展限值",
+            "value": transported["extended_limit"],
+            "digits": 4,
+            "source": "合成",
+            "model": "gbt28043",
+            "timegroup": "运输期",
+        }
+    ]
+    row = next(r for r in review(data, calculate(data)) if r["统计量"] == "稳定性扩展限值")
+    assert row["显示一致"] and row["推荐一致"]
+    make_report(target, data, calculate(data))
+    assert any("运输稳定性（B.6） 运输期" in p.text for p in Document(target).paragraphs)
 
     data["assigned_config"] = {
         "method": "known",

@@ -364,7 +364,8 @@ def _gbt_results(doc: Any, result: dict[str, Any], cfg: dict[str, Any], sig: int
         for warning in h["warnings"]:
             doc.add_paragraph("提示：" + warning)
     for name, s in result.get("GB/T稳定性", {}).items():
-        doc.add_paragraph(f"稳定性 {name}：B.5.1 式(B.17)、B.5.2 式(B.18)。")
+        kind = "运输稳定性（B.6）" if s.get("kind") == "transport" else "稳定性"
+        doc.add_paragraph(f"{kind} {name}：B.5.1 式(B.17)、B.5.2 式(B.18)。")
         items = [
             ("基线均值", "mean1"),
             ("后续均值", "mean2"),

@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """GB/T 28043-2019 附录 B：平衡重复设计的均匀性及独立样品稳定性。"""
 
+import json
 import math
 from typing import Any
 
@@ -99,6 +100,65 @@ def homogeneity(data: Any, sigma: float | None) -> dict[str, Any]:
     }
 
 
+def period_options(config: dict[str, Any], groups: Any) -> dict[str, dict[str, Any]]:
+    """解析逐时点类型及标准不确定度；不允许把一个时点的 u2 静默用于其他时点。"""
+
+    def pairs(items: list[tuple[str, Any]]) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for key, value in items:
+            if key in result:
+                raise InputError("逐时点配置中存在重复键")
+            result[key] = value
+        return result
+
+    raw = config.get("stability_period_options")
+    if raw in (None, ""):
+        raw = {}
+    elif isinstance(raw, str):
+        try:
+            raw = json.loads(raw, object_pairs_hook=pairs)
+        except (ValueError, TypeError):
+            raise InputError("逐时点配置须为有效 JSON 对象且不得有重复键") from None
+    if not isinstance(raw, dict) or not all(isinstance(k, str) for k in raw):
+        raise InputError("逐时点配置须为对象")
+    names = set(groups) - {"基线"}
+    if set(raw) - names:
+        raise InputError("逐时点配置包含不存在的时间组")
+    u1 = config.get("stability_u1")
+    global_u2 = config.get("stability_u2")
+
+    def uncertainty(value: Any) -> float | None:
+        if value in (None, ""):
+            return None
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise InputError("均值标准不确定度须为非负有限数")
+        try:
+            number = float(value)
+        except OverflowError:
+            raise InputError("均值标准不确定度数值溢出") from None
+        if not math.isfinite(number) or number < 0:
+            raise InputError("均值标准不确定度须为非负有限数")
+        return number
+
+    u1 = uncertainty(u1)
+    global_u2 = uncertainty(global_u2)
+    resolved = {}
+    for name in names:
+        entry = raw.get(name, {})
+        if not isinstance(entry, dict) or set(entry) - {"kind", "u2"}:
+            raise InputError("逐时点配置仅支持 kind 和 u2")
+        kind = entry.get("kind", "storage")
+        if kind not in ("storage", "transport"):
+            raise InputError("稳定性类型应为 storage 或 transport")
+        if name == "稳定期" and "u2" in entry and global_u2 is not None:
+            raise InputError("稳定期不确定度不可同时在两处输入")
+        u2 = (
+            uncertainty(entry["u2"]) if "u2" in entry else (global_u2 if name == "稳定期" else None)
+        )
+        resolved[name] = {"kind": kind, "u1": u1, "u2": u2}
+    return resolved
+
+
 def stability(
     baseline: Any,
     followup: Any,
@@ -107,6 +167,7 @@ def stability(
     u1: float | None = None,
     u2: float | None = None,
     independent: bool = True,
+    kind: str = "storage",
 ) -> dict[str, Any]:
     """按 B.5 评价；B.18 仅在提供两均值独立标准不确定度时计算。"""
     x, y = _matrix(baseline, "稳定性基线"), _matrix(followup, "稳定性后续组")
@@ -114,6 +175,8 @@ def stability(
         raise InputError("sigma 必须为正有限数")
     if not isinstance(independent, bool):
         raise InputError("独立性必须为布尔值")
+    if kind not in ("storage", "transport"):
+        raise InputError("稳定性类型应为 storage 或 transport")
     for value in (u1, u2):
         if value is not None and (not math.isfinite(value) or value < 0):
             raise InputError("均值标准不确定度须为非负有限数")
@@ -131,7 +194,11 @@ def stability(
     )
     if extended_limit is not None and not math.isfinite(extended_limit):
         raise InputError("稳定性扩展限值数值溢出")
-    warnings = ["B.4.2.3：确认随机抽样、相同实验室及方法和测量时间；运输效应按 B.6 人工确认"]
+    warnings = ["B.4.2.3：确认随机抽样、相同实验室及方法和测量时间"]
+    if kind == "transport":
+        warnings.append("B.6：确认基线是未运输对照组、后续组代表运输条件，并记录已知运输影响")
+    else:
+        warnings.append("B.4.2.2：确认是否包含运输影响；单独检验运输影响时登记 transport 类型")
     if x.shape[0] != y.shape[0] or x.shape[1] != y.shape[1]:
         warnings.append("B.4.2.3-B.4.2.4：两组样品数或重复数不同；使用历史均匀性数据须人工确认")
     if not independent:
@@ -140,7 +207,8 @@ def stability(
         warnings.append("B.5.3：评估不稳定性影响、改进制备储存或不进行能力评价")
     return {
         "standard": "gbt28043",
-        "reference": "GB/T 28043-2019 B.4-B.6",
+        "reference": "GB/T 28043-2019 B.5.1-B.5.2" + ("、B.6" if kind == "transport" else ""),
+        "kind": kind,
         "n1": x.shape[0],
         "m1": x.shape[1],
         "n2": y.shape[0],

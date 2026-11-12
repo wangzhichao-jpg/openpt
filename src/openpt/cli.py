@@ -12,6 +12,7 @@ from zipfile import BadZipFile
 from . import __version__
 from .core.assigned import assign_value
 from .core.gbt28043 import homogeneity as gbt_homogeneity
+from .core.gbt28043 import period_options as gbt_period_options
 from .core.gbt28043 import stability as gbt_stability
 from .core.homogeneity import analyze as homogeneity
 from .core.robust import algorithm_a, algorithm_s, median_niqr
@@ -256,23 +257,16 @@ def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]
         if standard == "gbt28043":
             if method != "two_sample":
                 raise InputError("GB/T 28043 稳定性模式需要两组样品")
-            u1_raw, u2_raw = cfg.get("stability_u1"), cfg.get("stability_u2")
-            u1 = float(u1_raw) if u1_raw not in (None, "") else None
-            u2 = float(u2_raw) if u2_raw not in (None, "") else None
+            settings = gbt_period_options(cfg, groups)
             independent = design_options["design"] == "independent"
             gbt_periods = {}
             for name, observations in groups.items():
                 if name == "基线":
                     continue
                 period = gbt_stability(
-                    groups["基线"],
-                    observations,
-                    sigma,
-                    u1=u1,
-                    u2=u2 if name == "稳定期" else None,
-                    independent=independent,
+                    groups["基线"], observations, sigma, independent=independent, **settings[name]
                 )
-                if name != "稳定期" and u2 is not None:
+                if name != "稳定期" and settings[name]["u2"] is None:
                     period["warnings"].append("额外时点不复用稳定期均值不确定度；须分别评定")
                 gbt_periods[name] = period
             result["GB/T稳定性"] = gbt_periods

@@ -66,7 +66,7 @@ python -m pytest -m "not internal"
 
 方法配置表 `alpha` 默认 0.05；`sigma` 缺省时相应提示未评价；`strict_homogeneity` 默认 FALSE；`stability_method` 默认 `two_sample`，可设 `one_sample` 并提供 `reference`；`assigned` 和 `sigma_pt` 用于 z；未提供 `sigma_pt` 时回退到 `sigma`。稳定性推荐模型使用包装单元均值。算法 A 的 `algorithm_a_rule` 默认 `gl002`（第三有效位及对应位），可选 `absolute`（使用 `algorithm_a_tolerance`）或 `simplified`；可配置 `algorithm_a_max_iterations`。程序另算绝对容差收敛对照并放入计算书附录，显示位数不同时提示停止规则敏感。DOCX 参加者 z 值默认保留两位小数，配置 `display_z_decimals` 可设 0～12 位；CSV 和 JSON 不按此设置截断。不平衡均匀性方法及分位数定义见 ADR-002。相关和配对稳定性设计必须在模板中显式声明，程序将阻断结论；参考值不确定度不可忽略时亦须显式声明并阻断。程序不能自动判定设计独立性。全部重复值仅用于复核，常规运行不接受。
 
-封闭内测可在方法配置设置 `criterion_standard=gbt28043`（默认 `gl003`）。GB/T 模式目前仅支持平衡、每样至少两次重复的定量数据；基本及扩展判据分别显示，GL003 计算作为参考。均匀性扩展系数仅在表 B.1 的样品数范围内计算；方法重复性、实验顺序和离群值均需人工审核，程序不自动剔除。稳定性扩展判据须手动输入互相独立的两组均值标准不确定度 `stability_u1`、`stability_u2`；缺失时不评价扩展判据。额外时间组不会复用稳定期的 `stability_u2`，需分别运行并登记不确定度。`report_standard` 可登记报告模式以提示 `STANDARD_MODE`。GB/T 模式仍处开发和验证阶段，未完成全部标准核对，不能用于正式评价；运输条件及不确定度分量的适用性须人工复核。
+封闭内测可在方法配置设置 `criterion_standard=gbt28043`（默认 `gl003`）。GB/T 模式目前仅支持平衡、每样至少两次重复的定量数据；基本及扩展判据分别显示，GL003 计算作为参考。均匀性扩展系数仅在表 B.1 的样品数范围内计算；方法重复性、实验顺序和离群值均需人工审核，程序不自动剔除。稳定性扩展判据须手动输入互相独立的两组均值标准不确定度 `stability_u1`、`stability_u2`；缺失时不评价扩展判据。额外时间组不会复用稳定期的 `stability_u2`；可在 `stability_period_options` 逐组登记，如 `{"运输期":{"kind":"transport","u2":0.02}}`。运输组的基线必须由人员确认是未运输对照，`u2` 为该组均值标准不确定度；同一时点不得同时从全局和逐组配置输入 `u2`。`report_standard` 可登记报告模式以提示 `STANDARD_MODE`。GB/T 模式仍处开发和验证阶段，未完成全部标准核对，不能用于正式评价；运输条件及不确定度分量的适用性须人工复核。
 
 ### 指定值和能力统计量
 
