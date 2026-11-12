@@ -5,6 +5,7 @@ ENUMS: dict[str, tuple[str, ...]] = {
     "decision": ("接受", "退回", "需补充"),
     "stability_method": ("one_sample", "two_sample", "mean_difference", "regression_trend"),
     "trend_aggregate": ("per_series", "time_mean"),
+    "trend_plot": ("TRUE", "FALSE"),
     "design": ("transfer_standard",),
     "stability_window": ("all", "transfer_only"),
     "transfer_mechanism": ("A", "B", "C"),

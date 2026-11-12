@@ -211,6 +211,7 @@ def template(path: str | Path) -> None:
         ("趋势依据来源（trend_source）", ""),
         ("实验设计类型（design）", ""),
         ("参加者传递点映射JSON（transfer_en_map）", ""),
+        ("趋势绘图（trend_plot）", False),
     ]:
         book["方法配置"].append(config_row)
 
@@ -241,6 +242,7 @@ def template(path: str | Path) -> None:
         ("B35", options_for("report_gl003_hom_criterion")),
         ("B36", options_for("trend_aggregate")),
         ("B42", options_for("design")),
+        ("B44", '"启用,关闭"'),
     ]:
         validation = DataValidation(type="list", formula1=options)
         book["方法配置"].add_data_validation(validation)
@@ -366,7 +368,12 @@ def _metadata(book: Any) -> tuple[dict[str, Any], dict[str, Any]]:
         value = row[1].value
         if (
             key
-            in ("strict_homogeneity", "reference_uncertainty_negligible", "algorithm_a_simplified")
+            in (
+                "strict_homogeneity",
+                "reference_uncertainty_negligible",
+                "algorithm_a_simplified",
+                "trend_plot",
+            )
             and isinstance(value, str)
             and value in ("启用", "关闭", "TRUE", "FALSE")
         ):

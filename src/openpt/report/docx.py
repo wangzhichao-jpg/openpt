@@ -524,6 +524,19 @@ def _other_results(
             )
             for warning in trend.get("design_warnings", []):
                 doc.add_paragraph("设计提示：" + warning)
+            if data.get("config", {}).get("trend_plot") is True:
+                from .trend_plot import trend_plot
+
+                image = trend_plot(
+                    data.get("trend_observations", []),
+                    name,
+                    data.get("config", {}).get("trend_aggregate") or "per_series",
+                    trend,
+                )
+                if image is None:
+                    doc.add_paragraph("未安装绘图库或无可绘制数据，已跳过趋势图。")
+                else:
+                    doc.add_picture(image, width=Cm(12.0))
         if result.get("趋势不确定度"):
             doc.add_paragraph(
                 "趋势稳定性分量 u_stab="

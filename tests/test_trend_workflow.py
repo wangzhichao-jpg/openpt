@@ -47,6 +47,26 @@ def test_trend_end_to_end(tmp_path: Path) -> None:
     assert main(["review", str(path), "--runs-dir", str(tmp_path / "reviews")]) == 0
 
 
+def test_trend_wide_time_mean_workbook(tmp_path: Path) -> None:
+    path = tmp_path / "wide.xlsx"
+    template(path)
+    book = load_workbook(path)
+    book["项目信息"]["B2"] = "合成"
+    book["项目信息"]["B3"] = "mg"
+    book["方法配置"]["B5"] = "回归趋势法"
+    book["方法配置"]["B36"] = "time_mean"
+    sheet = book["趋势稳定性"]
+    sheet.delete_rows(1, sheet.max_row)
+    sheet.append(["序列名", "时间单位", "时间=0", "时间=1", "时间=2"])
+    sheet.append(["A", "月", 1.0, 1.1, 1.3])
+    sheet.append(["B", "月", 1.2, 1.3, 1.5])
+    book.save(path)
+    assert inspect_input(path) == []
+    data = read_workbook(path)
+    assert data["trend_observations"][1]["source"] == "趋势稳定性!D2"
+    assert calculate(data)["趋势稳定性"]["时间均值"]["n"] == 3
+
+
 def test_trend_uncertainty_is_mapped_and_duplicate_reviewed(tmp_path: Path) -> None:
     path = tmp_path / "u.xlsx"
     template(path)
@@ -90,6 +110,34 @@ def test_trend_uncertainty_is_mapped_and_duplicate_reviewed(tmp_path: Path) -> N
     data["assigned_config"]["u_stab"] = 1.0
     with pytest.raises(ValueError, match="不可同时"):
         calculate(data)
+
+
+def test_optional_plot_absence_does_not_block_report(tmp_path: Path, monkeypatch) -> None:
+    import builtins
+
+    original = builtins.__import__
+
+    def without_matplotlib(name, *args, **kwargs):
+        if name.startswith("matplotlib"):
+            raise ImportError("optional")
+        return original(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", without_matplotlib)
+    data = {
+        "info": {},
+        "config": {"stability_method": "regression_trend", "trend_plot": True},
+        "homogeneity": [],
+        "stability": {},
+        "participants": [],
+        "claims": [],
+        "trend_observations": [
+            {"series": "A", "time_unit": "天", "x": x, "y": y}
+            for x, y in ((0, 1.0), (1, 1.1), (2, 1.3))
+        ],
+    }
+    target = tmp_path / "report.docx"
+    make_report(target, data, calculate(data))
+    assert "已跳过趋势图" in "\n".join(p.text for p in Document(target).paragraphs)
 
 
 def test_trend_validation_too_few(tmp_path: Path) -> None:

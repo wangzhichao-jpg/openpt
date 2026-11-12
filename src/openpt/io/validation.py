@@ -625,6 +625,7 @@ def inspect_input(
                             "strict_homogeneity",
                             "reference_uncertainty_negligible",
                             "algorithm_a_simplified",
+                            "trend_plot",
                         )
                         and isinstance(value, str)
                         and value in ("启用", "关闭", "TRUE", "FALSE")
