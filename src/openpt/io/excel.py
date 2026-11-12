@@ -17,6 +17,7 @@ from openpyxl.comments import Comment
 from openpyxl.worksheet.datavalidation import DataValidation
 
 from ..errors import InputError
+from .layout import wide_to_long
 from .shape import insufficient_homogeneity_replicates
 
 SHEETS = {
@@ -57,6 +58,9 @@ def template(path: str | Path) -> None:
     instructions.append(["参加者结果", "ζ、En 须填写相应不确定度、k，并登记不相关性。"])
     instructions.append(["算法S", "输入至少两个同类型标准差或极差，每行填写相同自由度。"])
     instructions.append(["候选批次", "预实验结果可填英文逗号分隔的数值；软件不自动选择批次。"])
+    instructions.append(
+        ["长表与宽表", "示例工作表仅供参考，不参与计算；复制相应表头到均匀性或稳定性表后填写数据。"]
+    )
     instructions.column_dimensions["A"].width = 22
     instructions.column_dimensions["B"].width = 80
     for name, headers in SHEETS.items():
@@ -66,6 +70,27 @@ def template(path: str | Path) -> None:
         ws.freeze_panes = "A2"
         for col in ws.columns:
             ws.column_dimensions[col[0].column_letter].width = 22
+    examples = {
+        "示例-均匀性长表": (
+            ["单元编号", "重复编号", "值", "单位"],
+            [["A", 1, 1.0, "mg"], ["A", 2, 1.1, "mg"]],
+        ),
+        "示例-均匀性宽表": (["单元编号", "测定1", "测定2", "单位"], [["A", 1.0, 1.1, "mg"]]),
+        "示例-稳定性长表": (
+            ["时间组", "单元编号", "重复编号", "值", "单位"],
+            [["稳定期", "A", 1, 1.0, "mg"], ["稳定期", "A", 2, 1.1, "mg"]],
+        ),
+        "示例-稳定性宽表": (
+            ["时间组", "单元编号", "测定1", "测定2", "单位"],
+            [["稳定期", "A", 1.0, 1.1, "mg"]],
+        ),
+    }
+    for name, (headers, example_rows) in examples.items():
+        ws = book.create_sheet(name)
+        ws.append(headers)
+        for example_row in example_rows:
+            ws.append(example_row)
+        ws.cell(1, 1).comment = Comment("示例不参与计算，请复制表头和数据到正式工作表。", "OpenPT")
     for col, header in enumerate(("标准不确定度u(x)", "扩展不确定度U(x)", "包含因子k"), 4):
         book["参加者结果"].cell(1, col, header)
     for row in [("项目名称", ""), ("单位", "")]:
@@ -102,6 +127,7 @@ def template(path: str | Path) -> None:
         ("稳定性均值基线来源（baseline_source）", ""),
         ("报告声明的稳定性方法（report_stability_method）", ""),
         ("重复性质（replicate_type）", "technical"),
+        ("测量表布局（layout）", ""),
     ]:
         book["方法配置"].append(config_row)
     for cell, options in [
@@ -123,6 +149,7 @@ def template(path: str | Path) -> None:
         ("B30", '"homogeneity,baseline_group"'),
         ("B31", '"one_sample,two_sample,mean_difference"'),
         ("B32", '"technical,adjacent_specimens,other,single"'),
+        ("B33", '"long,wide"'),
     ]:
         validation = DataValidation(type="list", formula1=options)
         book["方法配置"].add_data_validation(validation)
@@ -277,24 +304,63 @@ def _observations(
     precision: list[int],
     stability: bool = False,
     replicate_type: str = "technical",
+    layout: str | None = None,
 ) -> tuple[dict[str, Any], list[str], dict[str, list[str]]]:
     """读取包装单元和重复测量，记录单元格位置。"""
     grouped: dict[tuple[str, str], dict[str, float]] = defaultdict(dict)
     unit_sources: dict[tuple[str, str], str] = {}
     sources = []
-    for row in _rows(book, name):
-        group, uid, rep, val, actual_unit = (
-            (row[0].value, row[1].value, row[2].value, row[3], row[4].value)
-            if stability
-            else ("均匀性", row[0].value, row[1].value, row[2], row[3].value)
-        )
+    ws = book[name]
+    raw_rows = [list(row) for row in ws.iter_rows(values_only=True)]
+    aliases = getattr(book, "_openpt_columns", {})
+    wide = wide_to_long(name, raw_rows, aliases, layout)
+    records = []
+    if wide is not None:
+        normalized, origins = wide
+        for index, record_values in enumerate(normalized[1:], 2):
+            group, uid, rep, _number, actual_unit = (
+                (
+                    record_values[0],
+                    record_values[1],
+                    record_values[2],
+                    record_values[3],
+                    record_values[4],
+                )
+                if stability
+                else (
+                    "均匀性",
+                    record_values[0],
+                    record_values[1],
+                    record_values[2],
+                    record_values[3],
+                )
+            )
+            value_column = "D" if stability else "C"
+            unit_column = "E" if stability else "D"
+            value_address = origins[f"{value_column}{index}"]
+            unit_address = origins[f"{unit_column}{index}"]
+            val = ws[value_address]
+            for column in "ABCDE" if stability else "ABCD":
+                address = origins[f"{column}{index}"]
+                if ws[address].data_type == "f":
+                    raise InputError(f"{name}!{address}: 不接受公式")
+            records.append((group, uid, rep, val, actual_unit, unit_address))
+    else:
+        for row in _rows(book, name):
+            group, uid, rep, val, actual_unit = (
+                (row[0].value, row[1].value, row[2].value, row[3], row[4].value)
+                if stability
+                else ("均匀性", row[0].value, row[1].value, row[2], row[3].value)
+            )
+            records.append((group, uid, rep, val, actual_unit, row[-1].coordinate))
+    for group, uid, rep, val, actual_unit, unit_address in records:
         if not group or uid is None or rep is None:
-            raise InputError(f"{name}!{row[0].row}: 缺少分组或编号")
+            raise InputError(f"{name}!{val.row}: 缺少分组或编号")
         if actual_unit != unit:
-            raise InputError(f"{name}!{row[-1].coordinate}: 单位不一致")
+            raise InputError(f"{name}!{unit_address}: 单位不一致")
         key, repeat = (str(group), str(uid)), str(rep)
         if repeat in grouped[key]:
-            raise InputError(f"{name}!{row[0].row}: 重复编号")
+            raise InputError(f"{name}!{val.coordinate}: 重复编号")
         grouped[key][repeat] = _numeric(val, name)
         unit_sources[key] = f"{name}!{val.coordinate}"
         precision.append(_precision(val))
@@ -449,7 +515,12 @@ def read_workbook(
         aliases = (columns or {}).get(csv_sheet, {})
         if not isinstance(aliases, dict):
             raise InputError("CSV 列映射必须是对象")
-        numeric_fields = ("值", *PARTICIPANT_OPTIONAL) if csv_sheet == "参加者结果" else ("值",)
+        numeric_fields: tuple[str, ...] = (
+            ("值", *PARTICIPANT_OPTIONAL) if csv_sheet == "参加者结果" else ("值",)
+        )
+        numeric_fields += tuple(
+            field for field in rows[0] if re.fullmatch(r"测定\s*[1-9][0-9]*", field)
+        )
         for field in numeric_fields:
             value_label = aliases.get(field, field)
             if rows[0].count(value_label) == 1:
@@ -474,14 +545,24 @@ def read_workbook(
     if missing:
         raise InputError("缺少工作表：" + ", ".join(sorted(missing)))
     info, config = _metadata(book)
+    for name in ("均匀性", "稳定性", "报告声称值"):
+        ws = book[name]
+        columns_with_measurand = [cell.column for cell in ws[1] if cell.value == "被测量"]
+        if columns_with_measurand and any(
+            ws.cell(row, column).value not in (None, "")
+            for column in columns_with_measurand
+            for row in range(2, ws.max_row + 1)
+        ):
+            raise InputError(f"{name}：当前版本尚不能按被测量分别计算，拒绝混合数据")
     precision: list[int] = []
     replicate_type = config.get("replicate_type") or "technical"
     if replicate_type not in ("technical", "adjacent_specimens", "other", "single"):
         raise InputError("replicate_type 应为 technical、adjacent_specimens、other 或 single")
+    layout = config.get("layout") or None
     hom, hs, hom_ids = _observations(
-        book, "均匀性", info["单位"], precision, replicate_type=replicate_type
+        book, "均匀性", info["单位"], precision, replicate_type=replicate_type, layout=layout
     )
-    stab, ss, stab_ids = _observations(book, "稳定性", info["单位"], precision, True)
+    stab, ss, stab_ids = _observations(book, "稳定性", info["单位"], precision, True, layout=layout)
     assigned = {}
     if "指定值与不确定度" in book.sheetnames:
         assigned = {
@@ -505,7 +586,7 @@ def read_workbook(
     numeric_sources = {
         f"{ws.title}!{cell.coordinate}": cell.value
         for ws in book.worksheets
-        if ws.title != "填写说明"
+        if ws.title != "填写说明" and not ws.title.startswith("示例-")
         for row in ws.iter_rows(min_row=2)
         for cell in row
         if isinstance(cell.value, (int, float)) and not isinstance(cell.value, bool)

@@ -4,15 +4,16 @@
 import csv
 import math
 import re
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Any
 
 from openpyxl import load_workbook
-from openpyxl.utils import get_column_letter
+from openpyxl.utils.cell import column_index_from_string, coordinate_from_string, get_column_letter
 
 from ..errors import InputError
 from .excel import PARTICIPANT_OPTIONAL, SHEETS
+from .layout import wide_to_long
 from .shape import insufficient_homogeneity_replicates, insufficient_units
 
 MEASUREMENT_SHEETS = ("均匀性", "稳定性", "参加者结果")
@@ -53,6 +54,36 @@ def _positions(headers: list[Any], sheet: str, mapping: dict[str, Any]) -> dict[
     if len(set(positions.values())) != len(positions):
         raise InputError(f"{sheet}：多个标准字段映射到同一列")
     return positions
+
+
+def _restore_origin(issue: Issue, origins: dict[str, str], rows: list[list[Any]]) -> Issue:
+    """将虚拟长表的问题映回原地址及该单元格原始内容。"""
+    address = origins.get(issue.cell)
+    if address is None:
+        return issue
+    letter, number = coordinate_from_string(address)
+    index = column_index_from_string(letter) - 1
+    row = rows[number - 1] if number <= len(rows) else []
+    return replace(issue, cell=address, original=row[index] if index < len(row) else None)
+
+
+def _unsupported_measurand(sheet: str, rows: list[list[Any]]) -> list[Issue]:
+    """在尚未实现分被测量计算时拒绝混合结果。"""
+    if not rows or "被测量" not in rows[0]:
+        return []
+    positions = [i for i, value in enumerate(rows[0]) if value == "被测量"]
+    return [
+        Issue(
+            "UNSUPPORTED_MEASURAND",
+            sheet,
+            f"{get_column_letter(column + 1)}{index}",
+            row[column],
+            "当前版本尚不能按被测量分别计算，拒绝混合数据",
+        )
+        for index, row in enumerate(rows[1:], 2)
+        for column in positions
+        if column < len(row) and row[column] not in (None, "")
+    ]
 
 
 def _check_rows(
@@ -306,7 +337,15 @@ def inspect_input(
                 rows = list(csv.reader(stream))
         except (UnicodeDecodeError, LookupError) as exc:
             raise InputError("CSV 编码错误；若文件为 GBK，请显式指定 --encoding gbk") from exc
-        return _check_rows(csv_sheet, rows, [], mapping, csv_numbers=True)
+        measurand_issues = _unsupported_measurand(csv_sheet, rows)
+        wide = wide_to_long(csv_sheet, rows, mapping)
+        if wide:
+            normalized, csv_origins = wide
+            return measurand_issues + [
+                _restore_origin(issue, csv_origins, rows)
+                for issue in _check_rows(csv_sheet, normalized, [], {}, csv_numbers=True)
+            ]
+        return measurand_issues + _check_rows(csv_sheet, rows, [], mapping, csv_numbers=True)
     if source.suffix.lower() != ".xlsx":
         raise InputError("只支持 XLSX 或 CSV")
     book = load_workbook(source, data_only=False, read_only=True)
@@ -314,6 +353,7 @@ def inspect_input(
     try:
         issues: list[Issue] = []
         replicate_type = "technical"
+        layout = None
         if "方法配置" in book.sheetnames:
             config_rows = [list(row) for row in book["方法配置"].iter_rows(values_only=True)]
             if config_rows:
@@ -321,10 +361,25 @@ def inspect_input(
                 for index, row in enumerate(config_rows[1:], 2):
                     key = row[positions["字段"]] if positions["字段"] < len(row) else None
                     match = re.search(r"（([a-zA-Z_][a-zA-Z_0-9]*)）$", str(key))
-                    if (match.group(1) if match else str(key)) != "replicate_type":
-                        continue
+                    field = match.group(1) if match else str(key)
                     col = positions["值"]
                     value = row[col] if col < len(row) else None
+                    if field == "layout":
+                        if value not in (None, "", "long", "wide"):
+                            issues.append(
+                                Issue(
+                                    "INVALID_CONFIG",
+                                    "方法配置",
+                                    f"{get_column_letter(col + 1)}{index}",
+                                    value,
+                                    "布局应为 long 或 wide",
+                                )
+                            )
+                        else:
+                            layout = value or None
+                        continue
+                    if field != "replicate_type":
+                        continue
                     if value not in (
                         None,
                         "",
@@ -357,15 +412,47 @@ def inspect_input(
                 continue
             cells = list(book[sheet].iter_rows())
             rows = [[cell.value for cell in row] for row in cells]
+            original_rows = rows
             formulas = {cell.coordinate for row in cells for cell in row if cell.data_type == "f"}
+            issues.extend(_unsupported_measurand(sheet, rows))
             cached = [list(row) for row in values[sheet].iter_rows(values_only=True)]
-            issues.extend(
-                _check_rows(
-                    sheet, rows, cached, mapping, formulas=formulas, replicate_type=replicate_type
-                )
+            wide = wide_to_long(sheet, rows, mapping, layout if sheet != "参加者结果" else None)
+            origins: dict[str, str] = {}
+            effective_mapping = mapping
+            if wide:
+                rows, origins = wide
+                effective_mapping = {}
+                cached_original = cached
+                cached = [rows[0]]
+                for row_number, row in enumerate(rows[1:], 2):
+                    current = []
+                    for column in range(1, len(row) + 1):
+                        address = origins[f"{get_column_letter(column)}{row_number}"]
+                        letter, source_row = coordinate_from_string(address)
+                        source_col = column_index_from_string(letter) - 1
+                        cached_row = (
+                            cached_original[source_row - 1]
+                            if source_row <= len(cached_original)
+                            else []
+                        )
+                        current.append(
+                            cached_row[source_col] if source_col < len(cached_row) else None
+                        )
+                    cached.append(current)
+                formulas = {
+                    virtual for virtual, original in origins.items() if original in formulas
+                }
+            found = _check_rows(
+                sheet,
+                rows,
+                cached,
+                effective_mapping,
+                formulas=formulas,
+                replicate_type=replicate_type,
             )
+            issues.extend(_restore_origin(issue, origins, original_rows) for issue in found)
             if rows:
-                position = _positions(rows[0], sheet, mapping)["单位"]
+                position = _positions(rows[0], sheet, effective_mapping)["单位"]
                 for index, row in enumerate(rows[1:], 2):
                     value = row[position] if position < len(row) else None
                     if value in (None, ""):
@@ -373,7 +460,8 @@ def inspect_input(
                     if project_unit is None:
                         project_unit = value
                     elif value != project_unit:
-                        cell = f"{get_column_letter(position + 1)}{index}"
+                        virtual = f"{get_column_letter(position + 1)}{index}"
+                        cell = origins.get(virtual, virtual)
                         if not any(
                             i.category == "UNIT_MISMATCH" and i.sheet == sheet and i.cell == cell
                             for i in issues
@@ -395,6 +483,8 @@ def inspect_input(
                     cell.coordinate for row in cells for cell in row if cell.data_type == "f"
                 }
                 if sheet in ("报告声称值", "算法S"):
+                    if sheet == "报告声称值":
+                        issues.extend(_unsupported_measurand(sheet, rows))
                     issues.extend(_check_numeric_table(sheet, rows, mapping, formulas))
                 else:
                     issues.extend(_check_numeric_config(sheet, rows, mapping, formulas))
@@ -406,7 +496,11 @@ def inspect_input(
                     category = "FORMULA_NO_CACHE" if cached is None else "FORMULA"
                     message = "公式没有缓存值" if cached is None else "现有计算器不接受公式"
                     issues.append(Issue(category, sheet, cell.coordinate, cell.value, message))
-        return issues
+        unique: list[Issue] = []
+        for issue in issues:
+            if issue not in unique:
+                unique.append(issue)
+        return unique
     finally:
         book.close()
         values.close()
