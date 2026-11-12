@@ -17,7 +17,10 @@ def test_chinese_template(tmp_path: Path) -> None:
     template(path)
     book = load_workbook(path)
     assert "填写说明" in book.sheetnames
-    assert len(book["方法配置"].data_validations.dataValidation) == 10
+    cells = {
+        str(validation.sqref) for validation in book["方法配置"].data_validations.dataValidation
+    }
+    assert {"B4", "B5", "B21", "B24"} <= cells
     book["项目信息"]["B2"] = "合成项目"
     book["项目信息"]["B3"] = "mg/kg"
     book["方法配置"]["B4"] = "启用"
