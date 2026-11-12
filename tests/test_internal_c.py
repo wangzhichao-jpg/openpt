@@ -24,6 +24,14 @@ def test_transfer_identifiers(tmp_path: Path) -> None:
     sheet.cell(2, 3).value = 10
     sheet.cell(3, 3).value = 2
     assert [r["order"] for r in read_transfer_sheet(book)] == ["2", "3", "4", "10"]
+    for row, value in enumerate(("第十次", "第二次", "第一次", "第六次"), 2):
+        sheet.cell(row, 3).value = value
+    assert [r["order"] for r in read_transfer_sheet(book)] == [
+        "第一次",
+        "第二次",
+        "第六次",
+        "第十次",
+    ]
     sheet.cell(2, 3).value = None
     sheet.cell(2, 4).value = "2025-01-01"
     assert read_transfer_sheet(book)[-1]["date"] == "2025-01-01"

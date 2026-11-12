@@ -253,6 +253,24 @@ def read_transfer_sheet(book: Any) -> list[dict[str, Any]]:
 
     def sort_key(row: dict[str, Any]) -> tuple[Any, ...]:
         identifier = str(row["order"] if row["order"] is not None else row["date"])
+
+        # 报告中常以“第一次……第六次”表示顺序，不能按汉字编码排序。
+        def chinese_number(match: re.Match[str]) -> str:
+            digits = {c: i for i, c in enumerate("零一二三四五六七八九")}
+            digits.update({"\u3007": 0, "两": 2})
+            units = {"十": 10, "百": 100, "千": 1000}
+            if not any(char in units for char in match.group()):
+                return str(int("".join(str(digits[char]) for char in match.group())))
+            total = current = 0
+            for char in match.group():
+                if char in digits:
+                    current = digits[char]
+                else:
+                    total += (current or 1) * units[char]
+                    current = 0
+            return str(total + current)
+
+        identifier = re.sub(r"[零〇一二两三四五六七八九十百千]+", chinese_number, identifier)
         natural = tuple(
             (0, int(part)) if part.isdigit() else (1, part)
             for part in re.split(r"(\d+)", identifier)
