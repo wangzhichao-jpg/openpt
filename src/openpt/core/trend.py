@@ -69,35 +69,42 @@ def fit_series(records: list[dict[str, Any]], aggregate: str = "per_series") -> 
         raise InputError("trend_aggregate 应为 per_series 或 time_mean")
     grouped: dict[str, list[tuple[float, float]]] = defaultdict(list)
     points: dict[float, dict[str, float]] = defaultdict(dict)
-    units = set()
+    units: dict[str, str] = {}
     for row in records:
         try:
             name, unit = row["series"], row["time_unit"]
+            if isinstance(row["x"], bool) or isinstance(row["y"], bool):
+                raise ValueError("布尔值不是测量值")
             x, y = float(row["x"]), float(row["y"])
         except (KeyError, TypeError, ValueError, OverflowError):
             raise InputError("趋势数据须填写序列名、时间、时间单位及数值") from None
-        if not isinstance(name, str) or not name.strip() or unit not in ("天", "月"):
-            raise InputError("趋势序列名不能为空，时间单位须为天或月")
+        if not isinstance(name, str) or not name.strip() or unit not in ("天", "月", "次"):
+            raise InputError("趋势序列名不能为空，时间单位须为天、月或次")
         if not math.isfinite(x) or not math.isfinite(y):
             raise InputError("趋势时间和数值须为有限数")
-        units.add(unit)
+        if name in units and units[name] != unit:
+            raise InputError("同一序列的时间单位须一致")
+        units[name] = unit
         if name in points[x]:
             raise InputError("同一序列和时间点不得重复")
         points[x][name] = y
         grouped[name].append((x, y))
-    if len(units) != 1:
-        raise InputError("每次拟合的时间单位须一致")
+    if not units:
+        raise InputError("趋势序列不能为空")
     if aggregate == "time_mean":
+        if len(set(units.values())) != 1:
+            raise InputError("按时间均值拟合时单位须一致")
         sets = [set(group) for group in points.values()]
         if not sets or any(s != sets[0] for s in sets):
             raise InputError("按时间均值拟合须为每个时间点提供相同样品集合")
         grouped = {"时间均值": [(x, sum(v.values()) / len(v)) for x, v in points.items()]}
+        units = {"时间均值": next(iter(units.values()))}
     result = {}
     for name, values in grouped.items():
         ordered = sorted(values)
         result[name] = {
             **fit([v[0] for v in ordered], [v[1] for v in ordered]),
-            "time_unit": next(iter(units)),
+            "time_unit": units[name],
         }
     return result
 
