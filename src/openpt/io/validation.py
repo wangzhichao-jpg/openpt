@@ -276,19 +276,6 @@ def _check_rows(
             issues.append(
                 Issue("UNBALANCED_REPEATS", sheet, cell, original, "GB/T 模式需要平衡重复")
             )
-        if sheet == "稳定性" and standard == "gbt28043":
-            for uid, (repeats, row_number, original) in group.items():
-                if insufficient_homogeneity_replicates(len(repeats)):
-                    cell = f"{get_column_letter(positions['值'] + 1)}{row_number}"
-                    issues.append(
-                        Issue(
-                            "INSUFFICIENT_REPLICATES",
-                            sheet,
-                            cell,
-                            original,
-                            f"GB/T 模式中单元 {uid} 至少需要两次重复",
-                        )
-                    )
         if sheet == "稳定性" and len({len(repeats) for repeats, _, _ in group.values()}) > 1:
             _, row_number, original = next(iter(group.values()))
             cell = f"{get_column_letter(positions['值'] + 1)}{row_number}"

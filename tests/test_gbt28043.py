@@ -99,6 +99,21 @@ def test_stability_boundaries_and_independence() -> None:
         stability(a, b, 1, u1=-1)
 
 
+def test_stability_single_measurements_keep_basic_criterion() -> None:
+    baseline = [[1.0], [2.0], [3.0]]
+    followup = [[1.1], [2.1], [3.1]]
+    result = stability(baseline, followup, 1.0)
+    assert result["basic_pass"] is True
+    assert result["difference"] == pytest.approx(0.1)
+    assert result["sw1"] is None and result["sw2"] is None
+    assert result["repeatability_exceeded"] is None
+    assert sum("不可评价（单次测量）" in item for item in result["warnings"]) == 2
+    mixed = stability(baseline, [[0.0, 2.0], [0.0, 2.0]], 1.0)
+    assert mixed["repeatability_exceeded"] is True
+    quiet = stability(baseline, [[1.0, 1.0], [1.0, 1.0]], 1.0)
+    assert quiet["repeatability_exceeded"] is None
+
+
 def test_stability_repeatability_review_boundaries() -> None:
     baseline = [[0.0, 0.0]] * 2
     half = 0.5 / math.sqrt(2)
@@ -238,6 +253,37 @@ def test_template_and_workflow(tmp_path: Path) -> None:
     data["assigned_config"]["u_hom"] = 0.1
     with pytest.raises(InputError, match="不得同时"):
         calculate(data)
+
+
+def test_workbook_gbt_single_stability_does_not_block_homogeneity(tmp_path: Path) -> None:
+    from openpt.io.validation import inspect_input
+
+    path = tmp_path / "single_stability.xlsx"
+    template(path)
+    book = load_workbook(path)
+    book["项目信息"]["B2"] = "合成"
+    book["项目信息"]["B3"] = "mg"
+    book["方法配置"]["B3"] = 1.0
+    book["方法配置"]["B21"] = "gbt28043"
+    for uid in range(3):
+        for repeat in (1, 2):
+            book["均匀性"].append([uid + 1, repeat, uid + 0.01 * repeat, "mg"])
+        for group, delta in (("基线", 0.0), ("稳定期", 0.1)):
+            book["稳定性"].append([group, uid + 1, 1, uid + delta, "mg"])
+    book.save(path)
+    assert inspect_input(path) == []
+    data = read_workbook(path)
+    result = calculate(data)
+    assert result["GB/T均匀性"]["basic_pass"] is not None
+    period = result["GB/T稳定性"]["稳定期"]
+    assert period["basic_pass"] is True
+    assert period["sw1"] is None and period["sw2"] is None
+    assert any("稳定期组内重复性不可评价（单次测量）" in w for w in period["warnings"])
+    target = tmp_path / "report.docx"
+    make_report(target, data, result)
+    assert "稳定期组内重复性不可评价（单次测量）" in "\n".join(
+        p.text for p in Document(target).paragraphs
+    )
 
 
 def test_preselected_primary_rule_and_no_fallback(tmp_path: Path) -> None:

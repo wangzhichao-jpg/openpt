@@ -478,6 +478,8 @@ def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]
                     allow_single_baseline=source == "homogeneity" and replicate_type == "single",
                     **settings[name],
                 )
+                if period["m2"] == 1:
+                    period["warnings"].append(f"{name}组内重复性不可评价（单次测量）")
                 if name != "稳定期" and settings[name]["u2"] is None:
                     period["warnings"].append("额外时点不复用稳定期均值不确定度；须分别评定")
                 _select_gbt_rule(period, stab_rule)
