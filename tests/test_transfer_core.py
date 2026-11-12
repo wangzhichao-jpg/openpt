@@ -8,6 +8,7 @@ import pytest
 from openpt.core.scores import performance_score
 from openpt.core.transfer import assess_point, en_with_stability
 from openpt.errors import InputError
+from openpt.review.transfer import review_transfer
 
 
 def test_transfer_window_and_boundary() -> None:
@@ -23,6 +24,11 @@ def test_transfer_window_and_boundary() -> None:
     result = assess_point(rows, rules, window="transfer_only")
     assert result["delta_max"] == pytest.approx(0.5)
     assert [r["pass"] for r in result["criteria"]] == [True, False]
+    row = review_transfer(result, {"name": "Δmax", "value": 0.49, "digits": 2})
+    assert row["差异类型"] == "VALUE_MISMATCH" and row["说明"] == "结论受影响"
+    unaffected = assess_point(rows, [{"kind": "fixed", "value": 1.0}], window="transfer_only")
+    same = review_transfer(unaffected, {"name": "Δmax", "value": 0.4, "digits": 2})
+    assert same["说明"] == "结论不受影响"
     assert assess_point(rows, rules, window="all")["delta_max"] == pytest.approx(5.3)
     summary = assess_point(
         [], [{"kind": "u_ref", "value": 1, "k": 2, "inclusive": True}], summarized_delta=0.5
