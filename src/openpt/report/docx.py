@@ -39,6 +39,8 @@ def _table(doc: Any, headers: list[str], rows: list[list[Any]]) -> None:
     table.style = "Table Grid"
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
     widths = [1.45, 1.35, 1.55, 1.55, 1.35, 2.5, 4.0, 2.0] if len(headers) == 8 else None
+    if headers == ["时间（UTC）", "条目", "决定", "人员", "备注", "结果 SHA-256"]:
+        widths = [3.9, 1.7, 1.5, 1.5, 3.4, 6.0]
     if widths:
         table.autofit = False
         for column, width in zip(table.columns, widths, strict=True):
@@ -772,6 +774,19 @@ def _unevaluated(result: Any, path: str = "结果") -> list[tuple[str, str, str]
     return rows
 
 
+def _decision_time(value: Any) -> str:
+    """将带时区的决定时间转为 UTC；无法解析时保留原文供核查。"""
+    if not isinstance(value, str):
+        return str(value or "")
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            return value
+        return parsed.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    except ValueError:
+        return value
+
+
 def make_report(
     path: str | Path,
     data: dict[str, Any],
@@ -896,7 +911,7 @@ def make_report(
             ["时间（UTC）", "条目", "决定", "人员", "备注", "结果 SHA-256"],
             [
                 [
-                    item.get(key, "")
+                    _decision_time(item.get(key, "")) if key == "time" else item.get(key, "")
                     for key in ("time", "item", "decision", "by", "note", "result_sha256")
                 ]
                 for item in decisions

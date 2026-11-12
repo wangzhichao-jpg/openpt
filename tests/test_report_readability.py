@@ -5,7 +5,7 @@ from pathlib import Path
 
 from docx import Document
 
-from openpt.report.docx import make_report
+from openpt.report.docx import _decision_time, make_report
 
 
 def test_unprovided_data_and_appendix(tmp_path: Path) -> None:
@@ -21,3 +21,8 @@ def test_unprovided_data_and_appendix(tmp_path: Path) -> None:
     assert paragraphs.index("附录：原始数据及单元格来源") > paragraphs.index("人工复核")
     assert '  "示例": {' in paragraphs
     assert '    "value": 1.23456789' in paragraphs
+
+
+def test_decision_time() -> None:
+    assert _decision_time("2026-11-12T15:04:05+08:00") == "2026-11-12 07:04:05 UTC"
+    assert _decision_time("无时区原文") == "无时区原文"
