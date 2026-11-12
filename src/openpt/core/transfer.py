@@ -4,6 +4,7 @@
 import math
 from typing import Any
 
+from ..config.catalog import TRANSFER_CRITERION_FIELDS
 from ..errors import InputError
 from .decision import compare
 from .stability import analyze
@@ -58,6 +59,10 @@ def assess_point(
     results = []
     for rule in criteria:
         kind = rule.get("kind")
+        if kind not in TRANSFER_CRITERION_FIELDS:
+            raise InputError("未知传递标准判据")
+        if set(rule) - set(TRANSFER_CRITERION_FIELDS[kind]):
+            raise InputError(f"传递标准判据 {kind} 包含未知字段")
         inclusive = rule.get("inclusive", False)
         if not isinstance(inclusive, bool):
             raise InputError("inclusive 须为布尔值")

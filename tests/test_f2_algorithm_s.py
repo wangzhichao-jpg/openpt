@@ -71,7 +71,21 @@ def test_sensitivity_in_calculation_book(tmp_path: Path) -> None:
     for value in [0.1, 0.12, 0.11, 0.5, 0.09]:
         book["算法S"].append([value, 1])
     book.save(source)
-    assert main(["run", str(source)]) == 0
+    assert (
+        main(
+            [
+                "run",
+                str(source),
+                "--runs-dir",
+                str(tmp_path / "runs"),
+                "--json",
+                str(tmp_path / "s_结果.json"),
+                "--docx",
+                str(tmp_path / "s_计算书.docx"),
+            ]
+        )
+        == 0
+    )
     result = json.loads((tmp_path / "s_结果.json").read_text(encoding="utf-8"))["算法S"]
     assert result["warnings"] == ["STOP_RULE_SENSITIVITY"]
     assert result["reference_converged"] and result["reference_iterations"] > result["iterations"]

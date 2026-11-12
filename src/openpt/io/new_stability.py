@@ -205,12 +205,22 @@ def read_transfer_sheet(book: Any) -> list[dict[str, Any]]:
         if not any(cell.value not in (None, "") for cell in row):
             continue
         cells = {name: ws.cell(row[0].row, positions[name]) for name in names}
-        standard, point, order, day, stage, unit = (
-            _value(cells[name]) for name in names if name != "测量值"
+        standard, point, stage, unit = (
+            _value(cells[name]) for name in ("传递标准编号", "校准点", "阶段", "单位")
         )
+        for name in ("测量序号", "日期"):
+            if cells[name].data_type == "f":
+                raise InputError(f"传递标准复测!{cells[name].coordinate}: 不接受公式")
+        order, day = cells["测量序号"].value, cells["日期"].value
+        if isinstance(order, str):
+            order = order.strip() or None
+        if isinstance(day, str):
+            day = day.strip() or None
+        if order is None and day is None:
+            raise InputError(f"传递标准复测!{cells['测量序号'].coordinate}: 测量序号或日期必填")
         if stage not in ("传递前", "传递中", "传递后"):
             raise InputError(f"传递标准复测!{cells['阶段'].coordinate}: 阶段无效")
-        if not isinstance(day, (str, date, datetime)):
+        if day is not None and not isinstance(day, (str, date, datetime)):
             raise InputError(f"传递标准复测!{cells['日期'].coordinate}: 日期无效")
         group = ""
         if "测量组" in headers:
@@ -221,15 +231,17 @@ def read_transfer_sheet(book: Any) -> list[dict[str, Any]]:
                 if not isinstance(cell.value, str):
                     raise InputError(f"传递标准复测!{cell.coordinate}: 测量组须为文字")
                 group = cell.value.strip()
-        key = (str(standard), str(point), group, str(order))
+        identifier = str(order) if order is not None else str(day)
+        key = (str(standard), str(point), group, identifier)
         if key in seen:
-            raise InputError(f"传递标准复测!{cells['测量序号'].coordinate}: 测量序号重复")
+            field = "测量序号" if order is not None else "日期"
+            raise InputError(f"传递标准复测!{cells[field].coordinate}: {field}重复")
         seen.add(key)
         output.append(
             {
                 "standard": str(standard),
                 "point": str(point),
-                "order": str(order),
+                "order": str(order) if order is not None else None,
                 "date": day.isoformat() if isinstance(day, (date, datetime)) else day,
                 "stage": stage,
                 "value": _value(cells["测量值"], numeric=True),
@@ -238,4 +250,14 @@ def read_transfer_sheet(book: Any) -> list[dict[str, Any]]:
                 "source": f"传递标准复测!{cells['测量值'].coordinate}",
             }
         )
+
+    def sort_key(row: dict[str, Any]) -> tuple[Any, ...]:
+        identifier = str(row["order"] if row["order"] is not None else row["date"])
+        natural = tuple(
+            (0, int(part)) if part.isdigit() else (1, part)
+            for part in re.split(r"(\d+)", identifier)
+        )
+        return row["standard"], row["point"], row["group"], row["order"] is None, natural
+
+    output.sort(key=sort_key)
     return output

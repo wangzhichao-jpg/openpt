@@ -725,10 +725,10 @@ def _parser() -> argparse.ArgumentParser:
             "--runs-dir", default=os.environ.get("OPENPT_RUNS_DIR", "runs"), help="运行记录根目录"
         )
         p.add_argument("--sample-record", help="可选抽样记录文件，原样保存")
-        p.add_argument("--docx", help="计算书路径；默认写入输入文件旁")
-        p.add_argument("--json", help="结果 JSON 路径；默认写入输入文件旁")
+        p.add_argument("--docx", help="额外导出计算书路径；默认仅保存于运行目录")
+        p.add_argument("--json", help="额外导出结果 JSON 路径；默认仅保存于运行目录")
         if name == "review":
-            p.add_argument("--differences", help="差异 CSV 路径；默认写入输入文件旁")
+            p.add_argument("--differences", help="额外导出差异 CSV 路径；默认仅保存于运行目录")
             p.add_argument("--mapping", help="可选 JSON 评分映射")
     return parser
 
@@ -742,14 +742,15 @@ def _deny_run_write(path: str | Path) -> None:
 
 def _validate_output_paths(args: argparse.Namespace) -> None:
     """防止输出文件覆盖输入、映射文件或彼此覆盖。"""
-    outputs = [Path(args.docx).resolve(), Path(args.json).resolve()]
+    outputs = [Path(value).resolve() for value in (args.docx, args.json) if value is not None]
     protected = {Path(args.input).resolve()}
     if args.columns:
         protected.add(Path(args.columns).resolve())
     if args.sample_record:
         protected.add(Path(args.sample_record).resolve())
     if args.command == "review":
-        outputs.append(Path(args.differences).resolve())
+        if args.differences is not None:
+            outputs.append(Path(args.differences).resolve())
         if args.mapping:
             protected.add(Path(args.mapping).resolve())
     if len(set(outputs)) != len(outputs) or protected.intersection(outputs):
@@ -913,28 +914,30 @@ def main(argv: list[str] | None = None) -> int:
                 raise ValueError("评分映射必须是 JSON 对象")
             write_xlsx(args.output, batch_review(args.inputs, mapping))
             return 0
-        input_path = Path(args.input)
-        args.docx = args.docx or str(input_path.with_name(input_path.stem + "_计算书.docx"))
-        args.json = args.json or str(input_path.with_name(input_path.stem + "_结果.json"))
-        if args.command == "review":
-            args.differences = args.differences or str(
-                input_path.with_name(input_path.stem + "_差异.csv")
-            )
         _validate_output_paths(args)
         from .runs import create_run
 
         _deny_run_write(args.runs_dir)
         directory, data, result, differences, digest = create_run(args, Path(args.runs_dir))
+        print(f"运行记录：{directory}")
+        print(f"计算书：{directory / 'report.docx'}")
+        print(f"结果 JSON：{directory / 'result.json'}")
         if differences is not None:
-            from .review.compare import write_csv
+            print(f"差异表：{directory / 'differences.csv'}")
+            if args.differences is not None:
+                from .review.compare import write_csv
 
-            write_csv(args.differences, differences)
-        print(f"运行记录：{directory.name}")
-        Path(args.json).write_text(
-            json.dumps(result, ensure_ascii=False, indent=2, allow_nan=False) + "\n",
-            encoding="utf-8",
-        )
-        make_report(args.docx, data, result, differences, input_sha256=digest)
+                write_csv(args.differences, differences)
+                print(f"额外差异表：{args.differences}")
+        if args.json is not None:
+            Path(args.json).write_text(
+                json.dumps(result, ensure_ascii=False, indent=2, allow_nan=False) + "\n",
+                encoding="utf-8",
+            )
+            print(f"额外结果 JSON：{args.json}")
+        if args.docx is not None:
+            make_report(args.docx, data, result, differences, input_sha256=digest)
+            print(f"额外计算书：{args.docx}")
         return 0
     except OSError as exc:
         print(f"错误：文件操作失败（{exc.strerror or '系统错误'}）", file=sys.stderr)

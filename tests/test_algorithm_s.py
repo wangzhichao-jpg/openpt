@@ -40,6 +40,18 @@ def test_algorithm_s_workbook(tmp_path: Path) -> None:
     book["算法S"].append([1, 1])
     book["算法S"].append([1, 1])
     book.save(path)
-    assert main(["run", str(path)]) == 0
+    assert (
+        main(
+            [
+                "run",
+                str(path),
+                "--runs-dir",
+                str(tmp_path / "runs"),
+                "--json",
+                str(tmp_path / "s_结果.json"),
+            ]
+        )
+        == 0
+    )
     result = json.loads((tmp_path / "s_结果.json").read_text(encoding="utf-8"))["算法S"]
     assert result["w"] == pytest.approx(1.097) and result["history"]

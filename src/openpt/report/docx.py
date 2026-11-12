@@ -154,6 +154,26 @@ def _raw_tables(doc: Any, data: dict[str, Any]) -> None:
                 for i, row in enumerate(groups)
             ],
         )
+    transfer = data.get("transfer_observations", [])
+    if transfer:
+        doc.add_paragraph("传递标准复测（按测量序号或日期排序）")
+        _table(
+            doc,
+            ["标准器", "校准点", "测量组", "序号或日期", "阶段", "值", "单位", "来源"],
+            [
+                [
+                    row["standard"],
+                    row["point"],
+                    row["group"],
+                    row["order"] or row["date"],
+                    row["stage"],
+                    str(row["value"]),
+                    row["unit"],
+                    row["source"],
+                ]
+                for row in transfer
+            ],
+        )
     if sources:
         doc.add_paragraph("数据来源：" + "、".join(_source_ranges(sources)))
     else:

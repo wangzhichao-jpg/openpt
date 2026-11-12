@@ -51,6 +51,22 @@ ENUMS: dict[str, tuple[str, ...]] = {
     "trans_in_stab": ("TRUE", "FALSE"),
 }
 
+TRANSFER_CRITERION_FIELDS: dict[str, tuple[str, ...]] = {
+    "fixed": ("kind", "value", "inclusive"),
+    "mpev": ("kind", "value", "k", "inclusive"),
+    "u_ref": ("kind", "value", "k", "inclusive"),
+    "one_sample": ("kind", "reference", "critical_override", "critical_source", "inclusive"),
+    "two_sample": (
+        "kind",
+        "baseline",
+        "group1",
+        "group2",
+        "critical_override",
+        "critical_source",
+        "inclusive",
+    ),
+}
+
 CLAIM_NAMES = (
     "F",
     "F值",
@@ -148,6 +164,10 @@ def template_rows() -> list[tuple[str, str]]:
         )
         for name, values in ENUMS.items()
     ]
+    rows.extend(
+        ("传递判据 " + kind, "字段：" + "、".join(fields))
+        for kind, fields in TRANSFER_CRITERION_FIELDS.items()
+    )
     rows.append(("报告声称统计量", "、".join(CLAIM_NAMES)))
     rows.extend(("报告模型 " + name, description) for name, description in REPORT_MODELS.items())
     return rows
@@ -159,6 +179,11 @@ def markdown() -> str:
     lines.extend(
         f"| `{name}` | " + "、".join(f"`{value}`" for value in values) + " |"
         for name, values in ENUMS.items()
+    )
+    lines.extend(["", "### 传递标准判据 JSON 字段", "", "| kind | 字段 |", "|---|---|"])
+    lines.extend(
+        f"| `{kind}` | " + "、".join(f"`{field}`" for field in fields) + " |"
+        for kind, fields in TRANSFER_CRITERION_FIELDS.items()
     )
     lines.extend(
         [

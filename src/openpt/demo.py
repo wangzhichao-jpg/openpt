@@ -78,7 +78,31 @@ def create_demo(directory: Path) -> None:
     synthetic = directory / "synthetic_review.xlsx"
     _a1(a1)
     _synthetic(synthetic)
-    if main(["run", str(a1)]) or main(["review", str(synthetic)]):
+    if main(
+        [
+            "run",
+            str(a1),
+            "--runs-dir",
+            str(directory / "runs"),
+            "--docx",
+            str(directory / "GL003_A1_计算书.docx"),
+            "--json",
+            str(directory / "GL003_A1_结果.json"),
+        ]
+    ) or main(
+        [
+            "review",
+            str(synthetic),
+            "--runs-dir",
+            str(directory / "runs"),
+            "--docx",
+            str(directory / "synthetic_review_计算书.docx"),
+            "--json",
+            str(directory / "synthetic_review_结果.json"),
+            "--differences",
+            str(directory / "synthetic_review_差异.csv"),
+        ]
+    ):
         raise ValueError("示例计算失败")
     converter = shutil.which("soffice")
     if converter:

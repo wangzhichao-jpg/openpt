@@ -50,7 +50,23 @@ def test_multi_calculation_review_and_reproduction(tmp_path: Path) -> None:
     assert all(row["状态"] == "MATCH" for row in review(data, result))
     assert data["measurands"]["甲"]["sources"][0] == "均匀性!C2"
     assert data["measurands"]["乙"]["sources"][0] == "均匀性!C8"
-    assert main(["review", str(path), "--runs-dir", str(tmp_path / "runs")]) == 0
+    assert (
+        main(
+            [
+                "review",
+                str(path),
+                "--runs-dir",
+                str(tmp_path / "runs"),
+                "--json",
+                str(tmp_path / "multi_结果.json"),
+                "--docx",
+                str(tmp_path / "multi_计算书.docx"),
+                "--differences",
+                str(tmp_path / "multi_差异.csv"),
+            ]
+        )
+        == 0
+    )
     output = json.loads((tmp_path / "multi_结果.json").read_text(encoding="utf-8"))
     assert output == result
     with (tmp_path / "multi_差异.csv").open(encoding="utf-8-sig", newline="") as stream:

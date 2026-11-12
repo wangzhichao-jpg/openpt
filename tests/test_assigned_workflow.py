@@ -8,8 +8,24 @@ import pytest
 from docx import Document
 from openpyxl import load_workbook
 
-from openpt.cli import main
+from openpt.cli import main as cli_main
 from openpt.io.excel import template
+
+
+def main(args: list[str]) -> int:
+    """此组测试显式导出便于检查的副本。"""
+    path = Path(args[1])
+    return cli_main(
+        [
+            *args,
+            "--runs-dir",
+            str(path.parent / "runs"),
+            "--json",
+            str(path.with_name(path.stem + "_结果.json")),
+            "--docx",
+            str(path.with_name(path.stem + "_计算书.docx")),
+        ]
+    )
 
 
 def make_input(path: Path, duplicate: bool = False) -> None:
