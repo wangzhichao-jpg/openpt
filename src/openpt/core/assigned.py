@@ -44,6 +44,7 @@ class AssignedResult(ResultMapping):
     u_trans: float = 0.0
     trans_mapping: str = "none"
     trans_in_base: bool = False
+    trans_in_stab: bool = False
 
 
 def _number(value: Any, label: str, *, nonnegative: bool = False) -> float:
@@ -82,6 +83,7 @@ def assign_value(
     u_trans: float = 0.0,
     trans_mapping: str = "none",
     trans_in_base: bool = False,
+    trans_in_stab: bool = False,
 ) -> AssignedResult:
     """GL002 4.3.1；u(x*)=1.25 s*/√p，GB/T 28043-2019 7.7.3 式(6)。
 
@@ -106,7 +108,9 @@ def assign_value(
         raise InputError("分量映射无效")
     if trans_mapping not in ("none", "assigned"):
         raise InputError("运输分量只能映射至指定值不确定度或不分配")
-    if not all(isinstance(v, bool) for v in (hom_in_base, stab_in_base, trans_in_base)):
+    if not all(
+        isinstance(v, bool) for v in (hom_in_base, stab_in_base, trans_in_base, trans_in_stab)
+    ):
         raise InputError("基础不确定度包含分量的标识必须为布尔值")
     uh = _number(u_hom, "u_hom", nonnegative=True)
     us = _number(u_stab, "u_stab", nonnegative=True)
@@ -172,9 +176,11 @@ def assign_value(
     duplicate |= hom_in_base and hom_mapping in ("assigned", "sigma_prime")
     duplicate |= stab_in_base and stab_mapping in ("assigned", "sigma_prime")
     duplicate |= trans_in_base and trans_mapping == "assigned"
+    trans_via_stab = trans_in_stab and stab_mapping in ("assigned", "sigma_prime", "both")
+    duplicate |= trans_via_stab and (trans_in_base or trans_mapping == "assigned")
     if duplicate:
         warnings.append("均匀性、稳定性或运输分量重复计入，需审核并批准映射")
-    if ut > 0 and trans_mapping == "none" and not trans_in_base:
+    if ut > 0 and trans_mapping == "none" and not trans_in_base and not trans_via_stab:
         warnings.append("已提供运输分量但未分配且未包含在基础不确定度中，需审核")
     if any(not math.isfinite(v) for v in (x, base_u)):
         raise InputError("指定值数值溢出")
@@ -222,4 +228,5 @@ def assign_value(
         ut,
         trans_mapping,
         trans_in_base,
+        trans_in_stab,
     )

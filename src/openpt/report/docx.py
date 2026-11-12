@@ -506,9 +506,10 @@ def _assigned_table(doc: Any, result: dict[str, Any]) -> None:
         ("运输不确定度 u_trans", "u_trans"),
         ("运输分量映射", "trans_mapping"),
         ("基础值含运输分量", "trans_in_base"),
+        ("稳定性分量含运输分量", "trans_in_stab"),
         ("状态", "status"),
     ]
-    boolean_keys = {"independent", "hom_in_base", "stab_in_base", "trans_in_base"}
+    boolean_keys = {"independent", "hom_in_base", "stab_in_base", "trans_in_base", "trans_in_stab"}
     _table(
         doc,
         ["项目", "结果"],

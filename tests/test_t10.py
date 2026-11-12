@@ -81,7 +81,16 @@ def test_transport_component_and_duplicate_controls() -> None:
     assert omitted.status == "NOT_EVALUATED" and omitted.u is None
     included = assign_value(**options, u_trans=0.4, trans_in_base=True)
     assert included.status == "OK" and included.u == pytest.approx(0.3)
-    for kwargs in ({"u_trans": -1}, {"trans_mapping": "sigma_prime"}, {"trans_in_base": "TRUE"}):
+    via_stab = dict(u_trans=0.4, u_stab=0.5, stab_mapping="assigned", trans_in_stab=True)
+    assert assign_value(**options, **via_stab).u == pytest.approx(math.hypot(0.3, 0.5))
+    assert assign_value(**options, **via_stab, trans_mapping="assigned").status == "DESIGN_REVIEW"
+    assert assign_value(**options, **via_stab, trans_in_base=True).status == "DESIGN_REVIEW"
+    for kwargs in (
+        {"u_trans": -1},
+        {"trans_mapping": "sigma_prime"},
+        {"trans_in_base": "TRUE"},
+        {"trans_in_stab": "TRUE"},
+    ):
         with pytest.raises(InputError):
             assign_value(**options, **kwargs)
 

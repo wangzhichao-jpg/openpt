@@ -138,6 +138,7 @@ def template(path: str | Path) -> None:
         ("u_trans", 0),
         ("trans_mapping", "none"),
         ("trans_in_base", False),
+        ("trans_in_stab", False),
     ]:
         assigned.append(assigned_row)
     for cell, options in [
@@ -151,6 +152,7 @@ def template(path: str | Path) -> None:
         ("B22", '"manual,gbt_ss"'),
         ("B24", '"none,assigned"'),
         ("B25", '"TRUE,FALSE"'),
+        ("B26", '"TRUE,FALSE"'),
     ]:
         validation = DataValidation(type="list", formula1=options)
         assigned.add_data_validation(validation)
@@ -449,7 +451,7 @@ def read_workbook(
             for row in _rows(book, "指定值与不确定度")
             if row[0].value and row[1].value not in (None, "")
         }
-        for key in ("independent", "hom_in_base", "stab_in_base", "trans_in_base"):
+        for key in ("independent", "hom_in_base", "stab_in_base", "trans_in_base", "trans_in_stab"):
             if assigned.get(key) in ("TRUE", "FALSE"):
                 assigned[key] = assigned[key] == "TRUE"
     s_values: list[float] = []
