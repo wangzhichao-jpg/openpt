@@ -14,7 +14,7 @@ py -m pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -e ".[test]"
 `py -m openpt run input.xlsx` 等命令。可选 Wine 测试及其局限见
 [Windows 兼容性测试](docs/Windows兼容性测试.md)。
 
-Linux（用于开发和持续集成，不提供 macOS 支持承诺）：
+Linux（用于开发和持续集成）：
 
 ```sh
 python -m pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -e '.[test]'
