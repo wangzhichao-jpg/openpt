@@ -166,6 +166,8 @@ def template(path: str | Path) -> None:
         ("报告声明的稳定性方法（report_stability_method）", ""),
         ("重复性质（replicate_type）", "technical"),
         ("测量表布局（layout）", ""),
+        ("GL003均匀性主判据（gl003_hom_criterion）", ""),
+        ("报告声明GL003均匀性判据（report_gl003_hom_criterion）", ""),
     ]:
         book["方法配置"].append(config_row)
 
@@ -192,6 +194,8 @@ def template(path: str | Path) -> None:
         ("B31", options_for("report_stability_method")),
         ("B32", options_for("replicate_type")),
         ("B33", options_for("layout")),
+        ("B34", options_for("gl003_hom_criterion")),
+        ("B35", options_for("report_gl003_hom_criterion")),
     ]:
         validation = DataValidation(type="list", formula1=options)
         book["方法配置"].add_data_validation(validation)

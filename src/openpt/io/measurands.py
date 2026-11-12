@@ -22,6 +22,8 @@ CONFIG_FIELDS = {
     "stability_design",
     "replicate_type",
     "criterion_standard",
+    "gl003_hom_criterion",
+    "report_gl003_hom_criterion",
     "gbt_hom_rule",
     "gbt_stability_rule",
     "reference",

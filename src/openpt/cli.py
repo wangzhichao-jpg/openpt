@@ -307,8 +307,13 @@ def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]
         strict = cfg.get("strict_homogeneity", False)
         if not isinstance(strict, bool):
             raise ValueError("strict_homogeneity 必须是布尔值")
+        gl_criterion = _option(cfg, "gl003_hom_criterion", "f_test")
+        if gl_criterion not in ENUMS["gl003_hom_criterion"]:
+            raise InputError("GL003 均匀性判据应为 f_test、ss_0.3sigma 或 both")
+        if strict:
+            gl_criterion = "both"
         if replicate_type == "single":
-            if strict:
+            if gl_criterion == "both":
                 raise InputError("单测设计不能使用要求 F 检验的严格配置")
             if not 0 < alpha < 1:
                 raise InputError("alpha 必须在 0 和 1 之间")
@@ -328,7 +333,10 @@ def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]
                 strict,
                 _option(cfg, "sigma_source", None),
                 _option(cfg, "sigma_stage", None),
+                gl_criterion,
             ).to_dict()
+        if cfg.get("gl003_hom_criterion") not in (None, "") and replicate_type != "single":
+            result["均匀性"]["selected_criterion"] = gl_criterion
         if replicate_type == "adjacent_specimens":
             result["均匀性"]["warnings"].append(
                 "扩展提示：组内方差包含相邻试件之间的差异，可能低估样品间不均匀性"

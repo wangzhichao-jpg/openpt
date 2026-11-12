@@ -699,6 +699,34 @@ def review(
                 "说明": "报告模式与推荐模式不同；差异不自动认定为报告错误。",
             }
         )
+    report_criterion = cfg.get("report_gl003_hom_criterion")
+    if (
+        report_criterion not in (None, "")
+        and report_criterion not in ENUMS["report_gl003_hom_criterion"]
+    ):
+        raise ValueError("report_gl003_hom_criterion 无效")
+    selected_criterion = (
+        "both" if cfg.get("strict_homogeneity") else (cfg.get("gl003_hom_criterion") or "f_test")
+    )
+    if selected == "gl003" and report_criterion and report_criterion != selected_criterion:
+        rows.append(
+            {
+                "统计量": "GL003均匀性主判据",
+                "声称值": report_criterion,
+                "来源": "方法配置",
+                "显示小数位": None,
+                "按报告模型复现值": report_criterion,
+                "按推荐模型重算值": selected_criterion,
+                "按报告显示值": report_criterion,
+                "按推荐显示值": selected_criterion,
+                "显示一致": True,
+                "推荐一致": False,
+                "状态": "NOTE",
+                "差异类型": "MODEL_SWITCH",
+                "评分条目": _mapping_item(mapping, "GL003均匀性主判据", "homogeneity"),
+                "说明": "报告声明的均匀性判据与配置不同；须核对报告口径。",
+            }
+        )
     report_method = cfg.get("report_stability_method")
     selected_method = cfg.get("stability_method") or "two_sample"
     if report_method not in (None, "") and report_method not in ENUMS["report_stability_method"]:

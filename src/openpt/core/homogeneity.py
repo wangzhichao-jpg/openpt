@@ -117,6 +117,7 @@ def analyze(
     strict: bool = False,
     sigma_source: str | None = None,
     sigma_stage: str | None = None,
+    criterion: str = "f_test",
 ) -> HomogeneityResult:
     """按 GL003 4.2、4.3 计算 F=MS组间/MS组内 和 Ss。"""
     if not 0 < alpha < 1:
@@ -127,6 +128,9 @@ def analyze(
         raise InputError("sigma 阶段应为 temporary 或 final")
     if sigma_source is not None and not isinstance(sigma_source, str):
         raise InputError("sigma 来源必须为文字")
+    if criterion not in ENUMS["gl003_hom_criterion"]:
+        raise InputError("GL003 均匀性判据应为 f_test、ss_0.3sigma 或 both")
+    criterion = "both" if strict else criterion
     values = _anova(data)
     raw, msb, msw = values["variance_raw"], values["MS_between"], values["MS_within"]
     db, dw = values["df_between"], values["df_within"]
@@ -138,11 +142,12 @@ def analyze(
     fpass = compare(stat, critical) < 0 if stat is not None else None
     threshold = 0.3 * sigma if sigma is not None else None
     sspass = compare(ss, threshold) <= 0 if threshold is not None else None
-    conclusion = (
-        (fpass and sspass if sspass is not None else (False if fpass is False else None))
-        if strict
-        else fpass
-    )
+    if criterion == "ss_0.3sigma":
+        conclusion = sspass
+    elif criterion == "both":
+        conclusion = fpass and sspass if sspass is not None else (False if fpass is False else None)
+    else:
+        conclusion = fpass
     warnings = (["组间方差估计为负，Ss截零；不代表绝对均匀"] if raw < 0 else []) + (
         ["组内方差为零，F不可判定，请检查分辨力"] if stat is None else []
     )
@@ -151,7 +156,15 @@ def analyze(
         design_warnings.append("扩展方法：不平衡随机效应 ANOVA，采用有效重复数 n₀；需审核")
     return HomogeneityResult(
         **values,
-        status="INDETERMINATE" if stat is None else "OK",
+        status=(
+            "NOT_EVALUATED"
+            if criterion == "ss_0.3sigma" and sspass is None
+            else "OK"
+            if criterion == "ss_0.3sigma"
+            else "INDETERMINATE"
+            if stat is None
+            else "OK"
+        ),
         design_status="DESIGN_WARNING" if design_warnings else "OK",
         design_warnings=design_warnings,
         warnings=warnings,
@@ -172,6 +185,6 @@ def analyze(
             if sigma_stage == "temporary"
             else "OK"
         ),
-        strict=strict,
+        strict=criterion == "both",
         conclusion=conclusion,
     )

@@ -248,6 +248,9 @@ def _homogeneity_conclusion(
     alpha: float,
 ) -> None:
     """按 GL003 4.2 和 4.3 说明统计量、判定与未评价原因。"""
+    criterion = h.get("selected_criterion") or ("both" if h.get("strict") else "f_test")
+    if criterion == "ss_0.3sigma":
+        doc.add_paragraph("主判据为 GL003 4.3 的 Ss≤0.3σ；以下 F 检验仅供参考。")
     if h["F"] is None:
         doc.add_paragraph("按 GL003 4.2：未评价，组内均方为零或数值超出范围，F 无法计算。")
     else:
@@ -267,8 +270,15 @@ def _homogeneity_conclusion(
     else:
         relation = "≤" if h["Ss_pass"] else ">"
         judgement = "通过" if h["Ss_pass"] else "不通过"
+        label = (
+            "主判据"
+            if criterion == "ss_0.3sigma"
+            else "并列判据"
+            if criterion == "both"
+            else "并列提示"
+        )
         doc.add_paragraph(
-            f"并列提示（GL003 4.3）：Ss={_shown(h['Ss'], places=ss_places)} {relation} "
+            f"{label}（GL003 4.3）：Ss={_shown(h['Ss'], places=ss_places)} {relation} "
             f"0.3σ={_shown(h['threshold'], places=ss_places)}，用途判据{judgement}。"
         )
     if h.get("strict"):
@@ -836,6 +846,24 @@ def _decision_time(value: Any) -> str:
         return value
 
 
+def _gl003_homogeneity_summary(h: dict[str, Any], sig: int = 4) -> str:
+    """按实际主判据显示结论，避免把并列参考误写为主评价。"""
+    if h.get("method") == "single":
+        return (
+            f"均匀性（GB/T 28043-2019 B.1.2）：{_shown(h.get('conclusion'))}；"
+            f"s_x={_shown(h.get('Ss'), sig)}，0.3σ={_shown(h.get('threshold'), sig)}。"
+        )
+    criterion = h.get("selected_criterion") or ("both" if h.get("strict") else "f_test")
+    f_values = f"F={_shown(h.get('F'), sig)}，临界值={_shown(h.get('F_critical'), sig)}"
+    ss_values = f"Ss={_shown(h.get('Ss'), sig)}，0.3σ={_shown(h.get('threshold'), sig)}"
+    conclusion = _shown(h.get("conclusion"))
+    if criterion == "ss_0.3sigma":
+        return f"均匀性（GL003 4.3 主判据）：{conclusion}；{ss_values}；4.2 {f_values}（参考）。"
+    if criterion == "both":
+        return f"均匀性（GL003 4.2 与 4.3 综合主判据）：{conclusion}；{f_values}；{ss_values}。"
+    return f"均匀性（GL003 4.2 主判据）：{conclusion}；{f_values}；4.3 {ss_values}（参考）。"
+
+
 def make_report(
     path: str | Path,
     data: dict[str, Any],
@@ -863,17 +891,7 @@ def make_report(
                     f"ss={_shown(h.get('ss'))}；限值={_shown(h.get(rule + '_limit'))}。"
                 )
             else:
-                clause = "GB/T 28043 B.1.2" if h.get("method") == "single" else "GL003 4.3"
-                f_note = (
-                    ""
-                    if h.get("method") == "single"
-                    else f"；GL003 4.2 F={_shown(h.get('F'))}，"
-                    f"临界值={_shown(h.get('F_critical'))}（参考）"
-                )
-                doc.add_paragraph(
-                    f"被测量 {name}；均匀性（{clause}）：{_shown(h.get('Ss_pass'))}；"
-                    f"Ss={_shown(h.get('Ss'))}；限值={_shown(h.get('threshold'))}{f_note}。"
-                )
+                doc.add_paragraph(f"被测量 {name}；" + _gl003_homogeneity_summary(h))
             periods = sub.get("GB/T稳定性") or (
                 {sub.get("稳定性时间组") or "稳定期": sub["稳定性"], **sub.get("其他稳定性", {})}
                 if sub.get("稳定性")
@@ -966,19 +984,8 @@ def make_report(
             f"均匀性（GB/T 28043-2019 {clause}）：{_shown(gbt_h.get('conclusion'))}；"
             f"ss={_shown(gbt_h.get('ss'), sig)}；限值={_shown(gbt_h.get(rule + '_limit'), sig)}。"
         )
-    elif h and h.get("method") == "single":
-        doc.add_paragraph(
-            f"均匀性（GB/T 28043-2019 B.1.2）：{_shown(h.get('Ss_pass'))}；"
-            f"s_x={_shown(h.get('Ss'), sig)}，0.3σ={_shown(h.get('threshold'), sig)}。"
-        )
     elif h:
-        doc.add_paragraph(
-            f"均匀性（GL003 4.3）：{_shown(h.get('Ss_pass'))}；"
-            f"Ss={_shown(h.get('Ss'), sig)}，0.3σ={_shown(h.get('threshold'), sig)}；"
-            f"4.2 F={_shown(h.get('F'), sig)}，临界值={_shown(h.get('F_critical'), sig)}（参考）。"
-        )
-        if h.get("strict"):
-            doc.add_paragraph("严格配置综合结论：" + _shown(h.get("conclusion")) + "。")
+        doc.add_paragraph(_gl003_homogeneity_summary(h, sig))
     else:
         doc.add_paragraph("均匀性：未提供数据，本次未评价。")
     periods = (
