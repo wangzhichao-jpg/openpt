@@ -24,6 +24,27 @@ def review_trend(result: dict[str, Any], claims: list[dict[str, Any]]) -> list[d
     by_name: dict[str, dict[str, Any]] = {}
     for claim in claims:
         name = claim.get("name")
+        if name == "结论":
+            if name in by_name:
+                raise InputError("趋势声称结论重复")
+            value = claim.get("value")
+            if value not in ("稳定", "趋势显著"):
+                raise InputError("趋势声称结论应为稳定或趋势显著")
+            expected_stable = result.get("stable")
+            match = None if expected_stable is None else (value == "稳定") is expected_stable
+            rows.append(
+                {
+                    "统计量": "结论",
+                    "声称值": value,
+                    "重算值": expected_stable,
+                    "显示一致": match,
+                    "状态": "MATCH" if match else "DIFFERENCE" if match is False else "NOTE",
+                    "差异类型": "VALUE_MISMATCH" if match is False else "",
+                    "说明": "结论受影响" if match is False else "",
+                }
+            )
+            by_name[name] = claim
+            continue
         if name not in _NAMES or name in by_name:
             raise InputError("趋势声称统计量无效或重复")
         value, digits = claim.get("value"), claim.get("digits")

@@ -30,10 +30,12 @@ def test_trend_internal_consistency() -> None:
         {"name": "b0", "value": round(result["b0"], 2), "digits": 2},
         {"name": "X̄", "value": 2.4, "digits": 1},
         {"name": "Ȳ", "value": 6.28, "digits": 2},
+        {"name": "结论", "value": "稳定"},
     ]
     rows = review_trend(result, claims)
     assert result["stable"] is False
     assert next(row for row in rows if row["统计量"] == "b1")["差异类型"] == "VALUE_MISMATCH"
+    assert next(row for row in rows if row["统计量"] == "结论")["说明"] == "结论受影响"
     issue = next(row for row in rows if row["差异类型"] == "INTERNAL_INCONSISTENT")
     assert "截距与原始数据重算一致，斜率最可能有误" in issue["说明"]
 

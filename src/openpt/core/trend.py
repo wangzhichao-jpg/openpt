@@ -15,6 +15,10 @@ from .decision import compare
 def fit(x: list[float], y: list[float], alpha: float = 0.05) -> dict[str, Any]:
     """拟合截距和斜率；零残差的 0/0 不冒充可检验的稳定性。"""
     try:
+        if any(isinstance(value, (bool, np.bool_)) for value in x) or any(
+            isinstance(value, (bool, np.bool_)) for value in y
+        ):
+            raise ValueError("布尔值不是测量数")
         xx = np.asarray(x, dtype=float)
         yy = np.asarray(y, dtype=float)
     except (TypeError, ValueError, OverflowError):
