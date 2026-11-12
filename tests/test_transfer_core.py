@@ -29,6 +29,12 @@ def test_transfer_window_and_boundary() -> None:
     unaffected = assess_point(rows, [{"kind": "fixed", "value": 1.0}], window="transfer_only")
     same = review_transfer(unaffected, {"name": "Δmax", "value": 0.4, "digits": 2})
     assert same["说明"] == "结论不受影响"
+    assert (
+        review_transfer(unaffected, {"name": "限值", "value": 1.0, "digits": 1})["状态"] == "MATCH"
+    )
+    assert review_transfer(unaffected, {"name": "结论", "value": "不稳定"})["说明"] == "结论受影响"
+    with pytest.raises(InputError, match="序号"):
+        review_transfer(result, {"name": "限值", "value": 1.0, "digits": 1})
     assert assess_point(rows, rules, window="all")["delta_max"] == pytest.approx(5.3)
     summary = assess_point(
         [], [{"kind": "u_ref", "value": 1, "k": 2, "inclusive": True}], summarized_delta=0.5
