@@ -52,6 +52,22 @@ def test_primary_modes_and_legacy_strict(tmp_path: Path) -> None:
         calculate(data)
 
 
+@pytest.mark.parametrize("standard", ["gl003", "gbt28043"])
+def test_same_standard_description_does_not_downgrade_match(standard: str) -> None:
+    data = _data()
+    data["config"].update(criterion_standard=standard, report_standard=standard)
+    result = calculate(data)
+    value = result["均匀性"]["Ss"]
+    data["claims"] = [{"name": "Ss", "value": value, "digits": 3, "source": "合成"}]
+    row = next(row for row in review(data, result) if row["统计量"] == "Ss")
+    assert row["显示一致"] and row["推荐一致"]
+    assert row["状态"] == "MATCH" and row["差异类型"] == ""
+    assert f"报告标准模式={standard}；推荐模式={standard}" in row["说明"]
+    data["config"]["report_standard"] = "gbt28043" if standard == "gl003" else "gl003"
+    row = next(row for row in review(data, result) if row["统计量"] == "Ss")
+    assert row["状态"] == "NOTE" and "报告标准模式=" in row["说明"]
+
+
 def test_reported_criterion_switch_and_template(tmp_path: Path) -> None:
     path = tmp_path / "input.xlsx"
     template(path)

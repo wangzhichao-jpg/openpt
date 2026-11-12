@@ -207,7 +207,13 @@ def _values(
             recommended_value = _standard_value(data, result, claim, selected)
         except ValueError:
             return None, None, "标准模式所需数据或实验设计不适用"
-        note = "" if report_mode == selected else f"报告标准模式={report_mode}；推荐模式={selected}"
+        note = (
+            f"报告标准模式={report_mode}；推荐模式={selected}"
+            if report_mode != selected
+            or cfg.get("report_standard")
+            or model in ("gl003", "gbt28043")
+            else ""
+        )
         if selected == "gbt28043" and name.endswith("限值"):
             rule_key = "gbt_hom_rule" if name.startswith("均匀性") else "gbt_stability_rule"
             primary = cfg.get(rule_key) or "basic"
@@ -279,6 +285,8 @@ def _row(
     note: str,
     categories: list[str],
     item: str,
+    *,
+    informational_note: bool = False,
 ) -> dict[str, Any]:
     try:
         if not 0 <= digits <= 12:
@@ -306,7 +314,10 @@ def _row(
         if "VALUE_MISMATCH" in categories
         else (
             "NOTE"
-            if match is not True or recommended_match is False or categories or note
+            if match is not True
+            or recommended_match is False
+            or categories
+            or (note and not informational_note)
             else "MATCH"
         )
     )
@@ -558,7 +569,20 @@ def _review_claim(
     source = claim["source"]
     if claim.get("cell"):
         source = f"{source}；输入单元格：{claim['cell']}"
-    row = _row(name, claim["value"], digits, source, reproduced, rec, note, types, item)
+    selected_standard = data["config"].get("criterion_standard") or "gl003"
+    mode_information = note == f"报告标准模式={selected_standard}；推荐模式={selected_standard}"
+    row = _row(
+        name,
+        claim["value"],
+        digits,
+        source,
+        reproduced,
+        rec,
+        note,
+        types,
+        item,
+        informational_note=mode_information,
+    )
     if report_means is not None and row["显示一致"] is True and not row["差异类型"]:
         row["状态"] = "MATCH"
         if row["推荐一致"] is False:
