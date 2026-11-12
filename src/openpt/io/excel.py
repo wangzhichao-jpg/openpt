@@ -101,7 +101,7 @@ def template(path: str | Path) -> None:
     for cell, options in [
         ("B4", '"启用,关闭"'),
         ("B5", '"两均值,单均值"'),
-        ("B9", '"gl002,absolute,simplified"'),
+        ("B9", '"gl002,gbt28043,absolute,simplified"'),
         ("B11", '"标准方法精密度,经验值,稳健标准差,其他"'),
         ("B12", '"temporary,final"'),
         ("B13", '"unit_means,all_repeats"'),

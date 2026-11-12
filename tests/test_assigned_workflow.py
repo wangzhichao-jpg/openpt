@@ -84,7 +84,7 @@ def test_workbook_expert_consensus(tmp_path: Path) -> None:
     assert result["指定值与不确定度"]["expert_values"] == [99, 100, 101]
 
 
-@pytest.mark.parametrize("rule", ["absolute", "simplified"])
+@pytest.mark.parametrize("rule", ["absolute", "gbt28043", "simplified"])
 def test_consensus_uses_selected_algorithm_rule(tmp_path: Path, rule: str) -> None:
     """公议值与显示的算法 A 必须使用同一停止规则。"""
     path = tmp_path / "consensus.xlsx"

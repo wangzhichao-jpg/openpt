@@ -2,7 +2,7 @@
 """CNAS-GL002:2018 附录 A.2，算法 A。"""
 
 import math
-from decimal import Decimal, localcontext
+from decimal import ROUND_HALF_EVEN, Decimal, localcontext
 from typing import Any
 
 import numpy as np
@@ -64,11 +64,16 @@ def _iterate(
         if not math.isfinite(nx) or not math.isfinite(ns):
             raise InputError("数值溢出")
         history.append({"iteration": i + 1, "x": nx, "s": ns})
-        stable = (
-            _gl002_stable(x, s, nx, ns) and i > 0
-            if rule == "gl002"
-            else abs(nx - x) <= tolerance and abs(ns - s) <= tolerance
-        )
+        if rule == "gl002":
+            stable = _gl002_stable(x, s, nx, ns) and i > 0
+        elif rule == "gbt28043":
+            stable = (
+                i > 0
+                and _three_significant(x) == _three_significant(nx)
+                and _three_significant(s) == _three_significant(ns)
+            )
+        else:
+            stable = abs(nx - x) <= tolerance and abs(ns - s) <= tolerance
         x, s = nx, ns
         if stable:
             converged = True
@@ -83,7 +88,7 @@ def algorithm_a(
     simplified: bool = False,
     rule: str = "gl002",
 ) -> AlgorithmAResult:
-    """按 GL002 附录 A.2 用中位数及截尾数据计算稳健均值、标准差。"""
+    """算法 A；可选 GB/T 28043-2019 C.3.1 的各自三位有效数字停止规则。"""
     try:
         a = np.asarray(values, dtype=float)
     except (ValueError, TypeError):
@@ -97,7 +102,7 @@ def algorithm_a(
         or max_iterations < 1
     ):
         raise InputError("无效迭代参数")
-    if rule not in ("gl002", "absolute", "simplified"):
+    if rule not in ("gl002", "gbt28043", "absolute", "simplified"):
         raise InputError("算法 A 停止规则无效")
     if simplified:
         rule = "simplified"
@@ -162,13 +167,14 @@ def _iterate_s(
 
 
 def _three_significant(value: float) -> Decimal:
-    """按各自数值量级取三位有效数字，比较结果而不改动计算值。"""
+    """按各自数值量级用十进制半偶舍入比较，不改动计算值。"""
     if value == 0:
         return Decimal(0)
     decimal = Decimal(str(value))
     quantum = Decimal(1).scaleb(decimal.adjusted() - 2)
     with localcontext() as context:
         context.prec = 1024
+        context.rounding = ROUND_HALF_EVEN
         return decimal.quantize(quantum)
 
 

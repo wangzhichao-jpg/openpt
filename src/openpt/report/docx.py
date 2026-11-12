@@ -443,7 +443,7 @@ def _other_results(
 
 
 def _robust_results(doc: Any, result: dict[str, Any], sig: int, mean_places: int) -> None:
-    """显示 GL002 稳健统计及停止规则敏感性。"""
+    """显示稳健统计及停止规则敏感性。"""
     doc.add_heading("稳健统计", 1)
     a = result.get("算法A")
     if a:
@@ -462,7 +462,12 @@ def _robust_results(doc: Any, result: dict[str, Any], sig: int, mean_places: int
                 for label, key in names
             ],
         )
-        rules = {"gl002": "GL002 第三有效位规则", "absolute": "绝对容差", "simplified": "简化法"}
+        rules = {
+            "gl002": "GL002 第三有效位规则",
+            "gbt28043": "GB/T 28043-2019 C.3.1 各自三位有效数字（半偶舍入）",
+            "absolute": "绝对容差",
+            "simplified": "简化法",
+        }
         doc.add_paragraph("停止规则：" + rules.get(a.get("rule"), "未提供"))
         converged = result.get("算法A_收敛对照")
         if converged and not converged.get("converged"):

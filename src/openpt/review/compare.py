@@ -177,11 +177,22 @@ def _values(
     if name in ("x*", "s*"):
         key = "x" if name == "x*" else "s"
         value = result.get("算法A", {}).get(key)
-        if claim.get("model") == "absolute" and data.get("participants"):
-            alternative = algorithm_a([p["value"] for p in data["participants"]], rule="absolute")
+        if claim.get("model") in ("absolute", "gbt28043") and data.get("participants"):
+            rule = claim["model"]
+            alternative = algorithm_a([p["value"] for p in data["participants"]], rule=rule)
             if not alternative.converged:
-                return None, value, "绝对容差模型未收敛，未评价；报告停止规则待底稿确认"
-            return alternative[key], value, "绝对容差作为候选报告模型，原报告停止规则待底稿确认"
+                note = (
+                    "绝对容差模型未收敛，未评价；报告停止规则待底稿确认"
+                    if rule == "absolute"
+                    else "GB/T 28043 C.3.1 报告模型未收敛，未评价"
+                )
+                return None, value, note
+            note = (
+                "绝对容差作为候选报告模型，原报告停止规则待底稿确认"
+                if rule == "absolute"
+                else "报告使用 GB/T 28043 C.3.1 各自三位有效数字停止规则"
+            )
+            return alternative[key], value, note
         return value, value, ""
     if name == "t":
         return _t_reproduction(data, result, claim)
@@ -292,10 +303,13 @@ def _candidate_models(
 def _algorithm_candidates(
     data: dict[str, Any], name: str, claim: float, digits: int
 ) -> bool | None:
-    """检查算法 A 三种停止规则；数据不足时不推断无法复现。"""
+    """检查算法 A 的候选停止规则；数据不足时不推断无法复现。"""
     try:
         values = [p["value"] for p in data["participants"]]
-        results = [algorithm_a(values, rule=rule) for rule in ("gl002", "absolute", "simplified")]
+        results = [
+            algorithm_a(values, rule=rule)
+            for rule in ("gl002", "gbt28043", "absolute", "simplified")
+        ]
         valid = [r[name] for r in results if r.converged and r.status == "OK"]
         if any(display(value, digits) == display(claim, digits) for value in valid):
             return False
