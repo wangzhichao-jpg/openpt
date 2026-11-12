@@ -98,6 +98,44 @@ def test_optional_sheets_can_be_absent_and_metadata_is_checked(tmp_path: Path) -
     )
 
 
+def test_optional_participant_cells_are_checked(tmp_path: Path) -> None:
+    path = tmp_path / "input.xlsx"
+    template(path)
+    book = load_workbook(path)
+    book["项目信息"]["B2"] = "测试"
+    book["项目信息"]["B3"] = "mg"
+    book["参加者结果"].append(["P1", 1.0, "mg", "错误", "=1+1", 2])
+    book.save(path)
+    issues = inspect_input(path)
+    assert any(
+        i.category == "NON_NUMERIC" and i.sheet == "参加者结果" and i.cell == "D2" for i in issues
+    )
+    assert any(
+        i.category == "FORMULA_NO_CACHE" and i.sheet == "参加者结果" and i.cell == "E2"
+        for i in issues
+    )
+
+
+def test_claim_precision_is_validated(tmp_path: Path) -> None:
+    path = tmp_path / "input.xlsx"
+    template(path)
+    book = load_workbook(path)
+    book["项目信息"]["B2"] = "测试"
+    book["项目信息"]["B3"] = "mg"
+    for uid in (1, 2):
+        for repeat in (1, 2):
+            book["均匀性"].append([uid, repeat, uid + repeat / 10, "mg"])
+    book["报告声称值"].append(["F", 1.0, 1.5, "报告"])
+    book.save(path)
+    assert any(i.category == "INVALID_PRECISION" and i.cell == "C2" for i in inspect_input(path))
+    book["报告声称值"]["C2"] = None
+    book.save(path)
+    assert any(
+        i.category == "MISSING" and i.sheet == "报告声称值" and i.cell == "C2"
+        for i in inspect_input(path)
+    )
+
+
 def test_algorithm_s_shape_and_value_issues(tmp_path: Path) -> None:
     path = tmp_path / "input.xlsx"
     template(path)

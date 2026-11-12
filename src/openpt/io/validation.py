@@ -61,6 +61,17 @@ def _positions(headers: list[Any], sheet: str, mapping: dict[str, Any]) -> dict[
         positions[field] = headers.index(name)
     if len(set(positions.values())) != len(positions):
         raise InputError(f"{sheet}：多个标准字段映射到同一列")
+    if sheet == "参加者结果":
+        for field in PARTICIPANT_OPTIONAL:
+            name = aliases.get(field, field)
+            if name not in headers and field not in aliases:
+                continue
+            if not isinstance(name, str) or headers.count(name) != 1:
+                raise InputError(f"{sheet}：可选列 {name!r} 不存在或不唯一")
+            index = headers.index(name)
+            if index in positions.values():
+                raise InputError(f"{sheet}：多个标准字段映射到同一列")
+            positions[field] = index
     return positions
 
 
@@ -167,6 +178,45 @@ def _check_rows(
                 valid = False
             if not valid:
                 add("NON_NUMERIC", numeric, "数值必须为有限数")
+        if sheet == "参加者结果":
+            for field in PARTICIPANT_OPTIONAL:
+                if field not in positions:
+                    continue
+                raw_optional = value(field)
+                if raw_optional in (None, ""):
+                    continue
+                address = f"{get_column_letter(positions[field] + 1)}{index}"
+                if address in formulas:
+                    col = positions[field]
+                    cache_row = cached[index - 1] if index - 1 < len(cached) else []
+                    category = (
+                        "FORMULA_NO_CACHE"
+                        if col >= len(cache_row) or cache_row[col] is None
+                        else "FORMULA"
+                    )
+                    add(
+                        category,
+                        field,
+                        "公式没有缓存值"
+                        if category == "FORMULA_NO_CACHE"
+                        else "现有计算器不接受公式",
+                    )
+                    continue
+                try:
+                    number = (
+                        float(raw_optional)
+                        if csv_numbers and isinstance(raw_optional, str)
+                        else raw_optional
+                    )
+                    valid = (
+                        not isinstance(number, bool)
+                        and isinstance(number, (int, float))
+                        and math.isfinite(number)
+                    )
+                except (ValueError, OverflowError):
+                    valid = False
+                if not valid:
+                    add("NON_NUMERIC", field, "数值必须为有限数")
         actual = value("单位")
         if actual not in (None, ""):
             if unit is None:
@@ -282,6 +332,30 @@ def _check_numeric_table(
                     valid = False
                 if not valid:
                     issues.append(Issue("NON_NUMERIC", sheet, cell, value, "数值必须为有限数"))
+        if sheet == "报告声称值":
+            column = positions["显示小数位"]
+            value = row[column] if column < len(row) else None
+            cell = f"{get_column_letter(column + 1)}{number}"
+            if value in (None, ""):
+                issues.append(Issue("MISSING", sheet, cell, value, "复核声称值须填写显示小数位"))
+            elif (
+                cell not in formulas
+                and isinstance(value, (int, float))
+                and not isinstance(value, bool)
+            ):
+                try:
+                    if math.isfinite(value) and (value != int(value) or not 0 <= value <= 12):
+                        issues.append(
+                            Issue(
+                                "INVALID_PRECISION",
+                                sheet,
+                                cell,
+                                value,
+                                "显示小数位须为 0 至 12 的整数",
+                            )
+                        )
+                except OverflowError:
+                    pass
         if sheet == "算法S":
             for field in SHEETS[sheet]:
                 column = positions[field]
