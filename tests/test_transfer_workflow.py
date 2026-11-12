@@ -89,6 +89,27 @@ def test_transfer_full_flow(tmp_path: Path) -> None:
     assert main(["reproduce", str(next((tmp_path / "reviews").iterdir()))]) == 0
 
 
+def test_pretransfer_two_groups_are_independent(tmp_path: Path) -> None:
+    path = tmp_path / "groups.xlsx"
+    _workbook(path)
+    book = load_workbook(path)
+    sheet = book["传递标准复测"]
+    sheet.delete_rows(2, sheet.max_row - 1)
+    for group, values in (("甲", (1.0, 1.1, 1.2)), ("乙", (1.02, 1.12, 1.22))):
+        for order, value in enumerate(values, 1):
+            sheet.append(["STD1", "P1", order, "2025-01-01", "传递前", value, "V", group])
+    config = book["传递标准配置"]
+    config["D2"] = "all"
+    config["E2"] = json.dumps([{"kind": "two_sample", "group1": "甲", "group2": "乙"}])
+    book.save(path)
+    assert inspect_input(path) == []
+    point = calculate(read_workbook(path))["传递标准稳定性"]["STD1|P1"]
+    detail = point["criteria"][0]["detail"]
+    assert detail["n1"] == detail["n2"] == 3
+    assert detail["mean1"] == pytest.approx(1.1)
+    assert detail["mean2"] == pytest.approx(1.12)
+
+
 def test_transfer_c_condition_is_checked(tmp_path: Path) -> None:
     path = tmp_path / "input.xlsx"
     _workbook(path, "C")

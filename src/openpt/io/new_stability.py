@@ -197,9 +197,10 @@ def read_transfer_sheet(book: Any) -> list[dict[str, Any]]:
         return []
     ws = book["传递标准复测"]
     names = ("传递标准编号", "校准点", "测量序号", "日期", "阶段", "测量值", "单位")
-    positions = _required(_headers(ws), names, ws.title)
+    headers = _headers(ws)
+    positions = _required(headers, names, ws.title)
     output = []
-    seen: set[tuple[str, str, str]] = set()
+    seen: set[tuple[str, str, str, str]] = set()
     for row in ws.iter_rows(min_row=2):
         if not any(cell.value not in (None, "") for cell in row):
             continue
@@ -211,7 +212,16 @@ def read_transfer_sheet(book: Any) -> list[dict[str, Any]]:
             raise InputError(f"传递标准复测!{cells['阶段'].coordinate}: 阶段无效")
         if not isinstance(day, (str, date, datetime)):
             raise InputError(f"传递标准复测!{cells['日期'].coordinate}: 日期无效")
-        key = (str(standard), str(point), str(order))
+        group = ""
+        if "测量组" in headers:
+            cell = ws.cell(row[0].row, headers.index("测量组") + 1)
+            if cell.data_type == "f":
+                raise InputError(f"传递标准复测!{cell.coordinate}: 不接受公式")
+            if cell.value not in (None, ""):
+                if not isinstance(cell.value, str):
+                    raise InputError(f"传递标准复测!{cell.coordinate}: 测量组须为文字")
+                group = cell.value.strip()
+        key = (str(standard), str(point), group, str(order))
         if key in seen:
             raise InputError(f"传递标准复测!{cells['测量序号'].coordinate}: 测量序号重复")
         seen.add(key)
@@ -224,6 +234,7 @@ def read_transfer_sheet(book: Any) -> list[dict[str, Any]]:
                 "stage": stage,
                 "value": _value(cells["测量值"], numeric=True),
                 "unit": str(unit),
+                "group": group,
                 "source": f"传递标准复测!{cells['测量值'].coordinate}",
             }
         )

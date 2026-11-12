@@ -23,7 +23,7 @@ from ..errors import InputError
 from .layout import wide_to_long
 from .measurands import split_measurands
 from .new_stability import read_transfer_config, read_transfer_sheet, read_trend_sheet
-from .shape import STABILITY_METHOD_ALIASES, insufficient_homogeneity_replicates
+from .shape import STABILITY_METHOD_ALIASES, enum_problem, insufficient_homogeneity_replicates
 
 SHEETS = {
     "项目信息": ["字段", "值"],
@@ -138,7 +138,17 @@ def template(path: str | Path) -> None:
     trend_units.add("C2:C1048576")
     transfer_sheet = book.create_sheet("传递标准复测")
     transfer_sheet.append(
-        ["传递标准编号", "校准点", "测量序号", "日期", "阶段", "测量值", "单位", "（选填）"]
+        [
+            "传递标准编号",
+            "校准点",
+            "测量序号",
+            "日期",
+            "阶段",
+            "测量值",
+            "单位",
+            "测量组",
+            "（选填）",
+        ]
     )
     transfer_sheet.freeze_panes = "A2"
     stage_options = DataValidation(type="list", formula1='"传递前,传递中,传递后"')
@@ -366,6 +376,9 @@ def _metadata(book: Any) -> tuple[dict[str, Any], dict[str, Any]]:
         match = re.search(r"（([a-zA-Z_][a-zA-Z_0-9]*)）$", label)
         key = match.group(1) if match else label
         value = row[1].value
+        problem = enum_problem(key, value)
+        if problem:
+            raise InputError(f"方法配置!{row[1].coordinate}: {problem}")
         if (
             key
             in (
@@ -689,6 +702,10 @@ def read_workbook(
             for row in _rows(book, "指定值与不确定度")
             if row[0].value and row[1].value not in (None, "")
         }
+        for row in _rows(book, "指定值与不确定度"):
+            problem = enum_problem(str(row[0].value), row[1].value, assigned=True)
+            if problem:
+                raise InputError(f"指定值与不确定度!{row[1].coordinate}: {problem}")
         for key in ("independent", "hom_in_base", "stab_in_base", "trans_in_base", "trans_in_stab"):
             if assigned.get(key) in ("TRUE", "FALSE"):
                 assigned[key] = assigned[key] == "TRUE"

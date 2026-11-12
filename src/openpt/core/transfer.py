@@ -34,6 +34,7 @@ def assess_point(
     if not criteria:
         raise InputError("至少指定一个稳定性判据")
     values = []
+    selected_rows = []
     for row in observations:
         stage = row.get("stage")
         if stage not in ("传递前", "传递中", "传递后"):
@@ -41,6 +42,7 @@ def assess_point(
         value = _number(row.get("value"), "复测值")
         if window == "all" or stage in ("传递中", "传递后"):
             values.append(value)
+            selected_rows.append(row)
     if summarized_delta is not None:
         if observations:
             raise InputError("汇总变差与测量序列不可同时输入")
@@ -79,9 +81,16 @@ def assess_point(
                 before = rule.get("baseline")
                 if not isinstance(before, list):
                     raise InputError("两样本检验须提供基线组")
+                comparison = values
+                if rule.get("group2"):
+                    comparison = [
+                        _number(row["value"], "比较组值")
+                        for row in selected_rows
+                        if row.get("group") == rule["group2"]
+                    ]
                 result = analyze(
                     [[_number(v, "基线值")] for v in before],
-                    [[v] for v in values],
+                    [[v] for v in comparison],
                     method="two_sample",
                 )
             t, critical = result.t, result.critical
@@ -154,12 +163,33 @@ def assess_transfer(
         rules = []
         for rule in cfg["criteria"]:
             current = dict(rule)
+            if (
+                current.get("kind") == "two_sample"
+                and "baseline" in current
+                and current.get("group1")
+            ):
+                raise InputError("两样本基线不能同时以测量组和列表指定")
             if current.get("kind") == "two_sample" and "baseline" not in current:
-                if cfg["window"] != "transfer_only":
-                    raise InputError("自动选取基线时两样本检验须选择传递期间窗口")
-                current["baseline"] = [
-                    row["value"] for row in grouped[key] if row["stage"] == "传递前"
-                ]
+                if current.get("group1") or current.get("group2"):
+                    if (
+                        not all(
+                            isinstance(current.get(name), str) and current[name]
+                            for name in ("group1", "group2")
+                        )
+                        or current["group1"] == current["group2"]
+                    ):
+                        raise InputError("两样本检验须指定两个不同测量组")
+                    current["baseline"] = [
+                        row["value"]
+                        for row in grouped[key]
+                        if row.get("group") == current["group1"]
+                    ]
+                else:
+                    if cfg["window"] != "transfer_only":
+                        raise InputError("自动选取基线时两样本检验须选择传递期间窗口")
+                    current["baseline"] = [
+                        row["value"] for row in grouped[key] if row["stage"] == "传递前"
+                    ]
             rules.append(current)
         result = assess_point(
             grouped[key], rules, window=cfg["window"], summarized_delta=cfg.get("summarized_delta")
