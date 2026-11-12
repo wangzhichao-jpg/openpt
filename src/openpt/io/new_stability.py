@@ -70,6 +70,14 @@ def read_trend_sheet(book: Any) -> list[dict[str, Any]]:
         series, unit = _value(get("序列名")), _value(get("时间单位"))
         if not isinstance(series, str) or not series.strip() or unit not in ("天", "月", "次"):
             raise InputError(f"趋势稳定性!{row[0].row}: 序列名或时间单位无效")
+        condition = None
+        if "条件" in headers:
+            condition_cell = ws.cell(row[0].row, headers.index("条件") + 1)
+            if condition_cell.data_type == "f":
+                raise InputError(f"趋势稳定性!{condition_cell.coordinate}: 不接受公式")
+            condition = condition_cell.value
+            if condition not in (None, "") and not isinstance(condition, str):
+                raise InputError(f"趋势稳定性!{condition_cell.coordinate}: 条件须为文字")
         if long:
             xcell, ycell = get("时间 X"), get("值 Y")
             output.append(
@@ -80,6 +88,7 @@ def read_trend_sheet(book: Any) -> list[dict[str, Any]]:
                     "y": _value(ycell, numeric=True),
                     "source": f"趋势稳定性!{ycell.coordinate}",
                     "time_source": f"趋势稳定性!{xcell.coordinate}",
+                    "condition": condition,
                 }
             )
         else:
@@ -93,6 +102,7 @@ def read_trend_sheet(book: Any) -> list[dict[str, Any]]:
                         "y": _value(ycell, numeric=True),
                         "source": f"趋势稳定性!{ycell.coordinate}",
                         "time_source": f"趋势稳定性!{ws.cell(1, col).coordinate}",
+                        "condition": condition,
                     }
                 )
     return output

@@ -74,8 +74,9 @@ def fit_series(
     if aggregate not in ("per_series", "time_mean"):
         raise InputError("trend_aggregate 应为 per_series 或 time_mean")
     grouped: dict[str, list[tuple[float, float]]] = defaultdict(list)
-    points: dict[float, dict[str, float]] = defaultdict(dict)
+    points: dict[str, dict[float, dict[str, float]]] = defaultdict(lambda: defaultdict(dict))
     units: dict[str, str] = {}
+    condition_units: dict[str, str] = {}
     for row in records:
         try:
             name, unit = row["series"], row["time_unit"]
@@ -88,23 +89,36 @@ def fit_series(
             raise InputError("趋势序列名不能为空，时间单位须为天、月或次")
         if not math.isfinite(x) or not math.isfinite(y):
             raise InputError("趋势时间和数值须为有限数")
-        if name in units and units[name] != unit:
+        condition = row.get("condition") or ""
+        if not isinstance(condition, str) or condition == "时间均值":
+            raise InputError("趋势条件须为文字且不能使用保留名称时间均值")
+        series_name = f"{condition}/{name}" if condition else name
+        group_name = condition or "时间均值"
+        if series_name in units and units[series_name] != unit:
             raise InputError("同一序列的时间单位须一致")
-        units[name] = unit
-        if name in points[x]:
-            raise InputError("同一序列和时间点不得重复")
-        points[x][name] = y
-        grouped[name].append((x, y))
+        units[series_name] = unit
+        if (
+            aggregate == "time_mean"
+            and group_name in condition_units
+            and condition_units[group_name] != unit
+        ):
+            raise InputError("同一条件按时间均值拟合时单位须一致")
+        condition_units[group_name] = unit
+        if name in points[group_name][x]:
+            raise InputError("同一条件、序列和时间点不得重复")
+        points[group_name][x][name] = y
+        grouped[series_name].append((x, y))
     if not units:
         raise InputError("趋势序列不能为空")
     if aggregate == "time_mean":
-        if len(set(units.values())) != 1:
-            raise InputError("按时间均值拟合时单位须一致")
-        sets = [set(group) for group in points.values()]
-        if not sets or any(s != sets[0] for s in sets):
-            raise InputError("按时间均值拟合须为每个时间点提供相同样品集合")
-        grouped = {"时间均值": [(x, sum(v.values()) / len(v)) for x, v in points.items()]}
-        units = {"时间均值": next(iter(units.values()))}
+        grouped = {}
+        units = {}
+        for condition, timepoints in points.items():
+            sets = [set(group) for group in timepoints.values()]
+            if not sets or any(s != sets[0] for s in sets):
+                raise InputError("按时间均值拟合须为每个时间点提供相同样品集合")
+            grouped[condition] = [(x, sum(v.values()) / len(v)) for x, v in timepoints.items()]
+            units[condition] = condition_units[condition]
     result = {}
     for name, values in grouped.items():
         ordered = sorted(values)

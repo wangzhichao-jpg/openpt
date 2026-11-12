@@ -786,7 +786,12 @@ def _project_methods(doc: Any, data: dict[str, Any], cfg: dict[str, Any]) -> Non
         [
             ["均匀性方法", hom_method],
             ["并列用途判据", "样品间标准差判据：CNAS-GL003:2018 4.3"],
-            ["稳定性方法", method + "；均值差：5.3"],
+            [
+                "稳定性方法",
+                method
+                if cfg.get("stability_method") == "regression_trend"
+                else method + "；均值差：5.3",
+            ],
             ["稳健统计方法", "算法 A：CNAS-GL002:2018 附录 A.2"],
             ["显著性水平", _shown(cfg.get("alpha", 0.05))],
             ["严格配置", "启用" if cfg.get("strict_homogeneity") else "未启用"],

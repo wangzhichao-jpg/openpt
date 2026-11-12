@@ -129,7 +129,7 @@ def template(path: str | Path) -> None:
         ws = book[name]
         ws.cell(1, ws.max_column + 1, "被测量")
     trend_sheet = book.create_sheet("趋势稳定性")
-    trend_sheet.append(["序列名", "时间 X", "时间单位", "值 Y", "（选填）"])
+    trend_sheet.append(["序列名", "时间 X", "时间单位", "值 Y", "条件", "（选填）"])
     trend_sheet.freeze_panes = "A2"
     trend_units = DataValidation(type="list", formula1='"天,月,次"')
     trend_sheet.add_data_validation(trend_units)

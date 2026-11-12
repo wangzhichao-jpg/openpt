@@ -50,6 +50,11 @@ def test_trend_time_mean_and_uncertainty() -> None:
     assert result["b0"] == pytest.approx(1)
     assert result["b1"] == pytest.approx(1)
     assert len(fit_series(rows)) == 2
+    grouped = [{**row, "condition": "短期"} for row in rows] + [
+        {**row, "condition": "长期", "time_unit": "月"} for row in rows
+    ]
+    assert set(fit_series(grouped, "time_mean")) == {"短期", "长期"}
+    assert set(fit_series(grouped)) == {"短期/a", "短期/b", "长期/a", "长期/b"}
     with pytest.raises(InputError):
         fit_series(rows[:-1], "time_mean")
     with pytest.raises(InputError):
