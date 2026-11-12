@@ -516,6 +516,8 @@ def _assigned_table(doc: Any, result: dict[str, Any]) -> None:
         ("稳定性分量含运输分量", "trans_in_stab"),
         ("状态", "status"),
     ]
+    if "consensus_algorithm_rule" in assigned:
+        labels.append(("公议算法 A 停止规则", "consensus_algorithm_rule"))
     if "stability_disposition" in assigned:
         labels.extend(
             [

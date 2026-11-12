@@ -4,6 +4,7 @@
 import json
 from pathlib import Path
 
+import pytest
 from docx import Document
 from openpyxl import load_workbook
 
@@ -81,6 +82,33 @@ def test_workbook_expert_consensus(tmp_path: Path) -> None:
     result = json.loads((tmp_path / "expert_结果.json").read_text(encoding="utf-8"))
     assert result["指定值与不确定度"]["value"] == 100
     assert result["指定值与不确定度"]["expert_values"] == [99, 100, 101]
+
+
+@pytest.mark.parametrize("rule", ["absolute", "simplified"])
+def test_consensus_uses_selected_algorithm_rule(tmp_path: Path, rule: str) -> None:
+    """公议值与显示的算法 A 必须使用同一停止规则。"""
+    path = tmp_path / "consensus.xlsx"
+    make_input(path)
+    book = load_workbook(path)
+    book["方法配置"]["B9"] = rule
+    sheet = book["指定值与不确定度"]
+    fields = {sheet.cell(row, 1).value: row for row in range(2, sheet.max_row + 1)}
+    sheet.cell(fields["method"], 2, "participant_consensus")
+    sheet.cell(fields["value"], 2).value = None
+    sheet.cell(fields["uncertainty"], 2).value = None
+    participants = book["参加者结果"]
+    participants.delete_rows(2, participants.max_row - 1)
+    for i, value in enumerate([1, 2, 3, 4, 5, 6, 7, 8, 9, 100], 1):
+        participants.append([f"P{i}", value, "mg/kg"])
+    book.save(path)
+    assert main(["run", str(path)]) == 0
+    result = json.loads((tmp_path / "consensus_结果.json").read_text(encoding="utf-8"))
+    assigned, robust = result["指定值与不确定度"], result["算法A"]
+    assert robust["rule"] == assigned["consensus_algorithm_rule"] == rule
+    assert assigned["value"] == robust["x"]
+    assert assigned["base_u"] == pytest.approx(robust["u_x"], rel=1e-15)
+    doc = Document(tmp_path / "consensus_计算书.docx")
+    assert any(c.text == "公议算法 A 停止规则" for t in doc.tables for r in t.rows for c in r.cells)
 
 
 def test_single_participant_en(tmp_path: Path) -> None:

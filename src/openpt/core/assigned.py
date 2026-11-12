@@ -71,6 +71,10 @@ def assign_value(
     expert_values: Any = None,
     known_components: Any = None,
     consensus_method: str = "robust_mean",
+    algorithm_a_rule: str = "gl002",
+    algorithm_a_tolerance: float = 1e-10,
+    algorithm_a_max_iterations: int = 1000,
+    algorithm_a_simplified: bool = False,
     sigma_temporary: float | None = None,
     sigma_final: float | None = None,
     sigma_procedure: str = "",
@@ -126,7 +130,15 @@ def assign_value(
     expert: list[float] | None = None
     if method == "participant_consensus":
         if consensus_method == "robust_mean":
-            robust = algorithm_a(participants)
+            if not isinstance(algorithm_a_simplified, bool):
+                raise InputError("algorithm_a_simplified 必须是布尔值")
+            robust = algorithm_a(
+                participants,
+                tolerance=algorithm_a_tolerance,
+                max_iterations=algorithm_a_max_iterations,
+                simplified=algorithm_a_simplified,
+                rule=algorithm_a_rule,
+            )
             x, scale, count = robust.x, robust.s, robust.n
             if not robust.converged or robust.status != "OK":
                 warnings.append("稳健统计未收敛或尺度为零，指定值不作评价")

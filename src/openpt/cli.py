@@ -152,6 +152,19 @@ def _assigned_results(data: dict[str, Any], calculations: dict[str, Any]) -> dic
         if a.get("u_hom") not in (None, "", 0, 0.0):
             raise InputError("引用 ss 时不得同时手工输入 u_hom")
         options["u_hom"] = h["ss"]
+    if (
+        a.get("method") == "participant_consensus"
+        and _option(a, "consensus_method", "robust_mean") == "robust_mean"
+    ):
+        cfg = data["config"]
+        options.update(
+            {
+                "algorithm_a_rule": str(_option(cfg, "algorithm_a_rule", "gl002")),
+                "algorithm_a_tolerance": float(_option(cfg, "algorithm_a_tolerance", 1e-10)),
+                "algorithm_a_max_iterations": int(_option(cfg, "algorithm_a_max_iterations", 1000)),
+                "algorithm_a_simplified": _option(cfg, "algorithm_a_simplified", False),
+            }
+        )
     for key in ("known_components", "expert_values"):
         if a.get(key) not in (None, ""):
             if not isinstance(a[key], str):
@@ -170,6 +183,12 @@ def _assigned_results(data: dict[str, Any], calculations: dict[str, Any]) -> dic
         )
     assigned_details = assigned.to_dict()
     assigned_details.update(disposition_details)
+    if (
+        a.get("method") == "participant_consensus"
+        and _option(a, "consensus_method", "robust_mean") == "robust_mean"
+        and calculations.get("算法A", {}).get("rule") not in (None, "gl002")
+    ):
+        assigned_details["consensus_algorithm_rule"] = calculations["算法A"]["rule"]
     if hom_source == "gbt_ss":
         assigned_details["hom_source"] = "GB/T 28043-2019 B.3 ss"
     assigned_details.update(
