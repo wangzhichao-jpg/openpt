@@ -545,11 +545,46 @@ def _configure_console() -> None:
             continue
 
 
+def _check_cli_paths(args: argparse.Namespace) -> None:
+    """在转换为 Path 前拒绝空路径，并检查必须存在的输入。"""
+    inputs = {
+        "decide": ("directory",),
+        "reproduce": ("directory",),
+        "pack": ("directory",),
+        "verify": ("archive",),
+        "validate": ("input",),
+        "run": ("input",),
+        "review": ("input",),
+    }
+    names = list(inputs.get(args.command, ()))
+    names.extend(
+        name
+        for name in ("columns", "mapping", "strata", "sample_record")
+        if getattr(args, name, None) is not None
+    )
+    paths = [(name, getattr(args, name)) for name in names]
+    if args.command == "review-batch":
+        paths.extend(("input", value) for value in args.inputs)
+    for name, value in paths:
+        if not value or not str(value).strip():
+            raise InputError(f"{name} 路径不能为空")
+        if not Path(value).exists():
+            raise InputError(f"{name} 路径不存在：{value}")
+    output_names = ("output", "docx", "json", "differences", "runs_dir")
+    if args.command == "demo":
+        output_names += ("directory",)
+    for name in output_names:
+        value = getattr(args, name, None)
+        if value is not None and (not value or not str(value).strip()):
+            raise InputError(f"{name} 路径不能为空")
+
+
 def main(argv: list[str] | None = None) -> int:
     """执行模板、计算或复核命令，返回进程退出码。"""
     _configure_console()
     args = _parser().parse_args(argv)
     try:
+        _check_cli_paths(args)
         if args.command == "template":
             _deny_run_write(args.output)
             template(args.output)
