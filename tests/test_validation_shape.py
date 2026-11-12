@@ -116,6 +116,26 @@ def test_optional_participant_cells_are_checked(tmp_path: Path) -> None:
     )
 
 
+def test_batch_errors_are_located_before_run(tmp_path: Path) -> None:
+    path = tmp_path / "input.xlsx"
+    template(path)
+    book = load_workbook(path)
+    book["项目信息"]["B2"] = "测试"
+    book["项目信息"]["B3"] = "mg"
+    for uid in (1, 2):
+        for repeat in (1, 2):
+            book["均匀性"].append([uid, repeat, uid + repeat / 10, "mg"])
+    book["候选批次"].append(
+        ["B1", "样品", "目标", "材质", "来源", "日期", "错误", "弃用", "", "不存在"]
+    )
+    book.save(path)
+    found = {(i.category, i.cell) for i in inspect_input(path) if i.sheet == "候选批次"}
+    assert ("NON_NUMERIC", "G2") in found
+    assert ("MISSING", "I2") in found
+    assert ("INVALID_REFERENCE", "J2") in found
+    assert main(["run", str(path), "--runs-dir", str(tmp_path / "runs")]) == 2
+
+
 def test_claim_precision_is_validated(tmp_path: Path) -> None:
     path = tmp_path / "input.xlsx"
     template(path)

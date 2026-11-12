@@ -13,6 +13,7 @@ from openpyxl import load_workbook
 from openpyxl.utils.cell import column_index_from_string, coordinate_from_string, get_column_letter
 
 from ..config.catalog import ENUMS
+from ..core.gbt28043 import period_options as gbt_period_options
 from ..errors import InputError
 from .excel import PARTICIPANT_OPTIONAL, SHEETS
 from .layout import wide_to_long
@@ -402,6 +403,71 @@ def _check_numeric_table(
     return issues
 
 
+def _check_batches(rows: list[list[Any]], mapping: dict[str, Any]) -> list[Issue]:
+    """在导入前定位候选批次缺失、重复、无效状态及引用。"""
+    if not rows:
+        return []
+    positions = _positions(rows[0], "候选批次", mapping)
+    issues: list[Issue] = []
+    seen: set[str] = set()
+    references: list[tuple[str, str, Any]] = []
+    for number, row in enumerate(rows[1:], 2):
+        if not any(value not in (None, "") for value in row):
+            continue
+
+        def value(field: str, current_row: list[Any] = row) -> Any:
+            column = positions[field]
+            return current_row[column] if column < len(current_row) else None
+
+        def add(
+            category: str,
+            field: str,
+            message: str,
+            row_number: int = number,
+            current_row: list[Any] = row,
+        ) -> None:
+            column = positions[field]
+            cell = f"{get_column_letter(column + 1)}{row_number}"
+            raw = current_row[column] if column < len(current_row) else None
+            issues.append(Issue(category, "候选批次", cell, raw, message))
+
+        for field in ("批次编号", "物品", "目标量值", "材质", "来源", "制备日期", "状态"):
+            if value(field) in (None, ""):
+                add("MISSING", field, "必填值缺失")
+        ident = value("批次编号")
+        if ident not in (None, ""):
+            if str(ident) in seen:
+                add("DUPLICATE", "批次编号", "批次编号重复")
+            seen.add(str(ident))
+        status = value("状态")
+        if status not in (None, "") and status not in ENUMS["候选批次.状态"]:
+            add("INVALID_CONFIG", "状态", "候选批次状态无效")
+        if status in ("失败", "弃用") and not str(value("处理理由") or "").strip():
+            add("MISSING", "处理理由", "失败或弃用须填写理由")
+        raw = value("预实验结果")
+        if raw not in (None, ""):
+            try:
+                numbers = [float(item.strip()) for item in str(raw).split(",")]
+                valid = bool(numbers) and all(math.isfinite(number) for number in numbers)
+            except (ValueError, OverflowError):
+                valid = False
+            if not valid:
+                add("NON_NUMERIC", "预实验结果", "须为逗号分隔的有限数")
+        reference = value("关联批次")
+        if reference not in (None, ""):
+            references.append(
+                (
+                    str(reference),
+                    f"{get_column_letter(positions['关联批次'] + 1)}{number}",
+                    reference,
+                )
+            )
+    for reference, cell, original in references:
+        if reference not in seen:
+            issues.append(Issue("INVALID_REFERENCE", "候选批次", cell, original, "关联批次不存在"))
+    return issues
+
+
 def _check_numeric_config(
     sheet: str, rows: list[list[Any]], mapping: dict[str, Any], formulas: set[str]
 ) -> list[Issue]:
@@ -707,13 +773,15 @@ def inspect_input(
                                 )
                             )
         for sheet in sorted(set(book.sheetnames) - set(MEASUREMENT_SHEETS) - {"填写说明"}):
-            if sheet in ("报告声称值", "算法S", "方法配置", "指定值与不确定度"):
+            if sheet in ("报告声称值", "算法S", "方法配置", "指定值与不确定度", "候选批次"):
                 cells = list(book[sheet].iter_rows())
                 rows = [[cell.value for cell in row] for row in cells]
                 formulas = {
                     cell.coordinate for row in cells for cell in row if cell.data_type == "f"
                 }
-                if sheet in ("报告声称值", "算法S"):
+                if sheet == "候选批次":
+                    issues.extend(_check_batches(rows, mapping))
+                elif sheet in ("报告声称值", "算法S"):
                     if sheet == "报告声称值":
                         issues.extend(_unsupported_measurand(sheet, rows))
                     elif any(any(value not in (None, "") for value in row) for row in rows[1:]):
@@ -755,6 +823,30 @@ def inspect_input(
             sheet = "方法配置" if category in ("MISSING_CONFIG", "INVALID_CONFIG") else "稳定性"
             cell = config_cells.get(field, "B1") if sheet == "方法配置" else "A1"
             issues.append(Issue(category, sheet, cell, None, message))
+        if (
+            stability_groups
+            and config_values.get("criterion_standard") == "gbt28043"
+            and not problem
+        ):
+            try:
+                gbt_period_options(config_values, {group: None for group in stability_groups})
+            except InputError as exc:
+                field = "stability_period_options"
+                if config_values.get(field) in (None, ""):
+                    field = (
+                        "stability_u1"
+                        if config_values.get("stability_u1") not in (None, "")
+                        else "stability_u2"
+                    )
+                issues.append(
+                    Issue(
+                        "INVALID_CONFIG",
+                        "方法配置",
+                        config_cells.get(field, "B1"),
+                        config_values.get(field),
+                        str(exc),
+                    )
+                )
         if not calculation_data_present:
             issues.append(Issue("NO_DATA", "均匀性", "A1", None, "没有可计算的数据"))
         unique: list[Issue] = []
