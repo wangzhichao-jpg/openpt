@@ -5,6 +5,7 @@ from pathlib import Path
 
 from docx import Document
 
+from openpt.cli import calculate
 from openpt.report.docx import _decision_time, make_report
 
 
@@ -25,6 +26,34 @@ def test_unprovided_data_and_appendix(tmp_path: Path) -> None:
     assert code.paragraph_format.space_before.pt == 0
     assert code.paragraph_format.space_after.pt == 0
     assert code.paragraph_format.line_spacing == 1.0
+
+
+def test_gbt_summary_and_section_order(tmp_path: Path) -> None:
+    data = {
+        "info": {},
+        "config": {"criterion_standard": "gbt28043", "sigma": 1.0},
+        "homogeneity": [[1.0, 1.1], [1.2, 1.3], [1.4, 1.5]],
+        "stability": {
+            "基线": [[1.0, 1.1], [1.2, 1.3], [1.4, 1.5]],
+            "稳定期": [[1.1, 1.2], [1.3, 1.4], [1.5, 1.6]],
+        },
+        "participants": [],
+        "claims": [],
+    }
+    result = calculate(data)
+    path = tmp_path / "gbt.docx"
+    make_report(path, data, result)
+    paragraphs = [p.text for p in Document(path).paragraphs]
+    assert "GB/T 28043-2019 B.2.2" in paragraphs[1]
+    assert "GB/T 28043-2019 B.5.1" in paragraphs[2]
+    assert paragraphs.index("方法与配置") < paragraphs.index("均匀性方差分析")
+    assert paragraphs.index("均匀性方差分析") < paragraphs.index("GB/T 28043-2019 稳定性（主评价）")
+    assert paragraphs.index("GB/T 28043-2019 稳定性（主评价）") < paragraphs.index("稳定性评价")
+    assert (
+        paragraphs.index("稳定性评价")
+        < paragraphs.index("未评价事项")
+        < paragraphs.index("人工复核")
+    )
 
 
 def test_decision_time() -> None:

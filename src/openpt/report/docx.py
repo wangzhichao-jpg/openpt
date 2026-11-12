@@ -176,7 +176,7 @@ def _homogeneity(
 ) -> None:
     """按 GL003 4.2、4.3 显示方差分析和用途判据。"""
     h = result.get("均匀性")
-    doc.add_heading("均匀性方差分析", 1)
+    doc.add_heading("均匀性单测分析" if h and h.get("method") == "single" else "均匀性方差分析", 1)
     if not h:
         doc.add_paragraph("未提供均匀性数据。")
         return
@@ -346,8 +346,10 @@ def _stability_table(doc: Any, name: str, s: dict[str, Any], sig: int) -> None:
         doc.add_paragraph("设计提示：" + warning)
 
 
-def _gbt_results(doc: Any, result: dict[str, Any], cfg: dict[str, Any], sig: int) -> None:
-    """显示 GB/T 模式的中间量、各项判据及人工设计提示。"""
+def _gbt_homogeneity_results(
+    doc: Any, result: dict[str, Any], cfg: dict[str, Any], sig: int
+) -> None:
+    """显示 GB/T 均匀性主评价。"""
     doc.add_heading("GB/T 28043-2019 标准模式（主评价）", 1)
     doc.add_paragraph(
         "基本和扩展判据均供核查；主判据须在试验前选定，另一结果仅供参考，处置由授权人员决定。"
@@ -395,7 +397,17 @@ def _gbt_results(doc: Any, result: dict[str, Any], cfg: dict[str, Any], sig: int
             )
         for warning in h["warnings"]:
             doc.add_paragraph("提示：" + warning)
-    for name, s in result.get("GB/T稳定性", {}).items():
+    doc.add_paragraph("以下 GL003 计算仅为参考：均匀性结果不作为本次选定标准的主评价。")
+
+
+def _gbt_stability_results(doc: Any, result: dict[str, Any], sig: int) -> None:
+    """显示 GB/T 各稳定性时点主评价。"""
+    periods = result.get("GB/T稳定性", {})
+    if not periods:
+        return
+    doc.add_heading("GB/T 28043-2019 稳定性（主评价）", 1)
+    basis = result.get("主判据", {}).get("criterion_basis", "sigma_pt")
+    for name, s in periods.items():
         kind = "运输稳定性（B.6）" if s.get("kind") == "transport" else "稳定性"
         doc.add_paragraph(f"{kind} {name}：B.5.1 式(B.17)、B.5.2 式(B.18)。")
         items = [
@@ -432,7 +444,7 @@ def _gbt_results(doc: Any, result: dict[str, Any], cfg: dict[str, Any], sig: int
         )
         for warning in s["warnings"]:
             doc.add_paragraph("提示：" + warning)
-    doc.add_paragraph("以下 GL003 计算仅为参考，不作为本次选定标准的主评价。")
+    doc.add_paragraph("以下 GL003 计算仅为参考：稳定性结果不作为本次选定标准的主评价。")
 
 
 def _other_results(
@@ -940,7 +952,15 @@ def make_report(
         raise ValueError("输出精度配置超出范围，z 小数位须为 0 至 12 的整数")
     doc.add_heading("计算结论（须经人工复核签字）", 0)
     h = result.get("均匀性")
-    if h and h.get("method") == "single" and result.get("标准模式") != "gbt28043":
+    gbt_h = result.get("GB/T均匀性")
+    if gbt_h:
+        rule = gbt_h.get("selected_rule", "basic")
+        clause = "B.1.2" if gbt_h.get("m") == 1 else "B.2.3" if rule == "extended" else "B.2.2"
+        doc.add_paragraph(
+            f"均匀性（GB/T 28043-2019 {clause}）：{_shown(gbt_h.get('conclusion'))}；"
+            f"ss={_shown(gbt_h.get('ss'), sig)}；限值={_shown(gbt_h.get(rule + '_limit'), sig)}。"
+        )
+    elif h and h.get("method") == "single":
         doc.add_paragraph(
             f"均匀性（GB/T 28043-2019 B.1.2）：{_shown(h.get('Ss_pass'))}；"
             f"s_x={_shown(h.get('Ss'), sig)}，0.3σ={_shown(h.get('threshold'), sig)}。"
@@ -949,27 +969,42 @@ def make_report(
         doc.add_paragraph(
             f"均匀性（GL003 4.3）：{_shown(h.get('Ss_pass'))}；"
             f"Ss={_shown(h.get('Ss'), sig)}，0.3σ={_shown(h.get('threshold'), sig)}；"
-            f"4.2 F={_shown(h.get('F'), sig)}，临界值={_shown(h.get('F_critical'), sig)}。"
-            if result.get("标准模式") != "gbt28043"
-            else "均匀性主判据见正文 GB/T 28043 标准模式；GL003 结果仅供参考。"
+            f"4.2 F={_shown(h.get('F'), sig)}，临界值={_shown(h.get('F_critical'), sig)}（参考）。"
         )
+        if h.get("strict"):
+            doc.add_paragraph("严格配置综合结论：" + _shown(h.get("conclusion")) + "。")
     else:
         doc.add_paragraph("均匀性：未提供数据，本次未评价。")
     periods = (
         {result.get("稳定性时间组") or "稳定期": result["稳定性"]} if "稳定性" in result else {}
     )
     periods.update(result.get("其他稳定性", {}))
-    if periods and result.get("标准模式") != "gbt28043":
-        for name, period in periods.items():
+    gbt_periods = result.get("GB/T稳定性", {})
+    if gbt_periods:
+        for name, period in gbt_periods.items():
+            rule = period.get("selected_rule", "basic")
+            clause = "B.5.2" if rule == "extended" else "B.5.1"
             doc.add_paragraph(
-                f"稳定性 {name}（GL003 5.3，"
-                f"{'主判据' if period.get('method') == 'mean_difference' else '参考判据'}）："
-                f"{_shown(period.get('mean_difference_pass'))}；"
-                f"均值差={_shown(period.get('difference'), sig)}，"
-                f"0.3σ={_shown(period.get('threshold'), sig)}。"
+                f"稳定性 {name}（GB/T 28043-2019 {clause}）：{_shown(period.get('conclusion'))}；"
+                f"均值差={_shown(period.get('difference'), sig)}；"
+                f"限值={_shown(period.get(rule + '_limit'), sig)}。"
             )
     elif periods:
-        doc.add_paragraph("稳定性主判据见正文 GB/T 28043 标准模式。")
+        for name, period in periods.items():
+            if period.get("method") == "mean_difference":
+                doc.add_paragraph(
+                    f"稳定性 {name}（GL003 5.3）：{_shown(period.get('mean_difference_pass'))}；"
+                    f"均值差={_shown(period.get('difference'), sig)}，"
+                    f"0.3σ={_shown(period.get('threshold'), sig)}。"
+                )
+            else:
+                clause = "5.2.1" if period.get("method") == "one_sample" else "5.2.2"
+                doc.add_paragraph(
+                    f"稳定性 {name}（GL003 {clause}）：{_shown(period.get('pass'))}；"
+                    f"t={_shown(period.get('t'), sig)}，"
+                    f"临界值={_shown(period.get('critical'), sig)}；"
+                    f"5.3 均值差={_shown(period.get('difference'), sig)}（参考）。"
+                )
     else:
         doc.add_paragraph("未提供稳定性数据，本次未评价稳定性。")
     _project_methods(doc, data, cfg)
@@ -999,10 +1034,12 @@ def make_report(
             ],
         )
     if result.get("标准模式") == "gbt28043":
-        _gbt_results(doc, result, cfg, sig)
+        _gbt_homogeneity_results(doc, result, cfg, sig)
     else:
         doc.add_paragraph("标准模式：gl003；GB/T 28043 扩展未作为主评价。")
     _homogeneity(doc, result, mean_places, sig, ss_places, float(cfg.get("alpha") or 0.05))
+    if result.get("标准模式") == "gbt28043":
+        _gbt_stability_results(doc, result, sig)
     _other_results(doc, data, result, sig, mean_places, z_places)
     if differences is not None:
         _difference_table(doc, differences)
