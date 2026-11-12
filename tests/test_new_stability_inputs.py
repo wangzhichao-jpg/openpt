@@ -1,0 +1,45 @@
+# SPDX-License-Identifier: Apache-2.0
+"""新稳定性工作表的合成输入测试。"""
+
+import pytest
+from openpyxl import Workbook
+
+from openpt.errors import InputError
+from openpt.io.new_stability import read_transfer_sheet, read_trend_sheet
+
+
+def test_trend_long_and_wide_provenance() -> None:
+    book = Workbook()
+    sheet = book.active
+    sheet.title = "趋势稳定性"
+    sheet.append(["序列名", "时间 X", "时间单位", "值 Y"])
+    sheet.append(["样品A", 0, "天", 1.25])
+    records = read_trend_sheet(book)
+    assert records[0]["source"] == "趋势稳定性!D2"
+    sheet.delete_rows(1, sheet.max_row)
+    sheet.append(["序列名", "时间单位", "时间=0", "时间=2"])
+    sheet.append(["样品A", "天", 1.25, 1.3])
+    records = read_trend_sheet(book)
+    assert [(r["x"], r["y"], r["source"]) for r in records] == [
+        (0.0, 1.25, "趋势稳定性!C2"),
+        (2.0, 1.3, "趋势稳定性!D2"),
+    ]
+    sheet["D2"] = None
+    with pytest.raises(InputError, match="D2"):
+        read_trend_sheet(book)
+    sheet["D2"] = "=1+1"
+    with pytest.raises(InputError, match="D2"):
+        read_trend_sheet(book)
+
+
+def test_transfer_stage_and_duplicates() -> None:
+    book = Workbook()
+    sheet = book.active
+    sheet.title = "传递标准复测"
+    sheet.append(["传递标准编号", "校准点", "测量序号", "日期", "阶段", "测量值", "单位"])
+    sheet.append(["STD1", "P1", 1, "2025-01-01", "传递中", 2.0, "V"])
+    record = read_transfer_sheet(book)[0]
+    assert record["source"] == "传递标准复测!F2" and record["stage"] == "传递中"
+    sheet.append(["STD1", "P1", 1, "2025-01-02", "传递后", 2.1, "V"])
+    with pytest.raises(InputError, match="测量序号重复"):
+        read_transfer_sheet(book)
