@@ -13,11 +13,11 @@ def test_manual_commands(tmp_path: Path) -> None:
     root = Path(__file__).resolve().parents[1]
     text = (root / "docs/使用手册.md").read_text(encoding="utf-8")
     commands = [line for line in text.splitlines() if line.startswith("openpt ")]
-    assert len(commands) == 12
+    assert len(commands) == 18
     shutil.copyfile(root / "examples/GL003_A1.xlsx", tmp_path / "input.xlsx")
-    (tmp_path / "examples").mkdir()
-    for name in ("trend_synthetic.xlsx", "transfer_synthetic.xlsx"):
-        shutil.copyfile(root / "examples" / name, tmp_path / "examples" / name)
+    (tmp_path / "examples/synthetic").mkdir(parents=True)
+    for path in (root / "examples/synthetic").glob("*.xlsx"):
+        shutil.copyfile(path, tmp_path / "examples/synthetic" / path.name)
     env = dict(os.environ)
     for line in commands:
         args = shlex.split(line)
