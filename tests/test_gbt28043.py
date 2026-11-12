@@ -258,8 +258,17 @@ def test_internal_e2() -> None:
     h = homogeneity(x, sigma)
     s = stability(x, fixture["stability"], sigma)
     printed = fixture["printed"]
-    for key, target in (("mean", "mean"), ("sx", "mean_sd"), ("sw", "sw"), ("ss", "ss")):
+    for key, target in (
+        ("mean", "mean"),
+        ("sx", "mean_sd"),
+        ("sw", "sw"),
+        ("ss", "ss"),
+        ("sigma", "sigma"),
+        ("basic_limit", "limit"),
+    ):
         assert h[key] == pytest.approx(printed[target], abs=0.0000051)
+    assert h["g"] == len(x) and h["m"] == len(x[0])
+    assert s["basic_limit"] == pytest.approx(printed["limit"], abs=0.0000051)
     assert s["mean2"] == pytest.approx(printed["followup_mean"], abs=0.0000051)
     assert s["difference"] == pytest.approx(printed["difference"], abs=0.0000051)
     assert h["basic_pass"] is printed["homogeneity_pass"]
