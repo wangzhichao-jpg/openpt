@@ -27,7 +27,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="生成参数参考清单")
     parser.add_argument("--check", action="store_true", help="仅检查是否需要更新")
     args = parser.parse_args()
-    path = ROOT / "docs/使用手册.md"
+    path = ROOT / "docs/开发者命令行参考.md"
     original = path.read_text(encoding="utf-8")
     result = updated(original)
     if args.check:

@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_manual_matches_generated_catalog() -> None:
-    text = (ROOT / "docs/使用手册.md").read_text(encoding="utf-8")
+    text = (ROOT / "docs/开发者命令行参考.md").read_text(encoding="utf-8")
     begin = "<!-- OPENPT-CATALOG-BEGIN -->\n"
     end = "\n<!-- OPENPT-CATALOG-END -->"
     assert text.split(begin, 1)[1].split(end, 1)[0] == markdown()

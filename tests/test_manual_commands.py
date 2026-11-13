@@ -11,7 +11,7 @@ from pathlib import Path
 
 def test_manual_commands(tmp_path: Path) -> None:
     root = Path(__file__).resolve().parents[1]
-    text = (root / "docs/使用手册.md").read_text(encoding="utf-8")
+    text = (root / "docs/开发者命令行参考.md").read_text(encoding="utf-8")
     commands = [line for line in text.splitlines() if line.startswith("openpt ")]
     assert len(commands) == 18
     shutil.copyfile(root / "examples/GL003_A1.xlsx", tmp_path / "input.xlsx")

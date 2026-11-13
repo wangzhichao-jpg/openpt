@@ -6,6 +6,7 @@ import json
 import platform
 import shutil
 import subprocess
+import sys
 from datetime import datetime, timezone
 from importlib import metadata
 from importlib.resources import files
@@ -35,6 +36,8 @@ def environment() -> dict[str, Any]:
             versions[name] = None
     commit: str | None
     try:
+        if getattr(sys, "frozen", False):
+            raise OSError("打包运行时不查询 Git")
         proc = subprocess.run(
             ["git", "rev-parse", "HEAD"],
             cwd=Path(__file__).parent,
