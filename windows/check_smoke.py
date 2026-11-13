@@ -25,4 +25,4 @@ for actual, expected in [
 assert r["均匀性"]["conclusion"] is True
 assert r["稳定性"]["mean_difference_pass"] is True
 assert r["其他稳定性"]["运输期"]["mean_difference_pass"] is True
-print("GUI 打包入口、计算书及三核心结果通过。")
+print("GUI smoke checks passed.")
