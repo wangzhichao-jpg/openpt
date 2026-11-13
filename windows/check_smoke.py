@@ -17,10 +17,14 @@ if len(sys.argv) > 2 and sys.argv[2] == "传递":
     summary = (root / "gui-smoke.txt").read_text(encoding="utf-8")
     points = r["传递标准稳定性"]
     assert "不适用样品间均匀性检验" in summary
-    assert "35%RH" in summary and "55%RH" in summary and "限值 = 0.8" in summary
-    assert all(math.isclose(point["delta_max"], 0.16, abs_tol=1e-12) for point in points.values())
+    assert "直流8V" in summary and "交流2V" in summary
+    assert "限值 = 0.0002" in summary and "限值 = 0.0004" in summary
+    expected = {"标准器A|直流8V": 0.00017, "标准器A|交流2V": 0.0001}
+    assert set(points) == set(expected)
+    assert all(math.isclose(points[k]["delta_max"], v, abs_tol=1e-12) for k, v in expected.items())
     assert all(point["conclusion"] is True for point in points.values())
-    assert math.isclose(r["指定值与不确定度"]["value"], 0.1, abs_tol=1e-12)
+    assert math.isclose(r["指定值与不确定度"]["value"], 8.000025, abs_tol=1e-12)
+    assert math.isclose(r["参加者统计量"]["参加者A"]["En"]["value"], 0.1624591083, rel_tol=1e-9)
     print("传递样 GUI smoke checks passed.")
     raise SystemExit(0)
 
