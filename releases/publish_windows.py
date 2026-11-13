@@ -34,10 +34,11 @@ def main(manifest_path: Path, directory: Path) -> None:
     repo = os.environ["GITHUB_REPOSITORY"]
     root = f"repos/{repo}"
     tag = api(f"{root}/git/ref/tags/{TAG}", missing_ok=True)
-    if tag is not None:
-        commit = api(f"{root}/commits/{TAG}")
-        if commit is None or commit["sha"] != manifest["source_sha"]:
-            raise ValueError("现有 tag 不指向被核准的源码提交")
+    if tag is None:
+        raise ValueError("必须预先建立指向已核准源码的 tag")
+    commit = api(f"{root}/commits/{TAG}")
+    if commit is None or commit["sha"] != manifest["source_sha"]:
+        raise ValueError("现有 tag 不指向被核准的源码提交")
     release = api(f"{root}/releases/tags/{TAG}", missing_ok=True)
     bundle = directory / manifest["bundle"]
     sidecar = directory / (manifest["bundle"] + ".sha256")
@@ -59,8 +60,7 @@ def main(manifest_path: Path, directory: Path) -> None:
             "create",
             TAG,
             "--draft",
-            "--target",
-            manifest["source_sha"],
+            "--verify-tag",
             "--title",
             TITLE,
             "--notes-file",
