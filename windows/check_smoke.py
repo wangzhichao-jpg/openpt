@@ -25,7 +25,7 @@ if len(sys.argv) > 2 and sys.argv[2] == "传递":
     assert all(point["conclusion"] is True for point in points.values())
     assert math.isclose(r["指定值与不确定度"]["value"], 8.000025, abs_tol=1e-12)
     assert math.isclose(r["参加者统计量"]["参加者A"]["En"]["value"], 0.1624591083, rel_tol=1e-9)
-    print("传递样 GUI smoke checks passed.")
+    print("Transfer GUI smoke checks passed.")
     raise SystemExit(0)
 
 for actual, expected in [
