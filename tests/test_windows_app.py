@@ -23,7 +23,7 @@ def test_example_chinese_path_and_results(tmp_path: Path) -> None:
     assert result["指定值与不确定度"]["value"] == pytest.approx(100.0405652277587)
     assert result["指定值与不确定度"]["u"] == pytest.approx(0.22326622377769484)
     summary = summarize(data, result)
-    assert all(x in summary for x in ("甲醛样品", "稳定期", "运输期", "算法A", "0.223266"))
+    assert all(x in summary for x in ("甲醛样品", "稳定期", "运输期", "算法A稳健公议", "0.223266"))
 
 
 def test_template_has_no_measurements(tmp_path: Path) -> None:
@@ -62,6 +62,36 @@ def test_smoke_launch_records_failure(tmp_path: Path, monkeypatch: pytest.Monkey
         runpy.run_path(str(launch), run_name="__main__")
     assert exc.value.code == 1
     assert "smoke diagnostic" in (tmp_path / "gui-smoke-error.txt").read_text(encoding="utf-8")
+
+
+def test_transfer_and_gbt_summary() -> None:
+    text = summarize(
+        {},
+        {
+            "传递标准稳定性": {
+                "STD1|P1": {
+                    "standard": "STD1",
+                    "delta_max": 0.3,
+                    "unit": "V",
+                    "criteria": [{"kind": "fixed", "value": 0.3, "limit": 1, "pass": True}],
+                },
+            },
+        },
+    )
+    assert "单台传递标准：不适用样品间均匀性检验" in text
+    assert "Δmax = 0.3 V" in text and "限值 = 1；通过" in text
+    assert "稳定性：未计算" not in text
+    gbt = summarize(
+        {},
+        {
+            "均匀性": {"conclusion": False},
+            "GB/T均匀性": {"ss": 1, "selected_rule": "basic", "basic_limit": 2, "conclusion": True},
+            "稳定性": {"pass": False},
+            "GB/T稳定性": {"稳定期": {"difference": 0.1, "basic_limit": 0.2, "conclusion": True}},
+        },
+    )
+    assert "GB/T 28043 B.2.2" in gbt and "GB/T 28043 B.5.1" in gbt
+    assert "未通过" not in gbt
 
 
 def test_missing_component_and_period_names() -> None:

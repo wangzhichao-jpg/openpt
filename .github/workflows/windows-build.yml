@@ -33,35 +33,51 @@ jobs:
       - name: Build windowed onedir
         shell: pwsh
         run: |
-          python -m PyInstaller --noconfirm --clean --noupx --onedir --windowed --name OpenPT --collect-data openpt --collect-submodules scipy._external.array_api_compat.numpy --copy-metadata numpy --copy-metadata scipy --copy-metadata openpyxl --copy-metadata python-docx --add-data 'windows/甲醛示例.xlsx;windows' windows/launch.py
+          $app = '能力验证样品评价与定值工具'
+          python -m PyInstaller --noconfirm --clean --noupx --onedir --windowed --name $app --collect-data openpt --collect-submodules scipy._external.array_api_compat.numpy --copy-metadata numpy --copy-metadata scipy --copy-metadata openpyxl --copy-metadata python-docx --add-data 'windows/甲醛示例.xlsx;windows' windows/launch.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          Copy-Item LICENSE,NOTICE,THIRD_PARTY_LICENSES.md,docs/使用手册.md dist/OpenPT/
-          python windows/collect_licenses.py dist/OpenPT
+          Copy-Item LICENSE,NOTICE,THIRD_PARTY_LICENSES.md,docs/使用手册.md "dist/$app/"
+          python windows/prepare_examples.py "dist/$app"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python windows/collect_licenses.py "dist/$app"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Start packaged GUI and calculate example
         shell: pwsh
         run: |
-          $env:OPENPT_GUI_SMOKE_DIR = Join-Path $env:RUNNER_TEMP 'OpenPT 中文 空格'
-          New-Item -ItemType Directory -Force $env:OPENPT_GUI_SMOKE_DIR | Out-Null
-          $p = Start-Process -FilePath (Resolve-Path 'dist/OpenPT/OpenPT.exe') -PassThru
-          if (-not $p.WaitForExit(180000)) { Stop-Process -Id $p.Id -Force; throw 'GUI 冒烟超时' }
-          if ($p.ExitCode -ne 0) {
-            $errorFile = Join-Path $env:OPENPT_GUI_SMOKE_DIR 'gui-smoke-error.txt'
-            if (Test-Path $errorFile) { Get-Content -Raw -Encoding UTF8 $errorFile | Write-Host }
-            throw "GUI 冒烟失败：$($p.ExitCode)"
+          $app = '能力验证样品评价与定值工具'
+          $testParent = Join-Path $env:RUNNER_TEMP '程序 中文 空格'
+          New-Item -ItemType Directory -Force $testParent | Out-Null
+          Copy-Item -Recurse "dist/$app" $testParent
+          $bundle = Join-Path $testParent $app
+          $exe = Resolve-Path (Join-Path $bundle "$app.exe")
+          foreach ($case in @('甲醛', '传递')) {
+            $env:OPENPT_GUI_SMOKE_DIR = Join-Path $env:RUNNER_TEMP "能力验证 中文 空格 $case"
+            New-Item -ItemType Directory -Force $env:OPENPT_GUI_SMOKE_DIR | Out-Null
+            if ($case -eq '传递') {
+              $env:OPENPT_GUI_SMOKE_SOURCE = (Resolve-Path (Join-Path $bundle '示例案例/数字湿度计.xlsx')).Path
+            } else { Remove-Item Env:OPENPT_GUI_SMOKE_SOURCE -ErrorAction SilentlyContinue }
+            $p = Start-Process -FilePath $exe -PassThru
+            if (-not $p.WaitForExit(180000)) { Stop-Process -Id $p.Id -Force; throw 'GUI 冒烟超时' }
+            if ($p.ExitCode -ne 0) {
+              $errorFile = Join-Path $env:OPENPT_GUI_SMOKE_DIR 'gui-smoke-error.txt'
+              if (Test-Path $errorFile) { Get-Content -Raw -Encoding UTF8 $errorFile | Write-Host }
+              throw "GUI 冒烟失败：$($p.ExitCode)"
+            }
+            python windows/check_smoke.py $env:OPENPT_GUI_SMOKE_DIR $case
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
-          python windows/check_smoke.py $env:OPENPT_GUI_SMOKE_DIR
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Archive and checksum
         shell: pwsh
         run: |
-          Compress-Archive -Path dist/OpenPT -DestinationPath OpenPT-Windows-x64.zip
-          $hash = (Get-FileHash OpenPT-Windows-x64.zip -Algorithm SHA256).Hash.ToLower()
-          "$hash  OpenPT-Windows-x64.zip" | Out-File -Encoding ascii OpenPT-Windows-x64.zip.sha256
+          $app = '能力验证样品评价与定值工具'
+          $zip = "${app}_Windows.zip"
+          Compress-Archive -Path "dist/$app" -DestinationPath $zip
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+          "$hash  $zip" | Out-File -Encoding utf8 "$zip.sha256"
       - uses: actions/upload-artifact@v4
         with:
           name: OpenPT-Windows-x64
           path: |
-            OpenPT-Windows-x64.zip
-            OpenPT-Windows-x64.zip.sha256
+            能力验证样品评价与定值工具_Windows.zip
+            能力验证样品评价与定值工具_Windows.zip.sha256
           if-no-files-found: error

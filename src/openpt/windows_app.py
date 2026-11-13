@@ -89,7 +89,17 @@ def summarize(data: dict[str, Any], result: dict[str, Any]) -> str:
     unit = data.get("info", {}).get("单位", "")
     lines = [f"项目：{data.get('info', {}).get('项目名称', '')}　单位：{unit}", ""]
     hom = result.get("均匀性")
-    if hom:
+    gbt_hom = result.get("GB/T均匀性")
+    transfer = result.get("传递标准稳定性") or {}
+    if gbt_hom:
+        rule = gbt_hom.get("selected_rule", "basic")
+        clause = "B.1.2" if gbt_hom.get("m") == 1 else "B.2.3" if rule == "extended" else "B.2.2"
+        lines.append(
+            f"均匀性（GB/T 28043 {clause}）：Ss = {_number(gbt_hom.get('ss'))}；"
+            f"限值 = {_number(gbt_hom.get(rule + '_limit'))}；"
+            f"{_decision(gbt_hom.get('conclusion'))}"
+        )
+    elif hom:
         hom_method = {
             "ss_0.3sigma": "GL003 4.3",
             "f_test": "GL003 4.2 F检验",
@@ -105,12 +115,27 @@ def summarize(data: dict[str, Any], result: dict[str, Any]) -> str:
                 f"  F = {_number(hom.get('F'))}；F 临界值 = {_number(hom.get('F_critical'))}"
             )
     else:
-        lines.append("均匀性：未计算")
+        standards = {point.get("standard") for point in transfer.values()}
+        lines.append(
+            "单台传递标准：不适用样品间均匀性检验"
+            if len(standards) == 1 and None not in standards
+            else "均匀性：未计算"
+        )
     lines.append("")
     stability = result.get("稳定性")
     groups = {result.get("稳定性时间组", "稳定期"): stability} if stability else {}
     groups.update(result.get("其他稳定性") or {})
-    if not groups:
+    gbt_groups = result.get("GB/T稳定性") or {}
+    if gbt_groups:
+        groups = {}
+        for name, item in gbt_groups.items():
+            rule = item.get("selected_rule", "basic")
+            clause = "B.5.2" if rule == "extended" else "B.5.1"
+            lines.append(
+                f"{name}（GB/T 28043 {clause}）：差值 = {_number(item.get('difference'))}；"
+                f"限值 = {_number(item.get(rule + '_limit'))}；{_decision(item.get('conclusion'))}"
+            )
+    if not groups and not gbt_groups and not transfer:
         lines.append("稳定性：未计算")
     for name, item in groups.items():
         mean_difference = item.get("method") == "mean_difference"
@@ -123,15 +148,25 @@ def summarize(data: dict[str, Any], result: dict[str, Any]) -> str:
             f"{name}（{method_name}）：{label} = {_number(statistic)}；"
             f"限值 = {_number(limit)}；{_decision(conclusion)}"
         )
+    for name, point in transfer.items():
+        lines.append(
+            f"传递标准 {name}：Δmax = {_number(point.get('delta_max'))} {point.get('unit', '')}"
+        )
+        for criterion in point.get("criteria", []):
+            lines.append(
+                f"  {criterion.get('kind', '')}：统计量 = {_number(criterion.get('value'))}；"
+                f"限值 = {_number(criterion.get('limit'))}；{_decision(criterion.get('pass'))}"
+            )
     assigned = result.get("指定值与不确定度")
     lines.append("")
     if assigned:
         method = assigned.get("method", "")
+        method = {"reference": "参考测量", "certified": "有证参考值"}.get(method, method)
         if method == "participant_consensus":
-            method = "参加者公议 / " + (
-                "算法A"
+            method = (
+                "算法A稳健公议"
                 if assigned.get("consensus_method") == "robust_mean"
-                else str(assigned.get("consensus_method", ""))
+                else "参加者公议 / " + str(assigned.get("consensus_method", ""))
             )
         lines.append(
             f"指定值（{method}）：X = {_number(assigned.get('value'))}；"
@@ -163,14 +198,16 @@ def main() -> None:
     from tkinter import filedialog, messagebox, ttk
 
     root = tk.Tk()
-    root.title("OpenPT 能力验证计算")
+    root.title("能力验证样品评价与定值工具")
     root.geometry("800x530")
     selected = tk.StringVar(value="请选择数据文件")
     output: list[Path] = []
     events: queue.Queue[tuple[str, Any]] = queue.Queue()
     frame = ttk.Frame(root, padding=18)
     frame.pack(fill="both", expand=True)
-    ttk.Label(frame, text="OpenPT 能力验证计算", font=("Microsoft YaHei", 16)).pack(anchor="w")
+    ttk.Label(frame, text="能力验证样品评价与定值工具", font=("Microsoft YaHei", 16)).pack(
+        anchor="w"
+    )
     ttk.Label(frame, textvariable=selected, wraplength=740).pack(anchor="w", pady=12)
     buttons = ttk.Frame(frame)
     buttons.pack(anchor="w")
@@ -260,7 +297,9 @@ def main() -> None:
         # 冒烟测试必须先实际创建、显示窗口，再经过同一业务适配层。
         root.update_idletasks()
         root.update()
-        directory, data, result = run_workbook(example_path(), Path(smoke_dir))
+        smoke_source = os.environ.get("OPENPT_GUI_SMOKE_SOURCE")
+        source = Path(smoke_source) if smoke_source else example_path()
+        directory, data, result = run_workbook(source, Path(smoke_dir))
         (Path(smoke_dir) / "gui-smoke.txt").write_text(
             summarize(data, result) + "\n" + str(directory), encoding="utf-8"
         )
