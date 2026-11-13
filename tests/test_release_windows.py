@@ -81,22 +81,35 @@ def test_existing_mismatched_asset_is_not_overwritten(
     monkeypatch.setenv("GITHUB_REPOSITORY", "example/openpt")
     calls: list[tuple[str, ...]] = []
 
-    def fake_api(path: str, missing_ok: bool = False) -> dict:
+    release = {
+        "id": 1,
+        "draft": True,
+        "name": publisher.TITLE,
+        "tag_name": publisher.TAG,
+        "target_commitish": "a" * 40,
+        "prerelease": False,
+    }
+
+    def fake_api(path: str) -> dict:
         if "/git/ref/" in path:
             return {"object": {"sha": "a" * 40}}
-        if "/commits/" in path:
-            return {"sha": "a" * 40}
-        return {"id": 1, "draft": True, "name": publisher.TITLE, "tag_name": publisher.TAG}
+        return release
 
-    def fake_gh(*args: str, missing_ok: bool = False) -> str:
-        calls.append(args)
-        assert args[0] == "api"
-        return json.dumps(
-            [{"name": manifest["bundle"], "size": 1, "digest": "sha256:wrong", "state": "uploaded"}]
-        )
+    def fake_pages(path: str) -> list[dict]:
+        calls.append((path,))
+        if "/assets?" in path:
+            return [
+                {
+                    "name": manifest["bundle"],
+                    "size": 1,
+                    "digest": "sha256:wrong",
+                    "state": "uploaded",
+                }
+            ]
+        return [release]
 
     monkeypatch.setattr(publisher, "api", fake_api)
-    monkeypatch.setattr(publisher, "gh", fake_gh)
+    monkeypatch.setattr(publisher, "list_pages", fake_pages)
     with pytest.raises(ValueError, match="拒绝覆盖"):
         publisher.main(manifest_path, directory)
-    assert all(call[0] == "api" for call in calls)
+    assert all("/releases" in call[0] for call in calls)
