@@ -9,7 +9,6 @@ on:
       - 'src/openpt/windows_app.py'
       - 'src/openpt/runs.py'
       - 'pyproject.toml'
-      - 'README.md'
       - 'docs/使用手册.md'
       - 'LICENSE'
       - 'NOTICE'

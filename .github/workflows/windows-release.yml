@@ -1,0 +1,42 @@
+name: Publish verified Windows release
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'releases/windows-0.2.2.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-release-v0.2.2
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify source run and download its fixed artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest=releases/windows-0.2.2.json
+          run=$(jq -r '.native_run_id' "$manifest")
+          sha=$(jq -r '.source_sha' "$manifest")
+          artifact=$(jq -r '.artifact' "$manifest")
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run" |
+            jq -e --arg sha "$sha" '.head_sha == $sha and .status == "completed" and .conclusion == "success" and .name == "Windows portable build"' >/dev/null
+          gh run download "$run" --repo "$GITHUB_REPOSITORY" --name "$artifact" --dir "$RUNNER_TEMP/openpt-windows-release"
+          python releases/validate_windows.py "$manifest" "$RUNNER_TEMP/openpt-windows-release"
+      - name: Publish only matching assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python releases/publish_windows.py releases/windows-0.2.2.json "$RUNNER_TEMP/openpt-windows-release"
