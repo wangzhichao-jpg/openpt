@@ -421,8 +421,11 @@ def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]
         if strict:
             gl_criterion = "both"
         if replicate_type == "single":
-            if gl_criterion == "both":
-                raise InputError("单测设计不能使用要求 F 检验的严格配置")
+            if strict or cfg.get("gl003_hom_criterion") not in (None, ""):
+                raise InputError(
+                    "单测采用 GB/T 28043-2019 B.1.2 单测标准差法，不支持 GL003 4.2/4.3 "
+                    "主判据或严格配置；请清空 gl003_hom_criterion 并关闭 strict_homogeneity"
+                )
             if not 0 < alpha < 1:
                 raise InputError("alpha 必须在 0 和 1 之间")
             stage = _option(cfg, "sigma_stage", None)

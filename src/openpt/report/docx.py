@@ -857,7 +857,12 @@ def _project_methods(doc: Any, data: dict[str, Any], cfg: dict[str, Any]) -> Non
         ["项目", "选择与依据"],
         [
             ["均匀性方法", hom_method],
-            ["并列用途判据", "样品间标准差判据：CNAS-GL003:2018 4.3"],
+            [
+                "并列用途判据",
+                "单测标准差法，不计算 GL003 4.2/4.3"
+                if cfg.get("replicate_type") == "single"
+                else "样品间标准差判据：CNAS-GL003:2018 4.3",
+            ],
             [
                 "稳定性方法",
                 method
@@ -998,6 +1003,36 @@ def _gl003_homogeneity_summary(h: dict[str, Any], sig: int = 4) -> str:
     return f"均匀性（GL003 4.2 主判据）：{conclusion}；{f_values}；4.3 {ss_values}（参考）。"
 
 
+def _assigned_summary(result: dict[str, Any], data: dict[str, Any], sig: int = 4) -> str:
+    """简述指定值来源、结果和状态，不代替定值方法的人工判断。"""
+    assigned = result.get("指定值与不确定度")
+    if not assigned:
+        return "指定值：未提供指定值与不确定度表的计算结果。"
+    method = assigned.get("method")
+    names = {
+        "known": "已知值",
+        "certified": "有证参考值",
+        "reference": "参考测量",
+        "expert_consensus": "专家公议",
+        "participant_consensus": "参加者公议",
+    }
+    if method == "participant_consensus":
+        source = "程序计算（" + str(assigned.get("consensus_method") or "未注明") + "）"
+    elif method == "expert_consensus" and assigned.get("expert_values") is not None:
+        source = "由专家结果计算"
+    else:
+        source = "外部已评定值登记"
+        if method == "known" and assigned.get("known_components") is not None:
+            source += "，制备不确定度分量由程序合成"
+    unit = str(data.get("info", {}).get("单位") or "")
+    return (
+        f"指定值（{names.get(method, str(method))}；{source}）："
+        f"X={_shown(assigned.get('value'), sig)} {unit}；"
+        f"标准不确定度 u(X)={_shown(assigned.get('u'), sig)} {unit}；"
+        f"状态：{assigned.get('status', '未提供')}。"
+    )
+
+
 def make_report(
     path: str | Path,
     data: dict[str, Any],
@@ -1055,6 +1090,7 @@ def make_report(
                         f"t={_shown(period.get('t'))}；临界值={_shown(period.get('critical'))}；"
                         f"5.3 均值差={_shown(period.get('difference'))}（参考）。"
                     )
+            doc.add_paragraph(f"被测量 {name}；" + _assigned_summary(sub, data["measurands"][name]))
         for name, part in data["measurands"].items():
             heading = doc.add_heading("被测量：" + name, 0)
             heading.paragraph_format.page_break_before = True
@@ -1178,6 +1214,7 @@ def make_report(
                 f"传递标准 {name}：{_shown(point['conclusion'])}；"
                 f"Δmax={_shown(point['delta_max'], sig)}；判据见正文。"
             )
+    doc.add_paragraph(_assigned_summary(result, data, sig))
     _project_methods(doc, data, cfg)
     if data.get("batches"):
         doc.add_heading("候选批次追溯", 1)
@@ -1206,6 +1243,10 @@ def make_report(
         )
     if result.get("标准模式") == "gbt28043":
         _gbt_homogeneity_results(doc, result, cfg, sig)
+    elif h and h.get("method") == "single":
+        doc.add_paragraph(
+            "标准模式：gl003；均匀性单测例外采用 GB/T 28043-2019 B.1.2，不计算 GL003 4.2/4.3。"
+        )
     else:
         doc.add_paragraph("标准模式：gl003；GB/T 28043 扩展未作为主评价。")
     _homogeneity(doc, result, mean_places, sig, ss_places, float(cfg.get("alpha") or 0.05))
@@ -1216,13 +1257,15 @@ def make_report(
         _difference_table(doc, differences)
     doc.add_heading("未评价事项", 1)
     unevaluated = _unevaluated(result)
+    if not any(result.get(key) for key in ("均匀性", "GB/T均匀性", "传递标准稳定性")):
+        unevaluated.append(("均匀性", "UNASSESSED", "未提供均匀性数据"))
+    if not any(result.get(key) for key in ("稳定性", "GB/T稳定性", "趋势稳定性", "传递标准稳定性")):
+        unevaluated.append(("稳定性", "UNASSESSED", "未提供稳定性数据"))
     if unevaluated:
         _table(doc, ["条目", "状态", "原因"], [list(row) for row in unevaluated])
     else:
-        doc.add_paragraph(
-            "本次结果中没有'未评价/需设计审查'状态的条目。注意：模板中未填写的内容"
-            "（如未录入稳定性数据）不会被评价，请确认没有应评而未填的项目。"
-        )
+        doc.add_paragraph("本次结果中没有未评价或需设计审查的条目。")
+    doc.add_paragraph("模板中未填写的内容不会被评价，请确认没有应评而未填的项目。")
     doc.add_heading("人工复核", 1)
     doc.add_paragraph("待人工复核；以下决定仅供人工复核。")
     latest = {str(item.get("item")): item for item in decisions or []}

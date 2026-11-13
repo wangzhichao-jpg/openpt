@@ -1,13 +1,13 @@
-# OpenPT 0.2.0（封闭内测，未公开发布）
+# OpenPT 0.2.1（本地源码修订，未公开发布）
 
-能力验证统计工作台原型，提供单因子 ANOVA、Ss、稳定性 t 检验、算法 A 和 S、中位数与 NIQR、指定值及不确定度、D、D%、z、z′、ζ、En、Excel 模板、复核差异表与 DOCX。计算结果供具备资质的人员复核使用；方法依据为 CNAS-GL003:2018、CNAS-GL002:2018，用户可配置。**当前尚未通过全部验收，不得用于正式评价或直接发布。**
+能力验证统计工作台原型，帮助机构对自己的样品开展**均匀性检验、稳定性检验和定值**：通过 Excel 输入数据与方法，运行命令，查看含三个核心结果的计算书。也提供已有报告的复核和归档功能，但不需要先有报告。计算和扩展方法须由具备专业能力的人员结合实验设计核查；软件不自动放行样品。当前尚未公开发布，不得将原型直接用于正式评价。
 
 ## 安装
 
 Windows（Python 3.10～3.13）：
 
 ```powershell
-py -m pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -e ".[test]"
+py -m pip install -i https://pypi.tuna.tsinghua.edu.cn/simple .
 ```
 
 若 Python 的 `Scripts` 目录不在 PATH，使用 `py -m openpt demo 演示目录`、
@@ -22,23 +22,50 @@ python -m pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -e '.[test]'
 
 需要可选库交叉核对时单独安装 `.[crosscheck]`。`requirements.lock` 仅记录开发机 Python 3.12 的一次解析；跨平台使用项目声明的版本范围。实际运行平台和完整许可证必须审查，见 `THIRD_PARTY_LICENSES.md`。
 
-## 快速开始
+## 核心流程：均匀性 → 稳定性 → 定值
 
-```text
-openpt template input.xlsx
-openpt run input.xlsx
-openpt review input.xlsx --mapping examples/mapping.json
-openpt review-batch input1.xlsx input2.xlsx --output differences.xlsx --mapping examples/mapping.json
-openpt demo demo-output
-openpt --version
-python -m pytest -m "not internal"
+在已准备好的 Windows 环境中，从源码根目录执行：
+
+```powershell
+py -m openpt --version
+py -m openpt template input.xlsx
+# 用 Excel 填写 input.xlsx 并保存，再执行：
+py -m openpt validate input.xlsx
+py -m openpt run input.xlsx --runs-dir runs
 ```
 
-默认结果写在输入文件旁；`--docx`、`--json` 和 `--differences` 可覆盖路径。`demo` 生成公开示例，检测到 LibreOffice 时额外转换 PDF。
+在“项目信息”填项目名和单位；“均匀性”填包装单元、重复编号及测量值；“稳定性”填时间组、单元及重复值。“方法配置”按实际设计选择均匀性与稳定性方法、判据标准差 `sigma` 及其来源；“指定值与不确定度”填写选定方法、来源、数值及不确定度，或录入参加者结果以计算公议值。报告声称值可以留空；只需单项计算时也允许不填其他表。模板不接受公式。完整字段及独立性要求见[使用手册](docs/使用手册.md)。
 
-![公开示例计算书截图](docs/计算书截图.png)
+检查通过只代表所覆盖的输入检查未发现问题。`run` 默认只在新的 `runs/<运行编号>/` 输出 `report.docx`、`result.json` 等；路径以屏幕显示为准。打开计算书，依次核对均匀性、稳定性、指定值及标准不确定度。若需副本，可显式指定 `--docx` 或 `--json`；`review`、差异对照和打包是可选支线。
 
-填入项目名称、单位和所需测量表；均匀性与稳定性可使用长表或宽表，技术重复默认每单元至少两次；不能重复测量时可显式选择 `replicate_type=single`。支持平衡及不平衡重复，不平衡属于待审核扩展方法。稳定性可选择 GL003 5.3 均值差法及多个时间组。多个被测量的单位、配置和复核按量隔离，见 ADR-006。参考输入 `examples/GL003_A1.xlsx`。所有输入必须是实际值，不接受公式。复核声称值需填写统计量、数值、显示小数位及来源。报告模型可填 `recommended`、`repeats_pooled`、`repeats_welch`、`displayed_summary`。最后一种还需在配置表输入 `mean1`、`mean2`、`s1`、`s2`、`n1`、`n2`；多时点复核需在声称值表的“时间组”列指定时点。评分映射通过 `--mapping` 加载。差异清单按 `DIFFERENCE`、`NOTE`、`MATCH` 分组排序；报告模型能复现时，推荐模型不同只记为提示，不直接认定报告错误。`REPORT_RULE_UNKNOWN` 表示绝对容差仅作候选，原报告停止规则尚待确认；`STOP_RULE_SENSITIVITY` 表示停止规则影响显示结果。无更具体类别的提示使用 `REVIEW_NOTE`，待核查差异使用 `REVIEW_REQUIRED`。
+两个完全虚构的贯穿示例可直接验证，无需填报告声称值：
+
+```powershell
+py -m openpt validate examples/core/core_known.xlsx
+py -m openpt run examples/core/core_known.xlsx --runs-dir runs-known
+py -m openpt validate examples/core/core_consensus.xlsx
+py -m openpt run examples/core/core_consensus.xlsx --runs-dir runs-consensus
+```
+
+A 为外部已评定已知值及其标准不确定度；B 复用 A 的虚构均稳数据，另用虚构参加者结果按算法 A 算公议值。示例分量和来源仅为演示，不是对真实项目的评定。
+
+### 选择并登记定值方式
+
+| 方法 | 软件实际处理 |
+|---|---|
+| `known` 已知值 | 登记外部已评定的值与标准不确定度；也可合成独立的制备不确定度分量，但不从配料量计算值 |
+| `certified` 有证参考值 | 登记证书或外部已评定的值及标准不确定度，不自动识别证书 |
+| `reference` 参考测量 | 登记外部参考测量已评定的值及标准不确定度 |
+| `expert_consensus` 专家公议 | 登记外部公议值及标准不确定度；或对独立同精度专家值计算平均值和标准误，适用性须核查 |
+| `participant_consensus` 参加者公议 | 从参加者数据计算算法 A 稳健均值或中位数及程序支持的标准不确定度公式 |
+
+在“指定值与不确定度”填写外部评定的 `u_hom`、`u_stab`，用 `hom_mapping`、`stab_mapping` 选择 `assigned` 计入指定值标准不确定度，或 `sigma_prime` 计入后续评价标准差；无需计入时选 `none`。基础不确定度已含某分量时如实设置 `hom_in_base`、`stab_in_base`，不要重复映射。分量须由人员依据适当方法评定，不能从均稳检通过自动推算；程序不能发现未声明的相关性或重复计入。
+
+均匀性与稳定性可使用长表或宽表；常规技术重复默认每单元至少两次。破坏性单测应显式选择 `replicate_type=single`，均匀性使用 GB/T 28043-2019 B.1.2 单测标准差法；不要同时显式选择 GL003 4.2/4.3 主判据或严格配置。不平衡设计及扩展方法须核查适用性。多个被测量按量隔离，见 ADR-006。
+
+### 可选：报告复核
+
+`openpt review input.xlsx --mapping examples/mapping.json` 可复核已有报告；`openpt review-batch input1.xlsx input2.xlsx --output differences.xlsx` 可批量复核。`openpt demo demo-output` 生成合成演示。复核声称值需填写统计量、数值、显示小数位及来源。报告模型可填 `recommended`、`repeats_pooled`、`repeats_welch`、`displayed_summary`。最后一种还需在配置表输入 `mean1`、`mean2`、`s1`、`s2`、`n1`、`n2`；多时点复核需在声称值表的“时间组”列指定时点。评分映射通过 `--mapping` 加载。差异清单按 `DIFFERENCE`、`NOTE`、`MATCH` 分组排序；报告模型能复现时，推荐模型不同只记为提示，不直接认定报告错误。`REPORT_RULE_UNKNOWN` 表示绝对容差仅作候选，原报告停止规则尚待确认；`STOP_RULE_SENSITIVITY` 表示停止规则影响显示结果。无更具体类别的提示使用 `REVIEW_NOTE`，待核查差异使用 `REVIEW_REQUIRED`。
 
 ## 候选批次
 
@@ -56,7 +83,7 @@ python -m pytest -m "not internal"
 
 ## 可追溯工作流
 
-`openpt run input.xlsx --runs-dir runs` 或 `openpt review input.xlsx --runs-dir runs` 会创建新的运行目录，保存原始输入字节、配置、环境、结果、DOCX、日志及哈希清单；默认运行目录根为当前目录的 `runs/`。`--sample-record sample-output/sample.json` 可附带抽样记录。为兼容旧接口，计算书和 JSON 同时仍写入输入文件旁或指定输出位置，普通输出不能写进已有运行目录。
+`openpt run input.xlsx --runs-dir runs` 或 `openpt review input.xlsx --runs-dir runs` 会创建新的运行目录，保存原始输入字节、配置、环境、结果、DOCX、日志及哈希清单；默认运行目录根为当前目录的 `runs/`。`--sample-record sample-output/sample.json` 可附带抽样记录。默认输出仅在新运行目录；仅显式指定 `--docx`、`--json` 等路径时另存副本，普通输出不能写进已有运行目录。
 
 `openpt reproduce 运行目录` 首先核验清单，再重新计算并逐字段比较；环境不同会警告。`openpt pack 运行目录 -o 新文件.zip` 打包，`openpt verify 新文件.zip` 检查清单；不解压或执行包内代码，也不覆盖已有 ZIP。清单格式为 `{"files": {"相对文件名": "小写 SHA-256"}}`，清单本身不列入 `files`。清单没有数字签名，攻击者同时修改清单与内容时无法验证真实性；应通过可信渠道独立保存 ZIP 哈希或使用外部签名。每次运行同时生成 DOCX、XLSX 和内联样式 HTML。`openpt decide 运行目录 --item 均匀性 --decision 接受 --by 复核人 --note 备注` 会追加决定并生成新的带序号计算书，不改原始输入和旧计算书；这是运行目录追加写入的明确例外。决定追加后会更新清单，若中途失败导致清单不一致须人工恢复。软件不自动放行。虚构演示可执行 `python examples/trace_workflow.py 新目录`；`examples/trace_run/` 为一份已生成的样例。
 
