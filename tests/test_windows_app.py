@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """窗口共用的业务适配层和甲醛示例。"""
 
+import runpy
 from pathlib import Path
 
 import pytest
@@ -46,6 +47,21 @@ def test_short_validation_message() -> None:
         )
     )
     assert text == "均匀性 C2：缺少数值"
+
+
+def test_smoke_launch_records_failure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import openpt.windows_app as app
+
+    def fail() -> None:
+        raise RuntimeError("smoke diagnostic")
+
+    monkeypatch.setenv("OPENPT_GUI_SMOKE_DIR", str(tmp_path))
+    monkeypatch.setattr(app, "main", fail)
+    launch = Path(__file__).resolve().parents[1] / "windows" / "launch.py"
+    with pytest.raises(SystemExit) as exc:
+        runpy.run_path(str(launch), run_name="__main__")
+    assert exc.value.code == 1
+    assert "smoke diagnostic" in (tmp_path / "gui-smoke-error.txt").read_text(encoding="utf-8")
 
 
 def test_missing_component_and_period_names() -> None:

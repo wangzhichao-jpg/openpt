@@ -45,7 +45,11 @@ jobs:
           New-Item -ItemType Directory -Force $env:OPENPT_GUI_SMOKE_DIR | Out-Null
           $p = Start-Process -FilePath (Resolve-Path 'dist/OpenPT/OpenPT.exe') -PassThru
           if (-not $p.WaitForExit(180000)) { Stop-Process -Id $p.Id -Force; throw 'GUI 冒烟超时' }
-          if ($p.ExitCode -ne 0) { throw "GUI 冒烟失败：$($p.ExitCode)" }
+          if ($p.ExitCode -ne 0) {
+            $errorFile = Join-Path $env:OPENPT_GUI_SMOKE_DIR 'gui-smoke-error.txt'
+            if (Test-Path $errorFile) { Get-Content -Raw -Encoding UTF8 $errorFile | Write-Host }
+            throw "GUI 冒烟失败：$($p.ExitCode)"
+          }
           python windows/check_smoke.py $env:OPENPT_GUI_SMOKE_DIR
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Archive and checksum
