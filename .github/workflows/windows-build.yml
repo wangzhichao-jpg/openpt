@@ -1,6 +1,19 @@
 name: Windows portable build
 on:
   workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - '.github/workflows/windows-build.yml'
+      - 'windows/**'
+      - 'src/openpt/windows_app.py'
+      - 'src/openpt/runs.py'
+      - 'pyproject.toml'
+      - 'README.md'
+      - 'docs/使用手册.md'
+      - 'LICENSE'
+      - 'NOTICE'
+      - 'THIRD_PARTY_LICENSES.md'
 
 permissions:
   contents: read
