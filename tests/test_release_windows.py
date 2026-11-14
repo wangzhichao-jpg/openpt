@@ -82,7 +82,7 @@ def test_existing_mismatched_asset_is_not_overwritten(
     calls: list[tuple[str, ...]] = []
 
     release = {
-        "id": 1,
+        "id": 444316593,
         "draft": True,
         "name": publisher.TITLE,
         "tag_name": publisher.TAG,

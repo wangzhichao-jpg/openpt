@@ -27,7 +27,7 @@ def state(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     (tmp_path / "demo.zip").write_bytes(b"zip")
     (tmp_path / "demo.zip.sha256").write_bytes(b"side")
     release = {
-        "id": 15,
+        "id": 444316593,
         "tag_name": mod.TAG,
         "name": mod.TITLE,
         "draft": True,
@@ -47,7 +47,7 @@ def state(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         if "/git/ref/" in path:
             return {"object": {"sha": manifest["source_sha"]}}
         assert "/releases/tags/" not in path, "按 tag 查草稿不可用"
-        assert path.endswith("/releases/15")
+        assert path.endswith("/releases/444316593")
         return release.copy()
 
     def pages(path):
@@ -60,7 +60,11 @@ def state(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
             candidates.append(release)
             return json.dumps(release)
         if "PATCH" in args:
-            release["draft"] = False
+            if "draft=false" in args:
+                release["draft"] = False
+            if "prerelease=false" in args:
+                release["prerelease"] = False
+                release["target_commitish"] = manifest["source_sha"]
             return "{}"
         raise AssertionError(args)
 
@@ -91,13 +95,12 @@ def test_existing_draft_is_reused_without_create(state):
     assert all("/releases/tags/" not in str(call) for call in calls)
 
 
-def test_created_response_id_is_used_without_by_tag(state):
+def test_missing_draft_never_creates_new_release(state):
     mod, manifest, directory, _, candidates, _, calls = state
     candidates.clear()
-    mod.main(manifest, directory)
-    assert sum("POST" in call for call in calls) == 1
-    assert any("/releases/15/assets?" in str(call) for call in calls)
-    assert all("/releases/tags/" not in str(call) for call in calls)
+    with pytest.raises(ValueError, match="拒绝创建"):
+        mod.main(manifest, directory)
+    assert not any("POST" in call for call in calls)
 
 
 def test_identical_assets_not_uploaded_twice(state):
@@ -116,15 +119,15 @@ def test_identical_assets_not_uploaded_twice(state):
     assert not any(call[0] == "UPLOAD" for call in calls)
 
 
-@pytest.mark.parametrize("fault", ["multiple", "wrong_tag", "wrong_target", "wrong_asset"])
+@pytest.mark.parametrize("fault", ["multiple", "wrong_tag", "wrong_title", "wrong_asset"])
 def test_conflicts_stop_without_writes(state, fault):
     mod, manifest, directory, release, candidates, assets, calls = state
     if fault == "multiple":
         candidates.append({**release, "id": 16})
     elif fault == "wrong_tag":
         release["tag_name"] = "v-wrong"
-    elif fault == "wrong_target":
-        release["target_commitish"] = "b" * 40
+    elif fault == "wrong_title":
+        release["name"] = "wrong"
     else:
         assets.append({"name": "demo.zip", "state": "uploaded", "size": 1, "digest": "bad"})
     with pytest.raises(ValueError):
@@ -150,16 +153,58 @@ def test_error_reports_endpoint(monkeypatch, status):
         mod.gh("api", "repos/example/project/releases/42")
 
 
-def test_create_failure_only_reads_before_stopping(state, monkeypatch):
-    mod, manifest, directory, _, candidates, _, calls = state
-    candidates.clear()
+def test_patch_failure_only_reads_before_stopping(state, monkeypatch):
+    mod, manifest, directory, _, _, _, calls = state
 
     def failed(*args):
         calls.append(("WRITE", *args))
-        raise RuntimeError("POST HTTP 403")
+        raise RuntimeError("PATCH HTTP 403")
 
     monkeypatch.setattr(mod, "gh", failed)
-    with pytest.raises(RuntimeError, match="POST HTTP 403"):
+    with pytest.raises(RuntimeError, match="PATCH HTTP 403"):
         mod.main(manifest, directory)
-    assert sum("POST" in call for call in calls) == 1
-    assert sum(call[0] == "LIST" for call in calls) == 2
+    assert sum("PATCH" in call for call in calls) == 1
+    assert sum(call[0] == "LIST" and "/assets?" not in call[1] for call in calls) == 2
+
+
+def test_master_target_with_correct_tag_is_valid(state):
+    mod, manifest, directory, release, _, _, calls = state
+    release["target_commitish"] = "master"
+    mod.main(manifest, directory)
+    assert any("draft=false" in call for call in calls)
+
+
+def test_tag_wrong_at_start_is_rejected(state, monkeypatch):
+    mod, manifest, directory, _, _, _, calls = state
+    monkeypatch.setattr(mod, "api", lambda path: {"object": {"sha": "b" * 40}})
+    with pytest.raises(ValueError, match="tag 不指向"):
+        mod.main(manifest, directory)
+    assert not any(call[0] in ("WRITE", "UPLOAD") for call in calls)
+
+
+def test_tag_moved_before_publish_is_rejected(state, monkeypatch):
+    mod, manifest, directory, _, _, _, calls = state
+    original = mod.api
+    seen = 0
+
+    def moved(path):
+        nonlocal seen
+        if "/git/ref/" in path:
+            seen += 1
+            if seen == 2:
+                return {"object": {"sha": "b" * 40}}
+        return original(path)
+
+    monkeypatch.setattr(mod, "api", moved)
+    with pytest.raises(ValueError, match="tag 不指向"):
+        mod.main(manifest, directory)
+    assert not any("draft=false" in call for call in calls)
+
+
+def test_prerelease_draft_is_normalized(state):
+    mod, manifest, directory, release, _, _, calls = state
+    release["prerelease"] = True
+    release["target_commitish"] = "master"
+    mod.main(manifest, directory)
+    assert any("prerelease=false" in call for call in calls)
+    assert any("draft=false" in call for call in calls)

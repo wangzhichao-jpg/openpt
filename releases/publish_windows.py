@@ -43,7 +43,13 @@ def matching_releases(root: str) -> list[dict[str, Any]]:
     print(
         "Release 候选："
         + json.dumps(
-            [{k: r.get(k) for k in ("id", "tag_name", "name", "draft")} for r in matches],
+            [
+                {
+                    k: r.get(k)
+                    for k in ("id", "tag_name", "name", "draft", "prerelease", "target_commitish")
+                }
+                for r in matches
+            ],
             ensure_ascii=False,
         ),
         flush=True,
@@ -53,16 +59,30 @@ def matching_releases(root: str) -> list[dict[str, Any]]:
     return matches
 
 
-def check_release(release: dict[str, Any], source_sha: str) -> int:
-    if (
-        release.get("name") != TITLE
-        or release.get("tag_name") != TAG
-        or release.get("prerelease")
-        or release.get("target_commitish") != source_sha
-        or not isinstance(release.get("id"), int)
-    ):
-        raise ValueError("现有 Release 标题、标签、类型或目标提交不一致")
+def check_release(release: dict[str, Any]) -> int:
+    problems = []
+    if release.get("name") != TITLE:
+        problems.append("name")
+    if release.get("tag_name") != TAG:
+        problems.append("tag_name")
+    if not isinstance(release.get("id"), int) or isinstance(release.get("id"), bool):
+        problems.append("id")
+    if not isinstance(release.get("draft"), bool):
+        problems.append("draft")
+    if not isinstance(release.get("prerelease"), bool):
+        problems.append("prerelease")
+    if release.get("prerelease") is True and release.get("draft") is False:
+        problems.append("已发布的 prerelease")
+    if problems:
+        raise ValueError("现有 Release 字段不符：" + ", ".join(problems))
     return release["id"]
+
+
+def check_tag(root: str, source_sha: str) -> None:
+    tag = api(f"{root}/git/ref/tags/{TAG}")
+    obj = tag.get("object", {})
+    if obj.get("type") not in (None, "commit") or obj.get("sha") != source_sha:
+        raise ValueError("tag 不指向被核准的源码提交")
 
 
 def checked_assets(
@@ -142,52 +162,51 @@ def main(manifest_path: Path, directory: Path) -> None:
     repo = os.environ["GITHUB_REPOSITORY"]
     root = f"repos/{repo}"
     # 既有 tag 必须直接指向已验收源码，不允许触发隐式 tag 创建。
-    tag = api(f"{root}/git/ref/tags/{TAG}")
-    if tag.get("object", {}).get("sha") != manifest["source_sha"]:
-        raise ValueError("tag 不指向被核准的源码提交")
+    check_tag(root, manifest["source_sha"])
     matches = matching_releases(root)
     bundle = directory / manifest["bundle"]
     sidecar = directory / (manifest["bundle"] + ".sha256")
     expected = {p.name: (p.stat().st_size, "sha256:" + sha256(p)) for p in (bundle, sidecar)}
-    release_id: int | None = None
-    if matches:
-        release_id = check_release(matches[0], manifest["source_sha"])
-        release = api(f"{root}/releases/{release_id}")
-        if check_release(release, manifest["source_sha"]) != release_id:
-            raise ValueError("列表与 ID 查询返回的 Release 不一致")
-    else:
-        notes = (
-            "1. 下载附件中的 ZIP。\n2. 将 ZIP 全部解压。\n"
-            f"3. 双击 `{manifest['app']}.exe`。\n\n"
-            "案例：甲醛示例、金属材料抗拉强度、粉末振实密度、数字多用表。\n"
-            "无需安装 Python 或管理员权限。\n\n"
-            f"源码提交：`{manifest['source_sha']}`\nZIP SHA-256：`{manifest['sha256']}`\n"
-        )
+    if not matches:
+        raise ValueError("未找到已知草稿，拒绝创建新 Release")
+    release_id = check_release(matches[0])
+    if release_id != 444316593:
+        raise ValueError(f"候选 Release ID 不符：{release_id}")
+    release = api(f"{root}/releases/{release_id}")
+    if check_release(release) != release_id:
+        raise ValueError("列表与 ID 查询返回的 Release 不一致")
+    print(
+        "Release 详情："
+        + json.dumps(
+            {
+                k: release.get(k)
+                for k in ("id", "name", "tag_name", "draft", "prerelease", "target_commitish")
+            },
+            ensure_ascii=False,
+        ),
+        flush=True,
+    )
+    existing = checked_assets(root, release_id, expected)
+    print("已有附件：" + json.dumps([a["name"] for a in existing], ensure_ascii=False), flush=True)
+    if release["draft"] and release["prerelease"]:
+        check_tag(root, manifest["source_sha"])
         try:
-            response = gh(
+            gh(
                 "api",
                 "--method",
-                "POST",
-                f"{root}/releases",
-                "-f",
-                f"tag_name={TAG}",
-                "-f",
-                f"target_commitish={manifest['source_sha']}",
-                "-f",
-                f"name={TITLE}",
-                "-f",
-                f"body={notes}",
-                "-F",
-                "draft=true",
+                "PATCH",
+                f"{root}/releases/{release_id}",
                 "-F",
                 "prerelease=false",
+                "-f",
+                f"target_commitish={manifest['source_sha']}",
             )
-            release = json.loads(response)
-            release_id = check_release(release, manifest["source_sha"])
         except Exception:
             diagnostic(root, release_id)
             raise
-    existing = checked_assets(root, release_id, expected)
+        release = api(f"{root}/releases/{release_id}")
+        if check_release(release) != release_id or release["prerelease"] or not release["draft"]:
+            raise ValueError("草稿元数据规范化后状态不符")
     if not release["draft"] and len(existing) != len(expected):
         raise ValueError("现有正式 Release 附件不完整，拒绝修改")
     for file in (bundle, sidecar):
@@ -207,13 +226,14 @@ def main(manifest_path: Path, directory: Path) -> None:
     else:
         raise ValueError("远端附件尚未齐全，拒绝发布")
     if release["draft"]:
+        check_tag(root, manifest["source_sha"])
         try:
             gh("api", "--method", "PATCH", f"{root}/releases/{release_id}", "-F", "draft=false")
         except Exception:
             diagnostic(root, release_id)
             raise
     final = api(f"{root}/releases/{release_id}")
-    if check_release(final, manifest["source_sha"]) != release_id or final["draft"]:
+    if check_release(final) != release_id or final["draft"] or final["prerelease"]:
         raise ValueError("Release 尚未正式发布")
     print("Verified Windows release is published.")
 
