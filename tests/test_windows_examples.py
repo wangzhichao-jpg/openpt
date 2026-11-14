@@ -16,7 +16,9 @@ from docx import Document
 from openpyxl import load_workbook
 from scipy.stats import f, t
 
+from openpt import __version__
 from openpt.io.validation import inspect_input
+from openpt.runs import environment
 from openpt.windows_app import run_workbook, summarize
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -41,7 +43,7 @@ def _algorithm_a(values: list[float]) -> tuple[float, float]:
     raise AssertionError("算法 A 未收敛")
 
 
-@pytest.mark.parametrize("name", ["金属材料抗拉强度", "粉末振实密度", "数字多用表"])
+@pytest.mark.parametrize("name", ["材料抗拉强度", "颗粒振实密度", "数字多用表"])
 def test_examples_independent_recalculation(name: str, tmp_path: Path) -> None:
     path = EXAMPLES / f"{name}.xlsx"
     assert inspect_input(path) == []
@@ -136,6 +138,15 @@ def test_examples_independent_recalculation(name: str, tmp_path: Path) -> None:
     assert "均匀性" in doc_text and "稳定性" in doc_text
 
 
+def test_version_in_frozen_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    assert __version__ == "0.2.3"
+    assert environment()["openpt"] == __version__
+    assert environment()["git_commit"] is None
+    assert 'version = "0.2.3"' in (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    assert "version: 0.2.3" in (ROOT / "CITATION.cff").read_text(encoding="utf-8")
+
+
 def test_visible_package_layout(tmp_path: Path) -> None:
     target = tmp_path / "能力验证样品评价与定值工具"
     subprocess.run(
@@ -147,8 +158,8 @@ def test_visible_package_layout(tmp_path: Path) -> None:
     assert {p.stem for p in (target / "示例案例").glob("*.xlsx")} == {
         "甲醛示例",
         "数字多用表",
-        "金属材料抗拉强度",
-        "粉末振实密度",
+        "材料抗拉强度",
+        "颗粒振实密度",
     }
     index = (target / "示例案例" / "案例说明.txt").read_text(encoding="utf-8")
     assert "数字湿度计" not in index and "直流电能表" not in index

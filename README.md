@@ -2,8 +2,10 @@
 
 ## Windows 免安装版下载
 
-- **国内入口：**[Gitee 发行版](https://gitee.com/bigtaurus/openpt/releases)（Windows 本地附件正在补齐，请查看发布进度）。
-- **备用入口：**[GitHub 发行版下载](https://github.com/wangzhichao-jpg/openpt/releases/tag/v0.2.2)（Windows ZIP 已提供）。
+- **国内入口：**[Gitee 下载 Windows 免安装版 0.2.2](https://gitee.com/bigtaurus/openpt/releases/download/v0.2.2/_Windows.zip)（Gitee 本地附件）。
+- **备用入口：**[GitHub 发行版 0.2.2](https://github.com/wangzhichao-jpg/openpt/releases/tag/v0.2.2)（Windows ZIP）。
+
+上述下载为已发布的 0.2.2。当前源码 0.2.3 的更新包尚待构建与发布。
 
 下载 Windows ZIP 后全部解压并双击程序。
 
