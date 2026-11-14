@@ -90,8 +90,19 @@ def checked_assets(
 ) -> list[dict]:
     assets = list_pages(f"{root}/releases/{release_id}/assets?per_page=100")
     names = [item["name"] for item in assets]
+    print(
+        "附件只读诊断："
+        + json.dumps(
+            [
+                {k: item.get(k) for k in ("id", "name", "state", "size", "digest")}
+                for item in assets
+            ],
+            ensure_ascii=False,
+        ),
+        flush=True,
+    )
     if len(names) != len(set(names)) or any(name not in expected for name in names):
-        raise ValueError("现有 Release 含重复或未核准附件")
+        raise ValueError("现有 Release 含重复或未核准附件：" + repr(names))
     for item in assets:
         expected_size, expected_digest = expected[item["name"]]
         if item.get("state") != "uploaded" or item["size"] != expected_size:
