@@ -70,14 +70,15 @@ def state(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 
     def upload(repo, release_id, file):
         calls.append(("UPLOAD", str(release_id), file.name))
-        assets.append(
-            {
-                "name": file.name,
-                "state": "uploaded",
-                "size": file.stat().st_size,
-                "digest": "sha256:" + mod.sha256(file),
-            }
-        )
+        item = {
+            "id": 100 + len(assets),
+            "name": file.name,
+            "state": "uploaded",
+            "size": file.stat().st_size,
+            "digest": "sha256:" + mod.sha256(file),
+        }
+        assets.append(item)
+        return item
 
     monkeypatch.setattr(mod, "api", api)
     monkeypatch.setattr(mod, "list_pages", pages)
@@ -103,12 +104,58 @@ def test_missing_draft_never_creates_new_release(state):
     assert not any("POST" in call for call in calls)
 
 
+def test_normalized_asset_names_match_by_digest_without_upload(state):
+    mod, manifest, directory, _, _, assets, calls = state
+    for index, name in enumerate(("demo.zip", "demo.zip.sha256")):
+        file = directory / name
+        assets.append(
+            {
+                "id": 100 + index,
+                "name": f"normalized-{index}",
+                "state": "uploaded",
+                "size": file.stat().st_size,
+                "digest": "sha256:" + mod.sha256(file),
+            }
+        )
+    mod.main(manifest, directory)
+    assert not any(call[0] == "UPLOAD" for call in calls)
+    assert any("draft=false" in call for call in calls)
+
+
+@pytest.mark.parametrize("fault", ["unknown", "duplicate_role", "duplicate_id", "extra"])
+def test_unknown_or_ambiguous_content_stops_without_write(state, fault):
+    mod, manifest, directory, _, _, assets, calls = state
+    for index, name in enumerate(("demo.zip", "demo.zip.sha256")):
+        file = directory / name
+        assets.append(
+            {
+                "id": 100 + index,
+                "name": f"normalized-{index}",
+                "state": "uploaded",
+                "size": file.stat().st_size,
+                "digest": "sha256:" + mod.sha256(file),
+            }
+        )
+    if fault == "unknown":
+        assets[0]["digest"] = "sha256:" + "f" * 64
+    elif fault == "duplicate_role":
+        assets[1].update(size=assets[0]["size"], digest=assets[0]["digest"])
+    elif fault == "duplicate_id":
+        assets[1]["id"] = assets[0]["id"]
+    else:
+        assets.append({**assets[0], "id": 102})
+    with pytest.raises(ValueError):
+        mod.main(manifest, directory)
+    assert not any(call[0] in ("WRITE", "UPLOAD") for call in calls)
+
+
 def test_identical_assets_not_uploaded_twice(state):
     mod, manifest, directory, _, _, assets, calls = state
     for name in ("demo.zip", "demo.zip.sha256"):
         file = directory / name
         assets.append(
             {
+                "id": 100 + len(assets),
                 "name": name,
                 "state": "uploaded",
                 "size": file.stat().st_size,
@@ -129,7 +176,9 @@ def test_conflicts_stop_without_writes(state, fault):
     elif fault == "wrong_title":
         release["name"] = "wrong"
     else:
-        assets.append({"name": "demo.zip", "state": "uploaded", "size": 1, "digest": "bad"})
+        assets.append(
+            {"id": 100, "name": "demo.zip", "state": "uploaded", "size": 1, "digest": "bad"}
+        )
     with pytest.raises(ValueError):
         mod.main(manifest, directory)
     assert not any(call[0] in ("WRITE", "UPLOAD") for call in calls)

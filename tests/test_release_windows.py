@@ -100,6 +100,7 @@ def test_existing_mismatched_asset_is_not_overwritten(
         if "/assets?" in path:
             return [
                 {
+                    "id": 100,
                     "name": manifest["bundle"],
                     "size": 1,
                     "digest": "sha256:wrong",

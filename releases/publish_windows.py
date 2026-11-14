@@ -87,9 +87,8 @@ def check_tag(root: str, source_sha: str) -> None:
 
 def checked_assets(
     root: str, release_id: int, expected: dict[str, tuple[int, str]], *, allow_pending: bool = False
-) -> list[dict]:
+) -> tuple[dict[str, dict], int]:
     assets = list_pages(f"{root}/releases/{release_id}/assets?per_page=100")
-    names = [item["name"] for item in assets]
     print(
         "附件只读诊断："
         + json.dumps(
@@ -101,17 +100,31 @@ def checked_assets(
         ),
         flush=True,
     )
-    if len(names) != len(set(names)) or any(name not in expected for name in names):
-        raise ValueError("现有 Release 含重复或未核准附件：" + repr(names))
+    if len(set(expected.values())) != len(expected):
+        raise ValueError("期望附件摘要和大小不能相同")
+    ids = [item.get("id") for item in assets]
+    if (
+        len(assets) > len(expected)
+        or any(not isinstance(i, int) or isinstance(i, bool) or i <= 0 for i in ids)
+        or len(ids) != len(set(ids))
+    ):
+        raise ValueError("附件数量或 ID 无效、重复，拒绝覆盖")
+    roles: dict[str, dict] = {}
+    pending = 0
     for item in assets:
-        expected_size, expected_digest = expected[item["name"]]
-        if item.get("state") != "uploaded" or item["size"] != expected_size:
-            raise ValueError("现有附件状态或大小不一致，拒绝覆盖")
-        if item.get("digest") != expected_digest and not (
-            allow_pending and item.get("digest") is None
-        ):
-            raise ValueError("现有附件摘要或大小不一致，拒绝覆盖")
-    return assets
+        if item.get("state") != "uploaded":
+            raise ValueError("现有附件状态不符，拒绝覆盖")
+        pair = (item.get("size"), item.get("digest"))
+        matching = [role for role, values in expected.items() if values == pair]
+        if not matching and allow_pending and item.get("digest") is None:
+            if not any(size == item.get("size") for size, _ in expected.values()):
+                raise ValueError("待核验附件大小不符，拒绝覆盖")
+            pending += 1
+            continue
+        if len(matching) != 1 or matching[0] in roles:
+            raise ValueError(f"附件内容未知或角色重复，拒绝覆盖：{item!r}")
+        roles[matching[0]] = item
+    return roles, pending
 
 
 def diagnostic(root: str, release_id: int | None) -> None:
@@ -133,7 +146,7 @@ def diagnostic(root: str, release_id: int | None) -> None:
         print(f"写入后只读核查未完成：{error}", file=sys.stderr, flush=True)
 
 
-def upload(repo: str, release_id: int, file: Path) -> None:
+def upload(repo: str, release_id: int, file: Path) -> dict[str, Any]:
     """只向 GitHub 官方 uploads 域发送令牌，禁止 HTTP 重定向。"""
     url = (
         f"https://uploads.github.com/repos/{repo}/releases/{release_id}/assets?"
@@ -161,6 +174,16 @@ def upload(repo: str, release_id: int, file: Path) -> None:
         with urllib.request.build_opener(NoRedirect).open(request, timeout=180) as response:
             if response.status != 201:
                 raise RuntimeError(f"上传附件 HTTP {response.status}")
+            item = json.load(response)
+            print(
+                "上传响应："
+                + json.dumps(
+                    {k: item.get(k) for k in ("id", "name", "state", "size", "digest")},
+                    ensure_ascii=False,
+                ),
+                flush=True,
+            )
+            return item
     except urllib.error.HTTPError as error:
         raise RuntimeError(
             f"GitHub uploads endpoint releases/{release_id}/assets HTTP {error.code}"
@@ -197,8 +220,17 @@ def main(manifest_path: Path, directory: Path) -> None:
         ),
         flush=True,
     )
-    existing = checked_assets(root, release_id, expected)
-    print("已有附件：" + json.dumps([a["name"] for a in existing], ensure_ascii=False), flush=True)
+
+    def settled_assets() -> dict[str, dict]:
+        for _ in range(12):
+            roles, pending = checked_assets(root, release_id, expected, allow_pending=True)
+            if not pending:
+                return roles
+            time.sleep(5)
+        raise ValueError("远端附件摘要尚未就绪，拒绝上传或发布")
+
+    existing = settled_assets()
+    print("已有附件角色：" + json.dumps(list(existing), ensure_ascii=False), flush=True)
     if release["draft"] and release["prerelease"]:
         check_tag(root, manifest["source_sha"])
         try:
@@ -221,20 +253,23 @@ def main(manifest_path: Path, directory: Path) -> None:
     if not release["draft"] and len(existing) != len(expected):
         raise ValueError("现有正式 Release 附件不完整，拒绝修改")
     for file in (bundle, sidecar):
-        if not any(item["name"] == file.name for item in existing):
+        if file.name not in existing:
             try:
-                upload(repo, release_id, file)
+                response = upload(repo, release_id, file)
+                if (
+                    not isinstance(response.get("id"), int)
+                    or response.get("state") != "uploaded"
+                    or response.get("size") != expected[file.name][0]
+                    or response.get("digest") not in (None, expected[file.name][1])
+                ):
+                    raise ValueError("上传响应与预期内容不符")
+                existing = settled_assets()
+                if file.name not in existing or existing[file.name]["id"] != response["id"]:
+                    raise ValueError("上传响应与远端附件不一致")
             except Exception:
                 diagnostic(root, release_id)
                 raise
-    for _ in range(12):
-        uploaded = checked_assets(root, release_id, expected, allow_pending=True)
-        if {a["name"] for a in uploaded} == set(expected) and all(
-            a.get("digest") == expected[a["name"]][1] for a in uploaded
-        ):
-            break
-        time.sleep(5)
-    else:
+    if set(existing) != set(expected):
         raise ValueError("远端附件尚未齐全，拒绝发布")
     if release["draft"]:
         check_tag(root, manifest["source_sha"])
