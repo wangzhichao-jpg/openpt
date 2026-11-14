@@ -2,10 +2,10 @@
 
 ## Windows 免安装版下载
 
-- **国内入口：**[Gitee 下载 Windows 免安装版 0.2.2](https://gitee.com/bigtaurus/openpt/releases/download/v0.2.2/_Windows.zip)（Gitee 本地附件；0.2.3 附件待同步）。
-- **新版入口：**[GitHub 下载 Windows 免安装版 0.2.3](https://github.com/wangzhichao-jpg/openpt/releases/tag/v0.2.3)（已发布，含新案例名称）。
+- **国内入口：**[Gitee 下载 Windows 免安装版 0.2.3](https://gitee.com/bigtaurus/openpt/releases#release-v0.2.3)（Gitee 本地附件）。
+- **备用入口：**[GitHub 下载 Windows 免安装版 0.2.3](https://github.com/wangzhichao-jpg/openpt/releases/tag/v0.2.3)。
 
-两个入口的版本不同；如需“材料抗拉强度”和“颗粒振实密度”名称，请下载 0.2.3。
+两个入口均提供 0.2.3，包含甲醛、材料抗拉强度、颗粒振实密度和数字多用表四个示例。
 
 下载 Windows ZIP 后全部解压并双击程序。
 
