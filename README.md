@@ -1,8 +1,11 @@
 # 能力验证样品评价与定值工具
 
-## [下载 Windows 免安装版](https://github.com/wangzhichao-jpg/openpt/releases/tag/v0.2.2)
+## Windows 免安装版下载
 
-Windows 成品在 GitHub 发行版页面的附件中，下载 ZIP 后全部解压并双击程序；Gitee 用户也可使用此下载入口。
+- **国内入口：**[Gitee 发行版](https://gitee.com/bigtaurus/openpt/releases)（Windows 本地附件正在补齐，请查看发布进度）。
+- **备用入口：**[GitHub 发行版下载](https://github.com/wangzhichao-jpg/openpt/releases/tag/v0.2.2)（Windows ZIP 已提供）。
+
+下载 Windows ZIP 后全部解压并双击程序。
 
 本工具提供均匀性、稳定性和指定值计算。本项目采用 Apache-2.0 许可证。
 
