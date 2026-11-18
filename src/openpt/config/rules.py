@@ -108,6 +108,21 @@ def check_assigned(
     if reason not in (None, "") and not isinstance(reason, str):
         add("stability_disposition_reason", "稳定性处置依据须为文字", "文字", "填写书面依据")
     if method in (None, ""):
+        # 无定值方法时仍检查已填写的数值字段，避免遗漏模板输入错误。
+        for field in (
+            "value",
+            "uncertainty",
+            "sigma_temporary",
+            "sigma_final",
+            "u_hom",
+            "u_stab",
+            "u_trans",
+            "U_assigned",
+            "k_assigned",
+        ):
+            value = values.get(field)
+            if value not in (None, "") and not _number(value):
+                add(field, f"{field} 必须为有限数", "有限数", "修改数值")
         return issues
     for field, message in (
         ("source", "指定值来源必填"),
