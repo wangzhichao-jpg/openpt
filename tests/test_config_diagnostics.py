@@ -11,7 +11,13 @@ from openpt.cli import calculate
 from openpt.errors import InputError, locate
 from openpt.io.excel import read_workbook
 from openpt.io.validation import inspect_input
-from openpt.windows_app import error_dialog_summary, result_text_content, run_workbook, summarize
+from openpt.windows_app import (
+    error_dialog_summary,
+    friendly_error,
+    result_text_content,
+    run_workbook,
+    summarize,
+)
 
 EXAMPLE = Path(__file__).resolve().parents[1] / "windows/examples/GB-T合成检测.xlsx"
 
@@ -144,16 +150,55 @@ def test_calculation_errors_located(tmp_path: Path) -> None:
         _set(book, "指定值与不确定度", field, value)
     path = tmp_path / "known.xlsx"
     book.save(path)
-    with pytest.raises(InputError, match=r"第.*行.*known_components"):
+    with pytest.raises(InputError) as error:
         run_workbook(path, tmp_path / "runs2")
+    assert "known_components" in friendly_error(error.value)
     path = tmp_path / "transfer.xlsx"
     book = load_workbook(
         Path(__file__).resolve().parents[1] / "examples/synthetic/transfer_synthetic.xlsx"
     )
     book["方法配置"].append(["transfer_en_map", "{bad"])
     book.save(path)
-    with pytest.raises(InputError, match=r"『方法配置』第.*行.*transfer_en_map"):
+    with pytest.raises(InputError) as error:
         run_workbook(path, tmp_path / "runs3")
+    assert "『方法配置』第45行" in friendly_error(error.value)
+    assert "transfer_en_map" in friendly_error(error.value)
+
+
+@pytest.mark.parametrize(
+    ("sheet", "field", "value"),
+    [
+        ("指定值与不确定度", "method", "invalid"),
+        ("指定值与不确定度", "source", None),
+        ("指定值与不确定度", "uncertainty_source", None),
+        ("指定值与不确定度", "sigma_final", -1),
+        ("指定值与不确定度", "sigma_procedure", None),
+        ("指定值与不确定度", "u_stab", -1),
+        ("指定值与不确定度", "u_trans", -1),
+        ("指定值与不确定度", "hom_mapping", "invalid"),
+        ("指定值与不确定度", "stab_mapping", "invalid"),
+        ("指定值与不确定度", "trans_mapping", "invalid"),
+        ("指定值与不确定度", "hom_in_base", "invalid"),
+        ("指定值与不确定度", "stability_disposition", "invalid"),
+        ("方法配置", "alpha", 2),
+        ("方法配置", "criterion_standard", "invalid"),
+        ("方法配置", "trend_plot", "invalid"),
+        ("方法配置", "sigma", -1),
+    ],
+)
+def test_rule_preflight_and_calculation_agree(
+    tmp_path: Path, sheet: str, field: str, value: object
+) -> None:
+    data = read_workbook(EXAMPLE)
+    (data["config"] if sheet == "方法配置" else data["assigned_config"])[field] = value
+    book = load_workbook(EXAMPLE)
+    _set(book, sheet, field, value)
+    path = tmp_path / "invalid.xlsx"
+    book.save(path)
+    assert any(field in issue.message for issue in inspect_input(path))
+    with pytest.raises(InputError) as error:
+        calculate(data)
+    assert field in str(error.value)
 
 
 def test_delta_e_missing_rule_in_preflight_and_calculation(tmp_path: Path) -> None:
@@ -182,6 +227,19 @@ def test_error_location_fallback() -> None:
     assert str(locate(exc, {})) == "『方法配置』字段 sigma：无效"
     exc = InputError("无字段错误")
     assert locate(exc, {}) is exc
+    exc = InputError("映射冲突", fields=["hom_mapping", "stab_mapping"])
+    text = str(
+        locate(
+            exc,
+            {
+                "_cells": {
+                    ("指定值与不确定度", "hom_mapping"): ("B13", "none"),
+                    ("指定值与不确定度", "stab_mapping"): ("B14", "both"),
+                }
+            },
+        )
+    )
+    assert "第13行 hom_mapping" in text and "第14行 stab_mapping" in text
 
 
 def test_synthetic_gbt_example_scores(tmp_path: Path) -> None:

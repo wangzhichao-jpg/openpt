@@ -12,7 +12,7 @@ from zipfile import BadZipFile
 
 from . import __version__
 from .config.catalog import ENUMS
-from .config.rules import check_method_config
+from .config.rules import check_assigned, check_method_config
 from .config.sigma import criterion_sigma
 from .core.assigned import AssignedResult, assign_value
 from .core.decision import compare
@@ -124,7 +124,19 @@ def _gbt_stability_disposition(
             or (assigned.trans_in_stab and stable_mapped)
         )
         if (storage_flagged and not stable_mapped) or (transport_flagged and not transport_mapped):
-            raise InputError("稳定性或运输影响尚未登记到不确定度预算；不得凭均值差自动估算")
+            raise InputError(
+                "稳定性或运输影响尚未登记到不确定度预算；不得凭均值差自动估算",
+                fields=[
+                    "u_stab",
+                    "stab_mapping",
+                    "stab_in_base",
+                    "u_trans",
+                    "trans_mapping",
+                    "trans_in_base",
+                    "trans_in_stab",
+                ],
+                hint="审核并登记稳定性及运输不确定度预算",
+            )
     if disposition == "withhold" or (flagged and disposition == "pending"):
         assigned.status = "DESIGN_REVIEW"
         assigned.u = None
@@ -427,16 +439,40 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
             }
         }
     cfg = data["config"]
-    rule_issues = check_method_config(cfg)
-    if rule_issues:
-        issue = rule_issues[0]
+    assignment = data.get("assigned_config", {})
+    rule_groups = (
+        ("方法配置", check_method_config(cfg)),
+        ("指定值与不确定度", check_assigned(assignment, cfg)),
+    )
+    problems = []
+    for sheet, rule_issues in rule_groups:
+        for issue in rule_issues:
+            cell, value = data.get("_cells", {}).get((sheet, issue.field), ("", issue.value))
+            problems.append(
+                {
+                    "sheet": sheet,
+                    "cell": cell,
+                    "original": value,
+                    "message": f"{issue.field}：{issue.message}；允许值/要求：{issue.allowed}；"
+                    f"修改建议：{issue.hint}",
+                }
+            )
+    if problems:
+        if len(problems) == 1:
+            sheet, rules = next((sheet, rules) for sheet, rules in rule_groups if rules)
+            issue = rules[0]
+            raise InputError(
+                issue.message,
+                sheet=sheet,
+                field=issue.field,
+                allowed=issue.allowed,
+                hint=issue.hint,
+                value=issue.value,
+            )
         raise InputError(
-            issue.message,
-            sheet="方法配置",
-            field=issue.field,
-            value=issue.value,
-            allowed=issue.allowed,
-            hint=issue.hint,
+            format_error(
+                InputError("输入校验问题：" + json.dumps(problems, ensure_ascii=False, default=str))
+            )
         )
     alpha = float(_option(cfg, "alpha", 0.05))
     sigma = criterion_sigma(cfg)
@@ -461,7 +497,12 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
     if standard == "gbt28043" and (
         hom_rule not in ENUMS["gbt_hom_rule"] or stab_rule not in ENUMS["gbt_stability_rule"]
     ):
-        raise InputError("GB/T 判据应为 basic 或 extended")
+        raise InputError(
+            "GB/T 判据应为 basic 或 extended",
+            sheet="方法配置",
+            fields=["gbt_hom_rule", "gbt_stability_rule"],
+            allowed="basic 或 extended",
+        )
     replicate_type = _option(cfg, "replicate_type", "technical")
     if replicate_type not in ENUMS["replicate_type"]:
         raise InputError(

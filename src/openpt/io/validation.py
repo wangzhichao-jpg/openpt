@@ -13,7 +13,7 @@ from openpyxl import load_workbook
 from openpyxl.utils.cell import column_index_from_string, coordinate_from_string, get_column_letter
 
 from ..config.catalog import ENUMS
-from ..config.rules import check_method_config
+from ..config.rules import check_assigned, check_method_config
 from ..core.gbt28043 import period_options as gbt_period_options
 from ..core.transfer import assess_transfer
 from ..core.trend import configured_uncertainty, fit_series
@@ -982,6 +982,21 @@ def inspect_input(
                             )
                         if assigned_values.get("u_hom") not in (None, "", 0, 0.0):
                             add_assigned("u_hom", "引用 ss 时不得同时手工输入 u_hom；请清空")
+        if "指定值与不确定度" in book.sheetnames and rows:
+            for rule in check_assigned(assigned_values, config_values):
+                if not any(
+                    i.sheet == "指定值与不确定度" and i.message.startswith(rule.field + "：")
+                    for i in issues
+                ):
+                    issues.append(
+                        Issue(
+                            "INVALID_CONFIG",
+                            "指定值与不确定度",
+                            assigned_cells.get(rule.field, ""),
+                            rule.value,
+                            f"{rule.field}：{rule.message}；允许值/要求：{rule.allowed}；修改建议：{rule.hint}",
+                        )
+                    )
         for rule in check_method_config(config_values):
             issues.append(
                 Issue(
