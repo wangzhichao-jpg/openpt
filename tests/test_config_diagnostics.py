@@ -7,7 +7,7 @@ import pytest
 from docx import Document
 from openpyxl import load_workbook
 
-from openpt.cli import calculate
+from openpt.cli import _unevaluated_reason, calculate
 from openpt.errors import InputError, locate
 from openpt.io.excel import read_workbook
 from openpt.io.validation import inspect_input
@@ -122,6 +122,17 @@ def test_withhold_explained(tmp_path: Path) -> None:
     book.save(path)
     _, _, result = run_workbook(path, tmp_path / "runs")
     assert "withhold" in str(result["诊断提示"])
+
+
+def test_unevaluated_reason_details_and_fallback() -> None:
+    assert "测量条件失效" in _unevaluated_reason(
+        {"reason": "测量条件失效", "status": "NOT_EVALUATED"}, "兜底"
+    )
+    assert "采样不足" in _unevaluated_reason({"detail": {"warnings": ["采样不足"]}}, "兜底")
+    assert "斜率和斜率标准误均为零" in _unevaluated_reason(
+        {"status": "INDETERMINATE", "b1": 0, "s_b1": 0}, "兜底"
+    )
+    assert _unevaluated_reason({}, "兜底") == "兜底"
 
 
 def test_result_area_and_dialog_summary() -> None:

@@ -408,6 +408,27 @@ def _assigned_results(
     return result
 
 
+def _unevaluated_reason(item: dict[str, Any], fallback: str) -> str:
+    """优先采用结果已登记的原因、警告及非正常状态。"""
+    reason = item.get("reason")
+    warnings = item.get("warnings") or item.get("design_warnings") or []
+    if isinstance(warnings, str):
+        warnings = [warnings]
+    parts = [str(reason)] if reason else []
+    parts.extend(str(warning) for warning in warnings if warning and str(warning) not in parts)
+    if item.get("status") == "INDETERMINATE" and item.get("b1") == 0 and item.get("s_b1") == 0:
+        parts.append("斜率和斜率标准误均为零，无法进行趋势显著性判定")
+    status = item.get("status")
+    if status and status != "OK":
+        parts.append(f"状态 {status}")
+    detail = item.get("detail")
+    if isinstance(detail, dict):
+        nested = _unevaluated_reason(detail, "")
+        if nested:
+            parts.append(nested)
+    return "；".join(parts) if parts else fallback
+
+
 def _select_gbt_rule(result: dict[str, Any], rule: str) -> None:
     """记录预选判据；缺少数据时不静默切换到另一判据。"""
     result["selected_rule"] = rule
@@ -914,7 +935,7 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
     for participant, scores in result.get("参加者统计量", {}).items():
         for statistic, score in scores.items():
             if score.get("value") is None:
-                reason = score.get("reason") or score.get("status") or "原因未登记"
+                reason = score.get("reason") or _unevaluated_reason(score, "原因未登记")
                 if blocked and reason == "指定值或分量映射未通过审核":
                     reason = f"稳定性处置为 {disposition}，参加者评价被暂停"
                     other_warnings = [
@@ -950,19 +971,27 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
         )
     for name, trend in result.get("趋势稳定性", {}).items():
         if trend.get("stable") is None:
+            reason = _unevaluated_reason(trend, "结果未提供具体原因")
             diagnostics.append(
                 {
                     "类型": "趋势未评价",
-                    "说明": f"趋势序列 {name} 未评价；斜率和标准误无法判定，"
-                    "请检查时间点与观测数据。",
+                    "说明": f"趋势序列 {name} 未评价：{reason}；请检查时间点、观测数据及拟合结果。",
                 }
             )
     for name, point in result.get("传递标准稳定性", {}).items():
         if point.get("conclusion") is None:
+            reasons = [
+                _unevaluated_reason(criterion, "")
+                for criterion in point.get("criteria", [])
+                if criterion.get("pass") is None
+            ]
+            reason = "；".join(item for item in reasons if item) or _unevaluated_reason(
+                point, "结果未提供具体原因"
+            )
             diagnostics.append(
                 {
                     "类型": "传递标准未评价",
-                    "说明": f"传递标准 {name} 未评价；请检查判据和复测数据。",
+                    "说明": f"传递标准 {name} 未评价：{reason}；请检查逐点判据和复测数据。",
                 }
             )
     if assigned_result and assigned_result.get("status") != "OK":
