@@ -13,7 +13,7 @@ from openpyxl import load_workbook
 from openpyxl.utils.cell import column_index_from_string, coordinate_from_string, get_column_letter
 
 from ..config.catalog import ENUMS
-from ..config.rules import check_assigned, check_method_config
+from ..config.rules import check_assigned, check_cross, check_method_config
 from ..core.gbt28043 import period_options as gbt_period_options
 from ..core.transfer import assess_transfer
 from ..core.trend import configured_uncertainty, fit_series
@@ -969,17 +969,6 @@ def inspect_input(
                                 "引用 ss 须明确登记分量映射；"
                                 "请选择 assigned、sigma_prime 或 both",
                             )
-                        if config_values.get("criterion_standard") != "gbt28043":
-                            issues.append(
-                                Issue(
-                                    "INVALID_CONFIG",
-                                    "方法配置",
-                                    config_cells.get("criterion_standard", ""),
-                                    config_values.get("criterion_standard"),
-                                    "hom_source=gbt_ss 时 criterion_standard 须为 "
-                                    "gbt28043；请修改标准模式",
-                                )
-                            )
                         if assigned_values.get("u_hom") not in (None, "", 0, 0.0):
                             add_assigned("u_hom", "引用 ss 时不得同时手工输入 u_hom；请清空")
         if "指定值与不确定度" in book.sheetnames and rows:
@@ -997,7 +986,12 @@ def inspect_input(
                             f"{rule.field}：{rule.message}；允许值/要求：{rule.allowed}；修改建议：{rule.hint}",
                         )
                     )
-        for rule in check_method_config(config_values):
+        cross_issues = (
+            check_cross(assigned_values, config_values)
+            if "指定值与不确定度" in book.sheetnames and rows
+            else []
+        )
+        for rule in [*check_method_config(config_values), *cross_issues]:
             issues.append(
                 Issue(
                     "INVALID_CONFIG",

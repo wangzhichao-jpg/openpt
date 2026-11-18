@@ -203,6 +203,25 @@ def check_assigned(
     return issues
 
 
+def check_cross(assigned: dict[str, Any], config: dict[str, Any]) -> list[RuleIssue]:
+    """检查指定值表与方法配置表之间的静态约束。"""
+    if (
+        assigned.get("method") not in (None, "")
+        and assigned.get("hom_source") == "gbt_ss"
+        and config.get("criterion_standard") != "gbt28043"
+    ):
+        return [
+            RuleIssue(
+                "criterion_standard",
+                config.get("criterion_standard"),
+                "hom_source=gbt_ss 时 criterion_standard 须为 gbt28043",
+                "gbt28043",
+                "修改方法配置的标准模式",
+            )
+        ]
+    return []
+
+
 def check_method_config(values: dict[str, Any]) -> list[RuleIssue]:
     """检查方法表内可静态判断的字段。"""
     issues: list[RuleIssue] = []

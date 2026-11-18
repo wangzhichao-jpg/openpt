@@ -12,7 +12,7 @@ from zipfile import BadZipFile
 
 from . import __version__
 from .config.catalog import ENUMS
-from .config.rules import check_assigned, check_method_config
+from .config.rules import check_assigned, check_cross, check_method_config
 from .config.sigma import criterion_sigma
 from .core.assigned import AssignedResult, assign_value
 from .core.decision import compare
@@ -441,7 +441,7 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
     cfg = data["config"]
     assignment = data.get("assigned_config", {})
     rule_groups = (
-        ("方法配置", check_method_config(cfg)),
+        ("方法配置", check_method_config(cfg) + check_cross(assignment, cfg)),
         ("指定值与不确定度", check_assigned(assignment, cfg)),
     )
     problems = []

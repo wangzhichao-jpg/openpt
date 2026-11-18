@@ -201,6 +201,18 @@ def test_rule_preflight_and_calculation_agree(
     assert field in str(error.value)
 
 
+def test_cross_standard_preflight_and_calculation(tmp_path: Path) -> None:
+    data = read_workbook(EXAMPLE)
+    data["config"]["criterion_standard"] = "gl003"
+    book = load_workbook(EXAMPLE)
+    _set(book, "方法配置", "criterion_standard", "gl003")
+    path = tmp_path / "cross.xlsx"
+    book.save(path)
+    assert any("criterion_standard" in issue.message for issue in inspect_input(path))
+    with pytest.raises(InputError, match="criterion_standard"):
+        calculate(data)
+
+
 def test_delta_e_missing_rule_in_preflight_and_calculation(tmp_path: Path) -> None:
     book = load_workbook(EXAMPLE)
     _set(book, "方法配置", "gbt_criterion_basis", "delta_e")
