@@ -9,6 +9,33 @@ from typing import Any, TypeGuard
 from ..io.shape import period_enum_problem
 from .catalog import ENUMS
 
+RULE_CODES: dict[str, str] = {
+    "ASSIGNED_ENUM": "指定值枚举无效",
+    "ASSIGNED_BOOL": "指定值布尔标识无效",
+    "DISPOSITION_REASON_TYPE": "稳定性处置依据类型无效",
+    "SOURCE_REQUIRED": "指定值或不确定度来源缺失",
+    "LIST_METHOD": "指定值列表不适用当前方法",
+    "LIST_INVALID": "指定值列表格式或数值无效",
+    "COMPONENT_CONFLICT": "制备分量与不确定度冲突",
+    "EXPERT_CONFLICT": "专家结果与预评定值冲突",
+    "VALUE_REQUIRED": "指定值缺失",
+    "UNCERTAINTY_REQUIRED": "指定值不确定度缺失",
+    "ASSIGNED_NUMBER": "指定值数值无效",
+    "ASSIGNED_NUMBER_NO_METHOD": "未选择指定值方法时数值非有限数",
+    "SIGMA_PROCEDURE": "能力评定标准差确定程序缺失",
+    "HOM_SS_MAPPING": "引用 ss 未登记分量映射",
+    "HOM_SS_MANUAL": "引用 ss 与手工分量冲突",
+    "HOM_SS_STANDARD": "引用 ss 的标准模式不匹配",
+    "CONFIG_BOOL": "方法配置布尔值无效",
+    "CONFIG_ENUM": "方法配置枚举无效",
+    "CONFIG_NUMBER": "方法配置数值非有限数",
+    "ALPHA_RANGE": "显著性水平超出范围",
+    "CONFIG_POSITIVE": "方法配置数值应为正",
+    "PERIOD_OPTIONS": "逐时点配置无效",
+    "TRANSFER_MAP": "参加者传递标准映射无效",
+    "DELTA_REQUIRED": "所选依据缺少 delta_e",
+}
+
 
 @dataclass(frozen=True)
 class RuleIssue:
@@ -19,6 +46,11 @@ class RuleIssue:
     message: str
     allowed: str
     hint: str
+    code: str
+
+    def __post_init__(self) -> None:
+        if self.code not in RULE_CODES:
+            raise ValueError(f"未知规则代码：{self.code}")
 
 
 ASSIGNED_ENUMS = {
@@ -92,21 +124,27 @@ def check_assigned(
     """检查指定值表的静态配置；不推断数据相关结论。"""
     issues: list[RuleIssue] = []
 
-    def add(field: str, message: str, allowed: str, hint: str) -> None:
-        issues.append(RuleIssue(field, values.get(field), message, allowed, hint))
+    def add(field: str, message: str, allowed: str, hint: str, code: str) -> None:
+        issues.append(RuleIssue(field, values.get(field), message, allowed, hint, code))
 
     method = values.get("method")
     for field, enum in ASSIGNED_ENUMS.items():
         value = values.get(field)
         if value not in (None, "") and (not isinstance(value, str) or value not in ENUMS[enum]):
-            add(field, f"{field} 配置无效", "、".join(ENUMS[enum]), "选择允许的值")
+            add(field, f"{field} 配置无效", "、".join(ENUMS[enum]), "选择允许的值", "ASSIGNED_ENUM")
     for field in ASSIGNED_BOOLEANS:
         value = values.get(field)
         if value not in (None, "") and not _bool(value):
-            add(field, f"{field} 须为布尔值", "TRUE 或 FALSE", "修改为布尔值")
+            add(field, f"{field} 须为布尔值", "TRUE 或 FALSE", "修改为布尔值", "ASSIGNED_BOOL")
     reason = values.get("stability_disposition_reason")
     if reason not in (None, "") and not isinstance(reason, str):
-        add("stability_disposition_reason", "稳定性处置依据须为文字", "文字", "填写书面依据")
+        add(
+            "stability_disposition_reason",
+            "稳定性处置依据须为文字",
+            "文字",
+            "填写书面依据",
+            "DISPOSITION_REASON_TYPE",
+        )
     if method in (None, ""):
         # 无定值方法时仍检查已填写的数值字段，避免遗漏模板输入错误。
         for field in (
@@ -122,7 +160,13 @@ def check_assigned(
         ):
             value = values.get(field)
             if value not in (None, "") and not _number(value):
-                add(field, f"{field} 必须为有限数", "有限数", "修改数值")
+                add(
+                    field,
+                    f"{field} 必须为有限数",
+                    "有限数",
+                    "修改数值",
+                    "ASSIGNED_NUMBER_NO_METHOD",
+                )
         return issues
     for field, message in (
         ("source", "指定值来源必填"),
@@ -130,7 +174,7 @@ def check_assigned(
     ):
         value = values.get(field)
         if not isinstance(value, str) or not value.strip():
-            add(field, message, "非空文字", "填写来源")
+            add(field, message, "非空文字", "填写来源", "SOURCE_REQUIRED")
     components, experts = values.get("known_components"), values.get("expert_values")
     for field, raw, expected in (
         ("known_components", components, "known"),
@@ -139,7 +183,13 @@ def check_assigned(
         if raw in (None, ""):
             continue
         if method != expected:
-            add(field, f"{field} 仅适用于 {expected} 方法", expected, "清空该字段或修改方法")
+            add(
+                field,
+                f"{field} 仅适用于 {expected} 方法",
+                expected,
+                "清空该字段或修改方法",
+                "LIST_METHOD",
+            )
         try:
             numbers = (
                 [float(item.strip()) for item in raw.split(",")] if isinstance(raw, str) else []
@@ -150,7 +200,13 @@ def check_assigned(
         except (ValueError, OverflowError):
             valid = False
         if not valid:
-            add(field, "列表格式或数值无效", "逗号分隔的有限数；专家至少两个，分量非负", "修改列表")
+            add(
+                field,
+                "列表格式或数值无效",
+                "逗号分隔的有限数；专家至少两个，分量非负",
+                "修改列表",
+                "LIST_INVALID",
+            )
     if (
         method == "known"
         and components not in (None, "")
@@ -161,6 +217,7 @@ def check_assigned(
             "已知值不可同时输入基础不确定度和制备分量",
             "二者只能填一个",
             "清空其中一个",
+            "COMPONENT_CONFLICT",
         )
     if (
         method == "expert_consensus"
@@ -172,16 +229,23 @@ def check_assigned(
             "专家结果与预先评定的值或不确定度不可同时输入",
             "二者不可同时填写",
             "清空冲突字段",
+            "EXPERT_CONFLICT",
         )
     if method in ("known", "certified", "reference", "expert_consensus") and not (
         method == "expert_consensus" and experts not in (None, "")
     ):
         if values.get("value") in (None, ""):
-            add("value", "该方法须填写指定值", "有限数", "填写指定值")
+            add("value", "该方法须填写指定值", "有限数", "填写指定值", "VALUE_REQUIRED")
         if not (method == "known" and components not in (None, "")) and values.get(
             "uncertainty"
         ) in (None, ""):
-            add("uncertainty", "该方法须填写标准不确定度", "非负有限数", "填写标准不确定度")
+            add(
+                "uncertainty",
+                "该方法须填写标准不确定度",
+                "非负有限数",
+                "填写标准不确定度",
+                "UNCERTAINTY_REQUIRED",
+            )
     for field in (
         "value",
         "uncertainty",
@@ -200,11 +264,17 @@ def check_assigned(
         nonnegative = field in ("uncertainty", "u_hom", "u_stab", "u_trans", "U_assigned")
         if not _number(value) or (positive and value <= 0) or (nonnegative and value < 0):
             allowed = "正有限数" if positive else "非负有限数" if nonnegative else "有限数"
-            add(field, f"{field} 数值无效", allowed, "修改数值")
+            add(field, f"{field} 数值无效", allowed, "修改数值", "ASSIGNED_NUMBER")
     if any(values.get(field) not in (None, "") for field in ("sigma_temporary", "sigma_final")):
         value = values.get("sigma_procedure")
         if not isinstance(value, str) or not value.strip():
-            add("sigma_procedure", "须登记 σ_pt 确定程序", "非空文字", "填写确定程序")
+            add(
+                "sigma_procedure",
+                "须登记 σ_pt 确定程序",
+                "非空文字",
+                "填写确定程序",
+                "SIGMA_PROCEDURE",
+            )
     if values.get("hom_source") == "gbt_ss":
         if values.get("hom_mapping") not in ("assigned", "sigma_prime", "both"):
             add(
@@ -212,9 +282,16 @@ def check_assigned(
                 "hom_source=gbt_ss 时引用 ss 须明确登记分量映射",
                 "assigned、sigma_prime 或 both",
                 "选择分量映射",
+                "HOM_SS_MAPPING",
             )
         if values.get("u_hom") not in (None, "", 0, 0.0):
-            add("u_hom", "引用 ss 时不得同时手工输入 u_hom", "空白或零", "清空手工 u_hom")
+            add(
+                "u_hom",
+                "引用 ss 时不得同时手工输入 u_hom",
+                "空白或零",
+                "清空手工 u_hom",
+                "HOM_SS_MANUAL",
+            )
         # 标准模式属于方法表，由调用方按该表定位。
     return issues
 
@@ -233,6 +310,7 @@ def check_cross(assigned: dict[str, Any], config: dict[str, Any]) -> list[RuleIs
                 "hom_source=gbt_ss 时 criterion_standard 须为 gbt28043",
                 "gbt28043",
                 "修改方法配置的标准模式",
+                "HOM_SS_STANDARD",
             )
         ]
     return []
@@ -242,15 +320,15 @@ def check_method_config(values: dict[str, Any]) -> list[RuleIssue]:
     """检查方法表内可静态判断的字段。"""
     issues: list[RuleIssue] = []
 
-    def add(field: str, message: str, allowed: str, hint: str) -> None:
-        issues.append(RuleIssue(field, values.get(field), message, allowed, hint))
+    def add(field: str, message: str, allowed: str, hint: str, code: str) -> None:
+        issues.append(RuleIssue(field, values.get(field), message, allowed, hint, code))
 
     for field, value in values.items():
         if value in (None, ""):
             continue
         if field in METHOD_BOOLEANS:
             if not _bool(value, method=True):
-                add(field, f"{field} 须为布尔值", "TRUE 或 FALSE", "修改为布尔值")
+                add(field, f"{field} 须为布尔值", "TRUE 或 FALSE", "修改为布尔值", "CONFIG_BOOL")
         elif field in ENUMS and field not in ASSIGNED_ENUMS and field not in ASSIGNED_BOOLEANS:
             aliases = {"两均值", "单均值", "均值差法（GL003 5.3）", "回归趋势法"}
             valid = isinstance(value, str) and (
@@ -262,21 +340,27 @@ def check_method_config(values: dict[str, Any]) -> list[RuleIssue]:
                     if field in ("gbt_hom_rule", "gbt_stability_rule")
                     else f"{field} 配置无效"
                 )
-                add(field, message, "、".join(ENUMS[field]), "选择允许的值")
+                add(field, message, "、".join(ENUMS[field]), "选择允许的值", "CONFIG_ENUM")
     for field in METHOD_NUMBERS:
         value = values.get(field)
         if value not in (None, "") and not _number(value):
-            add(field, f"{field} 必须为有限数", "有限数", "修改数值")
+            add(field, f"{field} 必须为有限数", "有限数", "修改数值", "CONFIG_NUMBER")
     alpha = values.get("alpha")
     if _number(alpha) and not 0 < alpha < 1:
-        add("alpha", "alpha 必须在 0 和 1 之间", "0 < alpha < 1", "修改显著性水平")
+        add("alpha", "alpha 必须在 0 和 1 之间", "0 < alpha < 1", "修改显著性水平", "ALPHA_RANGE")
     for field in ("sigma", "sigma_pt", "delta_e"):
         value = values.get(field)
         if _number(value) and value <= 0:
-            add(field, f"{field} 必须为正有限数", "正有限数", "修改数值")
+            add(field, f"{field} 必须为正有限数", "正有限数", "修改数值", "CONFIG_POSITIVE")
     period_problem = period_enum_problem(values.get("stability_period_options"))
     if period_problem:
-        add("stability_period_options", period_problem, "有效逐时点 JSON 配置", "修正逐时点配置")
+        add(
+            "stability_period_options",
+            period_problem,
+            "有效逐时点 JSON 配置",
+            "修正逐时点配置",
+            "PERIOD_OPTIONS",
+        )
     raw = values.get("transfer_en_map")
     if raw not in (None, ""):
         try:
@@ -300,6 +384,7 @@ def check_method_config(values: dict[str, Any]) -> list[RuleIssue]:
                 "transfer_en_map 须为有效 JSON 对象",
                 "参加者编号到标准器|校准点的 JSON 对象",
                 "修正 JSON 格式及映射",
+                "TRANSFER_MAP",
             )
     if (
         values.get("criterion_standard") == "gbt28043"
@@ -311,5 +396,6 @@ def check_method_config(values: dict[str, Any]) -> list[RuleIssue]:
             "所选 gbt_criterion_basis 缺少对应输入",
             "正有限数",
             "填写 delta_e，或选择有对应输入的判据依据",
+            "DELTA_REQUIRED",
         )
     return issues

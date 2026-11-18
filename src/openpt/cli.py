@@ -474,6 +474,8 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
                     "sheet": sheet,
                     "cell": cell,
                     "original": value,
+                    "code": issue.code,
+                    "field": issue.field,
                     "message": f"{issue.field}：{issue.message}；允许值/要求：{issue.allowed}；"
                     f"修改建议：{issue.hint}",
                 }
@@ -489,11 +491,13 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
                 allowed=issue.allowed,
                 hint=issue.hint,
                 value=issue.value,
+                issues=problems,
             )
         raise InputError(
             format_error(
                 InputError("输入校验问题：" + json.dumps(problems, ensure_ascii=False, default=str))
-            )
+            ),
+            issues=problems,
         )
     alpha = float(_option(cfg, "alpha", 0.05))
     sigma = criterion_sigma(cfg)

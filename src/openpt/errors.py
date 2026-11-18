@@ -19,6 +19,7 @@ class InputError(ValueError):
         sheet: str | None = None,
         field: str | None = None,
         fields: list[str] | None = None,
+        issues: list[dict[str, Any]] | None = None,
         allowed: str | None = None,
         hint: str | None = None,
         value: Any = _MISSING,
@@ -27,6 +28,7 @@ class InputError(ValueError):
         self.sheet = sheet
         self.field = field
         self.fields = fields or []
+        self.issues = issues or []
         self.allowed = allowed
         self.hint = hint
         self.value = value
@@ -60,7 +62,7 @@ def locate(exc: InputError, data: dict[str, Any]) -> InputError:
             message += f"；允许值/要求：{exc.allowed}"
         if exc.hint:
             message += f"；修改建议：{exc.hint}"
-        return InputError(message)
+        return InputError(message, issues=exc.issues)
     cell_info = data.get("_cells", {}).get((sheet, exc.field))
     value = exc.value
     location = f"『{sheet}』字段 {exc.field}"
@@ -81,7 +83,7 @@ def locate(exc: InputError, data: dict[str, Any]) -> InputError:
         message += f"；允许值/要求：{exc.allowed}"
     if exc.hint:
         message += f"；修改建议：{exc.hint}"
-    return InputError(message)
+    return InputError(message, issues=exc.issues)
 
 
 def sheet_call(sheet: str, function: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:

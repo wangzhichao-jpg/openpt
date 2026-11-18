@@ -41,6 +41,8 @@ class Issue:
     cell: str
     original: Any
     message: str
+    code: str | None = None
+    field: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """返回可序列化的问题记录。"""
@@ -715,7 +717,7 @@ def inspect_input(
         if "指定值与不确定度" in book.sheetnames and rows:
             for rule in check_assigned(assigned_values, config_values):
                 if not any(
-                    i.sheet == "指定值与不确定度" and i.message.startswith(rule.field + "：")
+                    i.sheet == "指定值与不确定度" and i.field == rule.field and i.code == rule.code
                     for i in issues
                 ):
                     issues.append(
@@ -725,6 +727,8 @@ def inspect_input(
                             assigned_cells.get(rule.field, ""),
                             rule.value,
                             f"{rule.field}：{rule.message}；允许值/要求：{rule.allowed}；修改建议：{rule.hint}",
+                            code=rule.code,
+                            field=rule.field,
                         )
                     )
         cross_issues = (
@@ -740,6 +744,8 @@ def inspect_input(
                     config_cells.get(rule.field, ""),
                     rule.value,
                     f"{rule.field}：{rule.message}；允许值/要求：{rule.allowed}；修改建议：{rule.hint}",
+                    code=rule.code,
+                    field=rule.field,
                 )
             )
         method = config_values.get("stability_method") or "two_sample"
