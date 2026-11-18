@@ -3,10 +3,58 @@
 
 import json
 import re
+from typing import Any
+
+_MISSING = object()
 
 
 class InputError(ValueError):
-    """输入无法用于选定计算；可包含工作表和单元格位置。"""
+    """输入错误；字段定位信息不改变原始错误字符串。"""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        sheet: str | None = None,
+        field: str | None = None,
+        allowed: str | None = None,
+        hint: str | None = None,
+        value: Any = _MISSING,
+    ) -> None:
+        super().__init__(message)
+        self.sheet = sheet
+        self.field = field
+        self.allowed = allowed
+        self.hint = hint
+        self.value = value
+
+
+def locate(exc: InputError, data: dict[str, Any]) -> InputError:
+    """用输入工作簿的字段位置补全错误；无字段时不改变原消息。"""
+    if not exc.field:
+        return exc
+    sheet = exc.sheet or "指定值与不确定度"
+    cell_info = data.get("_cells", {}).get((sheet, exc.field))
+    value = exc.value
+    location = f"『{sheet}』字段 {exc.field}"
+    if cell_info:
+        cell, value = cell_info
+        match = re.search(r"\d+", cell)
+        row = f"第{match.group()}行" if match else ""
+        shown = (
+            "空白"
+            if value is None or value == ""
+            else f"「{value}」"
+            if isinstance(value, str)
+            else str(value)
+        )
+        location = f"『{sheet}』{row}（{cell}，当前值：{shown}）：{exc.field}"
+    message = f"{location}：{exc}"
+    if exc.allowed:
+        message += f"；允许值/要求：{exc.allowed}"
+    if exc.hint:
+        message += f"；修改建议：{exc.hint}"
+    return InputError(message)
 
 
 def format_error(exc: Exception) -> str:

@@ -745,8 +745,18 @@ def read_workbook(
         for cell in row
         if isinstance(cell.value, (int, float)) and not isinstance(cell.value, bool)
     }
+    cells: dict[tuple[str, str], tuple[str, Any]] = {}
+    if suffix != ".csv":
+        for sheet in ("项目信息", "方法配置", "指定值与不确定度"):
+            for row in _rows(book, sheet):
+                if row[0].value:
+                    label = str(row[0].value)
+                    match = re.search(r"（([a-zA-Z_][a-zA-Z_0-9]*)）$", label)
+                    key = match.group(1) if match else label
+                    cells[(sheet, key)] = (row[1].coordinate, row[1].value)
     return {
         "info": info,
+        "_cells": cells,
         "numeric_sources": numeric_sources,
         "batches": _batches(book),
         "assigned_config": assigned,

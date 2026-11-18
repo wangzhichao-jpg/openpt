@@ -27,7 +27,7 @@ from .core.stability import analyze as stability
 from .core.transfer import assess_transfer, summarize_transfer
 from .core.trend import configured_uncertainty, fit_series
 from .core.zscore import zscore
-from .errors import InputError, format_error
+from .errors import InputError, format_error, locate
 from .io.excel import template
 from .io.shape import stability_structure_problem
 from .report.docx import make_report
@@ -90,12 +90,27 @@ def _gbt_stability_disposition(
     disposition = _option(options, "stability_disposition", "pending")
     reason = _option(options, "stability_disposition_reason", "")
     if disposition not in ENUMS["stability_disposition"]:
-        raise InputError("stability_disposition 应为 pending、budgeted、reviewed 或 withhold")
+        raise InputError(
+            "stability_disposition 应为 pending、budgeted、reviewed 或 withhold",
+            field="stability_disposition",
+            allowed="pending、budgeted、reviewed 或 withhold",
+            hint="选择有效处置",
+        )
     if not isinstance(reason, str):
-        raise InputError("稳定性处置依据须为文字")
+        raise InputError(
+            "稳定性处置依据须为文字",
+            field="stability_disposition_reason",
+            allowed="文字",
+            hint="填写书面依据",
+        )
     flagged = {name: p for name, p in periods.items() if p.get("conclusion") is not True}
     if disposition in ("budgeted", "reviewed") and flagged and not reason.strip():
-        raise InputError("稳定性处置须登记书面依据")
+        raise InputError(
+            "稳定性处置须登记书面依据",
+            field="stability_disposition_reason",
+            allowed="非空文字",
+            hint="填写授权审核的书面依据",
+        )
     if disposition == "budgeted" and flagged:
         storage_flagged = any(p.get("kind") != "transport" for p in flagged.values())
         transport_flagged = any(p.get("kind") == "transport" for p in flagged.values())
@@ -140,7 +155,12 @@ def _transfer_score_options(
             output: dict[str, Any] = {}
             for item_key, value in items:
                 if item_key in output:
-                    raise InputError("transfer_en_map 含重复参加者编号")
+                    raise InputError(
+                        "transfer_en_map 含重复参加者编号",
+                        sheet="方法配置",
+                        field="transfer_en_map",
+                        hint="删除重复编号",
+                    )
                 output[item_key] = value
             return output
 
@@ -149,11 +169,23 @@ def _transfer_score_options(
                 json.loads(raw, object_pairs_hook=unique_pairs) if isinstance(raw, str) else raw
             )
         except ValueError:
-            raise InputError("transfer_en_map 须为有效 JSON 对象") from None
+            raise InputError(
+                "transfer_en_map 须为有效 JSON 对象",
+                sheet="方法配置",
+                field="transfer_en_map",
+                allowed="JSON 对象",
+                hint="修正 JSON 格式",
+            ) from None
         if not isinstance(mapping, dict) or not all(
             isinstance(k, str) and isinstance(v, str) for k, v in mapping.items()
         ):
-            raise InputError("transfer_en_map 须将参加者编号映射到标准器|校准点")
+            raise InputError(
+                "transfer_en_map 须将参加者编号映射到标准器|校准点",
+                sheet="方法配置",
+                field="transfer_en_map",
+                allowed="字符串到字符串的 JSON 对象",
+                hint="逐个登记参加者与校准点",
+            )
         key = mapping.get(participant_id)
     else:
         key = next(iter(points)) if len(points) == 1 else None
@@ -182,7 +214,12 @@ def _transfer_score_options(
             or not math.isfinite(base)
             or base < 0
         ):
-            raise InputError("参考值扩展不确定度须为非负有限数")
+            raise InputError(
+                "参考值扩展不确定度须为非负有限数",
+                field="U_assigned",
+                allowed="非负有限数",
+                hint="修改扩展不确定度",
+            )
         return {"U_assigned": math.hypot(base, 2 * point["u_stab"])}, None, source
     if options.get("mechanism") == "B":
         return {"U_E": point["U_E"], "stability_in_U_ref": already}, None, source
@@ -221,17 +258,28 @@ def _assigned_results(
     options = {key: a[key] for key in keys if key in a}
     hom_source = a.get("hom_source") or "manual"
     if hom_source not in ENUMS["hom_source"]:
-        raise InputError("hom_source 应为 manual 或 gbt_ss")
+        raise InputError(
+            "hom_source 应为 manual 或 gbt_ss", field="hom_source", allowed="manual 或 gbt_ss"
+        )
     if hom_source == "gbt_ss":
         if _option(data["config"], "criterion_standard", "gl003") != "gbt28043":
-            raise InputError("从标准模式引用 ss 须选择 gbt28043")
+            raise InputError(
+                "从标准模式引用 ss 须选择 gbt28043",
+                sheet="方法配置",
+                field="criterion_standard",
+                allowed="gbt28043",
+            )
         h = calculations.get("GB/T均匀性")
         if not h:
             raise InputError("引用 ss 须提供均匀性数据")
         if a.get("hom_mapping") not in ("assigned", "sigma_prime", "both"):
-            raise InputError("引用 ss 须明确登记分量映射")
+            raise InputError(
+                "引用 ss 须明确登记分量映射",
+                field="hom_mapping",
+                allowed="assigned、sigma_prime 或 both",
+            )
         if a.get("u_hom") not in (None, "", 0, 0.0):
-            raise InputError("引用 ss 时不得同时手工输入 u_hom")
+            raise InputError("引用 ss 时不得同时手工输入 u_hom", field="u_hom", hint="清空手工值")
         options["u_hom"] = h["ss"]
     if (
         a.get("method") == "participant_consensus"
@@ -354,6 +402,17 @@ def _select_gbt_rule(result: dict[str, Any], rule: str) -> None:
 
 
 def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]:
+    """计算并为结构化输入错误补充来源位置。"""
+    try:
+        return _calculate(data, review_mode)
+    except InputError as exc:
+        located = locate(exc, data)
+        if located is exc:
+            raise
+        raise located from None
+
+
+def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]:
     """根据输入选择 GL003 与 GL002 计算方法。"""
     if data.get("measurands"):
         return {
@@ -369,7 +428,12 @@ def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]
         raise ValueError("旧配置 gbt28043_extension 不支持；请使用 criterion_standard")
     standard = _option(cfg, "criterion_standard", "gl003")
     if standard not in ENUMS["criterion_standard"]:
-        raise InputError("criterion_standard 应为 gl003 或 gbt28043")
+        raise InputError(
+            "criterion_standard 应为 gl003 或 gbt28043",
+            sheet="方法配置",
+            field="criterion_standard",
+            allowed="gl003 或 gbt28043",
+        )
     delta_e = cfg.get("delta_e")
     delta_e = None if delta_e in (None, "") else delta_e
     basis_option = cfg.get("gbt_criterion_basis") or None
@@ -394,7 +458,12 @@ def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]
         raise InputError("趋势稳定性须选择 regression_trend 方法")
     if trend_input:
         if not isinstance(_option(cfg, "trend_plot", False), bool):
-            raise InputError("trend_plot 须为布尔值")
+            raise InputError(
+                "trend_plot 须为布尔值",
+                sheet="方法配置",
+                field="trend_plot",
+                allowed="TRUE 或 FALSE",
+            )
         if data.get("stability"):
             raise InputError("回归趋势法不能混用稳定性工作表")
         result["趋势稳定性"] = fit_series(
@@ -427,10 +496,20 @@ def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]
                     "主判据或严格配置；请清空 gl003_hom_criterion 并关闭 strict_homogeneity"
                 )
             if not 0 < alpha < 1:
-                raise InputError("alpha 必须在 0 和 1 之间")
+                raise InputError(
+                    "alpha 必须在 0 和 1 之间",
+                    sheet="方法配置",
+                    field="alpha",
+                    allowed="0 < alpha < 1",
+                )
             stage = _option(cfg, "sigma_stage", None)
             if stage is not None and stage not in ENUMS["sigma_stage"]:
-                raise InputError("sigma 阶段应为 temporary 或 final")
+                raise InputError(
+                    "sigma 阶段应为 temporary 或 final",
+                    sheet="方法配置",
+                    field="sigma_stage",
+                    allowed="temporary 或 final",
+                )
             result["均匀性"] = single_homogeneity(data["homogeneity"], sigma)
             result["均匀性"]["sigma_source"] = _option(cfg, "sigma_source", None)
             result["均匀性"]["sigma_stage"] = stage if sigma is not None else None

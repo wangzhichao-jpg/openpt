@@ -3,9 +3,11 @@
 
 from pathlib import Path
 
+import pytest
 from docx import Document
 from openpyxl import load_workbook
 
+from openpt.errors import InputError, locate
 from openpt.io.validation import inspect_input
 from openpt.windows_app import error_dialog_summary, result_text_content, run_workbook, summarize
 
@@ -114,6 +116,43 @@ def test_result_area_and_dialog_summary() -> None:
     assert "完整清单见结果区" in error_dialog_summary(text)
     assert "7. 错误" not in error_dialog_summary(text)
     assert "结果目录：" in result_text_content("【诊断提示】", Path("output"))
+
+
+def test_calculation_errors_located(tmp_path: Path) -> None:
+    book = load_workbook(EXAMPLE)
+    _set(book, "方法配置", "sigma", None)
+    _set(book, "指定值与不确定度", "stability_disposition", "reviewed")
+    path = tmp_path / "reviewed.xlsx"
+    book.save(path)
+    with pytest.raises(InputError, match=r"第28行.*stability_disposition_reason"):
+        run_workbook(path, tmp_path / "runs1")
+    book = load_workbook(EXAMPLE)
+    for field, value in (
+        ("method", "known"),
+        ("value", 100),
+        ("uncertainty", 1),
+        ("known_components", "1,2"),
+    ):
+        _set(book, "指定值与不确定度", field, value)
+    path = tmp_path / "known.xlsx"
+    book.save(path)
+    with pytest.raises(InputError, match=r"第.*行.*known_components"):
+        run_workbook(path, tmp_path / "runs2")
+    path = tmp_path / "transfer.xlsx"
+    book = load_workbook(
+        Path(__file__).resolve().parents[1] / "examples/synthetic/transfer_synthetic.xlsx"
+    )
+    book["方法配置"].append(["transfer_en_map", "{bad"])
+    book.save(path)
+    with pytest.raises(InputError, match=r"『方法配置』第.*行.*transfer_en_map"):
+        run_workbook(path, tmp_path / "runs3")
+
+
+def test_error_location_fallback() -> None:
+    exc = InputError("无效", sheet="方法配置", field="sigma")
+    assert str(locate(exc, {})) == "『方法配置』字段 sigma：无效"
+    exc = InputError("无字段错误")
+    assert locate(exc, {}) is exc
 
 
 def test_synthetic_gbt_example_scores(tmp_path: Path) -> None:

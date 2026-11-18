@@ -50,14 +50,29 @@ class AssignedResult(ResultMapping):
 
 def _number(value: Any, label: str, *, nonnegative: bool = False) -> float:
     """检查有限数和非负不确定度。"""
+    field = {
+        "指定值": "value",
+        "指定值标准不确定度": "uncertainty",
+        "临时σ_pt": "sigma_temporary",
+        "最终σ_pt": "sigma_final",
+        "制备标准不确定度分量": "known_components",
+        "专家结果": "expert_values",
+    }.get(label, label)
     if isinstance(value, bool) or not isinstance(value, (int, float)):
-        raise InputError(f"{label}须为有限数值")
+        raise InputError(
+            f"{label}须为有限数值", field=field, allowed="有限数值", hint="填写有效数值"
+        )
     try:
         number = float(value)
     except OverflowError:
-        raise InputError(f"{label}数值溢出") from None
+        raise InputError(f"{label}数值溢出", field=field, hint="检查数值范围") from None
     if not math.isfinite(number) or (nonnegative and number < 0):
-        raise InputError(f"{label}无效")
+        raise InputError(
+            f"{label}无效",
+            field=field,
+            allowed="非负有限数" if nonnegative else "有限数",
+            hint="修改输入数值",
+        )
     return number
 
 
@@ -95,19 +110,31 @@ def assign_value(
     外部定值和不确定度应由经批准的预算输入；分量按独立假定合成。
     """
     if method not in METHODS:
-        raise InputError("未知指定值方法")
+        raise InputError(
+            "未知指定值方法", field="method", allowed="、".join(METHODS), hint="选择指定值方法"
+        )
     if known_components is not None and method != "known":
-        raise InputError("制备分量仅适用于已知值方法")
+        raise InputError(
+            "制备分量仅适用于已知值方法",
+            field="known_components",
+            hint="清空该字段或选择 known 方法",
+        )
     if expert_values is not None and method != "expert_consensus":
-        raise InputError("专家结果仅适用于专家公议方法")
+        raise InputError(
+            "专家结果仅适用于专家公议方法", field="expert_values", hint="清空该字段或选择专家公议"
+        )
     if not isinstance(source, str) or not source.strip():
-        raise InputError("指定值来源必填")
+        raise InputError("指定值来源必填", field="source", hint="填写来源")
     if not isinstance(uncertainty_source, str) or not uncertainty_source.strip():
-        raise InputError("指定值不确定度来源必填")
+        raise InputError("指定值不确定度来源必填", field="uncertainty_source", hint="填写来源")
     if hom_mapping not in ENUMS["hom_mapping"] or stab_mapping not in ENUMS["stab_mapping"]:
         raise InputError("分量映射无效")
     if trans_mapping not in ENUMS["trans_mapping"]:
-        raise InputError("运输分量只能映射至指定值不确定度或不分配")
+        raise InputError(
+            "运输分量只能映射至指定值不确定度或不分配",
+            field="trans_mapping",
+            allowed="none 或 assigned",
+        )
     if not all(
         isinstance(v, bool) for v in (hom_in_base, stab_in_base, trans_in_base, trans_in_stab)
     ):
@@ -120,7 +147,7 @@ def assign_value(
     if any(x is not None and x <= 0 for x in (temporary, final)):
         raise InputError("σ_pt 必须为正")
     if (temporary is not None or final is not None) and not sigma_procedure.strip():
-        raise InputError("须登记 σ_pt 确定程序")
+        raise InputError("须登记 σ_pt 确定程序", field="sigma_procedure", hint="填写确定程序")
     warnings: list[str] = []
     components: list[float] | None = None
     expert: list[float] | None = None
@@ -144,14 +171,22 @@ def assign_value(
             if scale == 0:
                 warnings.append("NIQR 为零，指定值不作评价")
         else:
-            raise InputError("未知参加者公议方法")
+            raise InputError(
+                "未知参加者公议方法", field="consensus_method", allowed="robust_mean 或 median"
+            )
         base_u = CONSENSUS_U_FACTOR * (scale / math.sqrt(count))
         formula = "u(X)=1.25·s*/√p；GB/T 28043-2019 7.7.3 式(6)"
     elif method == "known" and known_components is not None:
         if uncertainty is not None:
-            raise InputError("已知值不可同时输入基础不确定度和制备分量")
+            raise InputError(
+                "已知值不可同时输入基础不确定度和制备分量",
+                field="known_components",
+                hint="清空制备分量或基础不确定度之一",
+            )
         if not isinstance(known_components, (list, tuple)) or not known_components:
-            raise InputError("制备分量须为非空列表")
+            raise InputError(
+                "制备分量须为非空列表", field="known_components", hint="填写非空数值列表"
+            )
         components = [
             _number(item, "制备标准不确定度分量", nonnegative=True) for item in known_components
         ]
@@ -162,7 +197,9 @@ def assign_value(
         if value is not None or uncertainty is not None:
             raise InputError("专家结果与预先评定的值或不确定度不可同时输入")
         if not isinstance(expert_values, (list, tuple)) or len(expert_values) < 2:
-            raise InputError("专家公议至少需要两个专家结果")
+            raise InputError(
+                "专家公议至少需要两个专家结果", field="expert_values", hint="填写至少两个专家结果"
+            )
         expert = [_number(item, "专家结果") for item in expert_values]
         try:
             x = statistics.mean(expert)
