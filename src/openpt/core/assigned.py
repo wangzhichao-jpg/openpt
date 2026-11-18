@@ -128,7 +128,9 @@ def assign_value(
     if not isinstance(uncertainty_source, str) or not uncertainty_source.strip():
         raise InputError("指定值不确定度来源必填", field="uncertainty_source", hint="填写来源")
     if hom_mapping not in ENUMS["hom_mapping"] or stab_mapping not in ENUMS["stab_mapping"]:
-        raise InputError("分量映射无效")
+        raise InputError(
+            "分量映射无效", fields=["hom_mapping", "stab_mapping"], hint="检查两个分量映射"
+        )
     if trans_mapping not in ENUMS["trans_mapping"]:
         raise InputError(
             "运输分量只能映射至指定值不确定度或不分配",
@@ -138,14 +140,20 @@ def assign_value(
     if not all(
         isinstance(v, bool) for v in (hom_in_base, stab_in_base, trans_in_base, trans_in_stab)
     ):
-        raise InputError("基础不确定度包含分量的标识必须为布尔值")
+        raise InputError(
+            "基础不确定度包含分量的标识必须为布尔值",
+            fields=["hom_in_base", "stab_in_base", "trans_in_base", "trans_in_stab"],
+            allowed="TRUE 或 FALSE",
+        )
     uh = _number(u_hom, "u_hom", nonnegative=True)
     us = _number(u_stab, "u_stab", nonnegative=True)
     ut = _number(u_trans, "u_trans", nonnegative=True)
     temporary = None if sigma_temporary is None else _number(sigma_temporary, "临时σ_pt")
     final = None if sigma_final is None else _number(sigma_final, "最终σ_pt")
     if any(x is not None and x <= 0 for x in (temporary, final)):
-        raise InputError("σ_pt 必须为正")
+        raise InputError(
+            "σ_pt 必须为正", fields=["sigma_temporary", "sigma_final"], allowed="正有限数"
+        )
     if (temporary is not None or final is not None) and not sigma_procedure.strip():
         raise InputError("须登记 σ_pt 确定程序", field="sigma_procedure", hint="填写确定程序")
     warnings: list[str] = []
@@ -195,7 +203,11 @@ def assign_value(
         formula = "扩展方法（独立分量合成）：u_base=√Σuᵢ²；GL002 4.3.1 a、4.3.2"
     elif method == "expert_consensus" and expert_values is not None:
         if value is not None or uncertainty is not None:
-            raise InputError("专家结果与预先评定的值或不确定度不可同时输入")
+            raise InputError(
+                "专家结果与预先评定的值或不确定度不可同时输入",
+                fields=["expert_values", "value", "uncertainty"],
+                hint="清空冲突输入",
+            )
         if not isinstance(expert_values, (list, tuple)) or len(expert_values) < 2:
             raise InputError(
                 "专家公议至少需要两个专家结果", field="expert_values", hint="填写至少两个专家结果"

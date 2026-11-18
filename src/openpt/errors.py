@@ -17,6 +17,7 @@ class InputError(ValueError):
         *,
         sheet: str | None = None,
         field: str | None = None,
+        fields: list[str] | None = None,
         allowed: str | None = None,
         hint: str | None = None,
         value: Any = _MISSING,
@@ -24,6 +25,7 @@ class InputError(ValueError):
         super().__init__(message)
         self.sheet = sheet
         self.field = field
+        self.fields = fields or []
         self.allowed = allowed
         self.hint = hint
         self.value = value
@@ -31,9 +33,33 @@ class InputError(ValueError):
 
 def locate(exc: InputError, data: dict[str, Any]) -> InputError:
     """用输入工作簿的字段位置补全错误；无字段时不改变原消息。"""
-    if not exc.field:
+    if not exc.field and not exc.fields:
         return exc
     sheet = exc.sheet or "指定值与不确定度"
+    if exc.fields:
+        pieces = []
+        for field in exc.fields:
+            entry = data.get("_cells", {}).get((sheet, field))
+            if entry:
+                cell, value = entry
+                match = re.search(r"\d+", cell)
+                row = f"第{match.group()}行" if match else ""
+                shown = (
+                    "空白"
+                    if value is None or value == ""
+                    else f"「{value}」"
+                    if isinstance(value, str)
+                    else str(value)
+                )
+                pieces.append(f"{row} {field}（{cell}，当前值：{shown}）")
+            else:
+                pieces.append(f"字段 {field}")
+        message = f"『{sheet}』" + "、".join(pieces) + f"：{exc}"
+        if exc.allowed:
+            message += f"；允许值/要求：{exc.allowed}"
+        if exc.hint:
+            message += f"；修改建议：{exc.hint}"
+        return InputError(message)
     cell_info = data.get("_cells", {}).get((sheet, exc.field))
     value = exc.value
     location = f"『{sheet}』字段 {exc.field}"
