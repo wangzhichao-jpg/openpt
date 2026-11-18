@@ -829,7 +829,8 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
                 "类型": "统计量暂停",
                 "层级": "后果",
                 "说明": f"{cause}稳定性处置为 {disposition}，未得出通过结论的时间组：{names}；"
-                "请补充判据及数据，或由授权人员评定并登记 budgeted、reviewed 或 withhold 处置及依据。",
+                "请补充判据及数据，或由授权人员评定并登记 "
+                "budgeted、reviewed 或 withhold 处置及依据。",
             }
         )
     grouped_scores: dict[tuple[str, str], list[str]] = {}
@@ -839,13 +840,13 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
                 reason = score.get("reason") or score.get("status") or "原因未登记"
                 if blocked and reason == "指定值或分量映射未通过审核":
                     reason = f"稳定性处置为 {disposition}，参加者评价被暂停"
-                    extra = [
+                    other_warnings = [
                         w
                         for w in assigned_result.get("warnings", [])
                         if w != "稳定性或运输处置未完成，或已登记暂停评价"
                     ]
-                    if extra:
-                        reason += "；" + "；".join(extra)
+                    if other_warnings:
+                        reason += "；" + "；".join(other_warnings)
                 grouped_scores.setdefault((statistic, str(reason)), []).append(str(participant))
     for (statistic, reason), participants in grouped_scores.items():
         if "参加者 u(x)" in reason:
