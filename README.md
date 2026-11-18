@@ -5,7 +5,7 @@
 - **国内入口：**[Gitee 下载 Windows 免安装版 0.2.3](https://gitee.com/bigtaurus/openpt/releases#release-v0.2.3)（Gitee 本地附件）。
 - **备用入口：**[GitHub 下载 Windows 免安装版 0.2.3](https://github.com/wangzhichao-jpg/openpt/releases/tag/v0.2.3)。
 
-两个入口均提供 0.2.3，包含甲醛、材料抗拉强度、颗粒振实密度和数字多用表四个示例。
+两个入口均提供 0.2.3，包含甲醛、材料抗拉强度、颗粒振实密度和数字多用表四个示例。当前开发源码另含 GB/T 28043 合成检测示例；该示例不在上述已发布安装包中。
 
 下载 Windows ZIP 后全部解压并双击程序。
 

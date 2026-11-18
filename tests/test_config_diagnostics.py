@@ -3,10 +3,11 @@
 
 from pathlib import Path
 
+from docx import Document
 from openpyxl import load_workbook
 
 from openpt.io.validation import inspect_input
-from openpt.windows_app import run_workbook, summarize
+from openpt.windows_app import error_dialog_summary, result_text_content, run_workbook, summarize
 
 EXAMPLE = Path(__file__).resolve().parents[1] / "windows/examples/GB-T合成检测.xlsx"
 
@@ -33,6 +34,23 @@ def test_preflight_collects_multiple_configuration_errors(tmp_path: Path) -> Non
     assert all(i.cell.startswith("B") for i in issues if i.sheet == "指定值与不确定度")
 
 
+def test_static_errors_and_boolean_strings(tmp_path: Path) -> None:
+    book = load_workbook(EXAMPLE)
+    _set(book, "方法配置", "reference_uncertainty_negligible", "TRUE")
+    _set(book, "指定值与不确定度", "hom_in_base", "FALSE")
+    _set(book, "指定值与不确定度", "method", "known")
+    _set(book, "指定值与不确定度", "source", None)
+    _set(book, "指定值与不确定度", "sigma_final", -1)
+    _set(book, "指定值与不确定度", "sigma_procedure", None)
+    path = tmp_path / "multiple.xlsx"
+    book.save(path)
+    messages = "\n".join(issue.message for issue in inspect_input(path))
+    for field in ("value", "uncertainty", "source", "sigma_final", "sigma_procedure"):
+        assert field in messages
+    assert "reference_uncertainty_negligible" not in messages
+    assert "hom_in_base" not in messages
+
+
 def test_missing_criterion_and_pending_are_explained(tmp_path: Path) -> None:
     book = load_workbook(EXAMPLE)
     _set(book, "方法配置", "sigma", None)
@@ -43,6 +61,59 @@ def test_missing_criterion_and_pending_are_explained(tmp_path: Path) -> None:
     assert "sigma_final" in text and "不作为均匀性" in text
     assert "pending" in text and "稳定期" in text
     assert summarize(data, result).startswith("【诊断提示】")
+
+
+def test_gl003_diagnostic_and_report(tmp_path: Path) -> None:
+    book = load_workbook(EXAMPLE)
+    _set(book, "方法配置", "criterion_standard", "gl003")
+    _set(book, "方法配置", "gl003_hom_criterion", "ss_0.3sigma")
+    _set(book, "方法配置", "sigma", None)
+    _set(book, "指定值与不确定度", "hom_source", "manual")
+    path = tmp_path / "gl003.xlsx"
+    book.save(path)
+    directory, _, result = run_workbook(path, tmp_path / "runs")
+    assert "均匀性未评价" in str(result["诊断提示"])
+    paragraphs = [p.text for p in Document(directory / "report.docx").paragraphs]
+    assert "诊断提示" in paragraphs
+    assert any("判据 sigma 未填写" in p for p in paragraphs)
+
+
+def test_missing_participant_uncertainty_grouped(tmp_path: Path) -> None:
+    book = load_workbook(EXAMPLE)
+    _set(book, "方法配置", "score_type", "zeta")
+    path = tmp_path / "zeta.xlsx"
+    book.save(path)
+    _, _, result = run_workbook(path, tmp_path / "runs")
+    grouped = [d["说明"] for d in result["诊断提示"] if d["类型"] == "参加者统计量未评价"]
+    assert len(grouped) == 1
+    assert "P01" in grouped[0] and "P12" in grouped[0]
+
+
+def test_unallocated_transport_component_explained(tmp_path: Path) -> None:
+    book = load_workbook(EXAMPLE)
+    _set(book, "指定值与不确定度", "u_trans", 1)
+    _set(book, "指定值与不确定度", "trans_mapping", "none")
+    path = tmp_path / "transport.xlsx"
+    book.save(path)
+    _, _, result = run_workbook(path, tmp_path / "runs")
+    assert "运输分量但未分配" in str(result["诊断提示"])
+
+
+def test_withhold_explained(tmp_path: Path) -> None:
+    book = load_workbook(EXAMPLE)
+    _set(book, "指定值与不确定度", "stability_disposition", "withhold")
+    path = tmp_path / "withhold.xlsx"
+    book.save(path)
+    _, _, result = run_workbook(path, tmp_path / "runs")
+    assert "withhold" in str(result["诊断提示"])
+
+
+def test_result_area_and_dialog_summary() -> None:
+    text = "输入校验问题：\n" + "\n".join(f"{i}. 错误" for i in range(8))
+    assert result_text_content(text) == text
+    assert "完整清单见结果区" in error_dialog_summary(text)
+    assert "7. 错误" not in error_dialog_summary(text)
+    assert "结果目录：" in result_text_content("【诊断提示】", Path("output"))
 
 
 def test_synthetic_gbt_example_scores(tmp_path: Path) -> None:

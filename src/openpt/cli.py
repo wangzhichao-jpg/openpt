@@ -673,22 +673,90 @@ def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]
         }
     diagnostics: list[dict[str, str]] = []
     assigned_config = data.get("assigned_config", {})
-    if standard == "gbt28043" and (result.get("GB/T均匀性") or result.get("GB/T稳定性")):
-        missing = (basis == "sigma_pt" and sigma is None) or (
-            basis == "delta_e" and delta_e is None
+    unevaluated: list[str] = []
+    hom_result = result.get("GB/T均匀性") if standard == "gbt28043" else result.get("均匀性")
+    if hom_result and hom_result.get("conclusion") is None:
+        unevaluated.append("均匀性")
+    if standard == "gbt28043":
+        periods = result.get("GB/T稳定性", {})
+    else:
+        periods = dict(result.get("其他稳定性", {}))
+        if result.get("稳定性"):
+            periods[result.get("稳定性时间组", "稳定期")] = result["稳定性"]
+    for name, period in periods.items():
+        conclusion_key = (
+            "conclusion"
+            if standard == "gbt28043"
+            else "mean_difference_pass"
+            if period.get("method") == "mean_difference"
+            else "pass"
         )
-        if missing:
-            field = "sigma" if basis == "sigma_pt" else "delta_e"
-            message = f"『方法配置』判据 {field} 未填写，均匀性和稳定性可能未评价。"
-            if field == "sigma" and any(
-                assigned_config.get(key) not in (None, "")
-                for key in ("sigma_final", "sigma_temporary")
-            ):
-                message += (
-                    "指定值表中的 sigma_final/sigma_temporary 仅作为 σ_pt 用于 z 等统计量，"
-                    "不作为均匀性或稳定性判据；如需同值请在『方法配置』sigma 填写。"
-                )
-            diagnostics.append({"类型": "判据缺失", "说明": message})
+        if period.get(conclusion_key) is None:
+            unevaluated.append(f"稳定性（{name}）")
+    missing = (basis == "sigma_pt" and sigma is None) or (basis == "delta_e" and delta_e is None)
+    sigma_items: list[str] = []
+    if standard == "gbt28043":
+        sigma_items = unevaluated.copy()
+    else:
+        if (
+            hom_result
+            and hom_result.get("conclusion") is None
+            and hom_result.get("selected_criterion") in ("ss_0.3sigma", "both")
+        ):
+            sigma_items.append("均匀性")
+        sigma_items.extend(
+            f"稳定性（{name}）"
+            for name, period in periods.items()
+            if period.get("method") == "mean_difference"
+            and period.get("mean_difference_pass") is None
+        )
+    if sigma_items and missing:
+        field = "sigma" if basis == "sigma_pt" else "delta_e"
+        message = f"{'、'.join(sigma_items)}未评价；『方法配置』判据 {field} 未填写，请填写判据。"
+        if field == "sigma" and any(
+            assigned_config.get(key) not in (None, "") for key in ("sigma_final", "sigma_temporary")
+        ):
+            message += (
+                "指定值表中的 sigma_final/sigma_temporary 仅作为 σ_pt 用于 z 等统计量，"
+                "不作为均匀性或稳定性判据；如需同值请在『方法配置』sigma 填写。"
+            )
+        diagnostics.append({"类型": "判据缺失", "说明": message})
+    others = [item for item in unevaluated if not (missing and item in sigma_items)]
+    if others:
+        diagnostics.append(
+            {"类型": "未评价", "说明": f"{'、'.join(others)}未评价；请检查数据及设计警告。"}
+        )
+    grouped_scores: dict[tuple[str, str], list[str]] = {}
+    for participant, scores in result.get("参加者统计量", {}).items():
+        for statistic, score in scores.items():
+            if score.get("value") is None:
+                reason = score.get("reason") or score.get("status") or "原因未登记"
+                grouped_scores.setdefault((statistic, str(reason)), []).append(str(participant))
+    for (statistic, reason), participants in grouped_scores.items():
+        diagnostics.append(
+            {
+                "类型": "参加者统计量未评价",
+                "说明": f"{statistic} 未评价：{reason}；参加者：{'、'.join(participants)}。"
+                "请根据原因补充不确定度、包含因子或审核指定值和处置。",
+            }
+        )
+    for name, trend in result.get("趋势稳定性", {}).items():
+        if trend.get("stable") is None:
+            diagnostics.append(
+                {
+                    "类型": "趋势未评价",
+                    "说明": f"趋势序列 {name} 未评价；斜率和标准误无法判定，"
+                    "请检查时间点与观测数据。",
+                }
+            )
+    for name, point in result.get("传递标准稳定性", {}).items():
+        if point.get("conclusion") is None:
+            diagnostics.append(
+                {
+                    "类型": "传递标准未评价",
+                    "说明": f"传递标准 {name} 未评价；请检查判据和复测数据。",
+                }
+            )
     assigned_result = result.get("指定值与不确定度", {})
     flagged = assigned_result.get("stability_flagged_periods", [])
     disposition = assigned_result.get("stability_disposition")
@@ -968,6 +1036,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"结果 JSON：{directory / 'result.json'}")
         for item in result.get("诊断提示", []):
             print(f"诊断提示：{item['说明']}")
+        for name, part in result.get("被测量", {}).items():
+            for item in part.get("诊断提示", []):
+                print(f"诊断提示（{name}）：{item['说明']}")
         if differences is not None:
             print(f"差异表：{directory / 'differences.csv'}")
             if args.differences is not None:

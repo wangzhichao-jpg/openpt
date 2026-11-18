@@ -1255,6 +1255,10 @@ def make_report(
     _other_results(doc, data, result, sig, mean_places, z_places)
     if differences is not None:
         _difference_table(doc, differences)
+    if result.get("诊断提示"):
+        doc.add_heading("诊断提示", 1)
+        for item in result["诊断提示"]:
+            doc.add_paragraph(item["说明"])
     doc.add_heading("未评价事项", 1)
     unevaluated = _unevaluated(result)
     if not any(result.get(key) for key in ("均匀性", "GB/T均匀性", "传递标准稳定性")):

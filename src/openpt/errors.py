@@ -22,9 +22,18 @@ def format_error(exc: Exception) -> str:
             cell = issue.get("cell", "")
             match = re.search(r"\d+", cell)
             row = f"第{match.group()}行" if match else ""
+            value = issue.get("original")
+            shown = (
+                "空白"
+                if value is None or value == ""
+                else f"「{value}」"
+                if isinstance(value, str)
+                else str(value)
+            )
+            location = f"{cell}，" if cell else ""
             lines.append(
                 f"{index}. 『{issue.get('sheet', '')}』{row}"
-                f"（{cell}，当前值：{issue.get('original')!r}）：{issue.get('message', '')}"
+                f"（{location}当前值：{shown}）：{issue.get('message', '')}"
             )
         return "输入校验问题：\n" + "\n".join(lines)
     except (ValueError, TypeError, AttributeError):

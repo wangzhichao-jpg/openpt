@@ -871,6 +871,73 @@ def inspect_input(
                     )
 
                 if assigned_values.get("method") not in (None, ""):
+                    method_value = assigned_values.get("method")
+                    components = assigned_values.get("known_components")
+                    experts = assigned_values.get("expert_values")
+                    if method_value in (
+                        "known",
+                        "certified",
+                        "reference",
+                        "expert_consensus",
+                    ) and not (method_value == "expert_consensus" and experts not in (None, "")):
+                        if assigned_values.get("value") in (None, ""):
+                            add_assigned("value", "该方法须填写指定值，请填写有限数")
+                        if not (
+                            method_value == "known" and components not in (None, "")
+                        ) and assigned_values.get("uncertainty") in (None, ""):
+                            add_assigned(
+                                "uncertainty", "该方法须填写标准不确定度，请填写非负有限数"
+                            )
+                    for field, expected in (
+                        ("known_components", "known"),
+                        ("expert_values", "expert_consensus"),
+                    ):
+                        raw = assigned_values.get(field)
+                        if raw not in (None, ""):
+                            if method_value != expected:
+                                add_assigned(field, f"仅适用于 {expected} 方法；请清空或修改方法")
+                            try:
+                                numbers = (
+                                    [float(x.strip()) for x in raw.split(",")]
+                                    if isinstance(raw, str)
+                                    else []
+                                )
+                                valid = bool(numbers) and all(math.isfinite(x) for x in numbers)
+                                valid = valid and (
+                                    field != "known_components" or all(x >= 0 for x in numbers)
+                                )
+                                valid = valid and (field != "expert_values" or len(numbers) >= 2)
+                            except (ValueError, OverflowError):
+                                valid = False
+                            if not valid:
+                                add_assigned(
+                                    field, "须填写逗号分隔的有限数；专家结果至少两个，制备分量非负"
+                                )
+                    for field in ("sigma_temporary", "sigma_final"):
+                        value = assigned_values.get(field)
+                        if (
+                            isinstance(value, (int, float))
+                            and not isinstance(value, bool)
+                            and value <= 0
+                        ):
+                            add_assigned(field, "须为正有限数，请修改")
+                    if any(
+                        assigned_values.get(k) not in (None, "")
+                        for k in ("sigma_temporary", "sigma_final")
+                    ):
+                        procedure = assigned_values.get("sigma_procedure")
+                        if not isinstance(procedure, str) or not procedure.strip():
+                            add_assigned(
+                                "sigma_procedure", "填写 σ_pt 时须登记确定程序，请填写文字"
+                            )
+                    for field in ("uncertainty", "u_hom", "u_stab", "u_trans", "U_assigned"):
+                        value = assigned_values.get(field)
+                        if (
+                            isinstance(value, (int, float))
+                            and not isinstance(value, bool)
+                            and value < 0
+                        ):
+                            add_assigned(field, "须为非负有限数，请修改")
                     for field, label in (
                         ("source", "指定值来源必填"),
                         ("uncertainty_source", "不确定度来源必填"),

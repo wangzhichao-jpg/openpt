@@ -180,6 +180,21 @@ def summarize(data: dict[str, Any], result: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def result_text_content(text: str, directory: Path | None = None) -> str:
+    """生成结果区内容；失败时完整保留问题清单。"""
+    return text + "\n\n结果目录：" + str(directory) if directory is not None else text
+
+
+def error_dialog_summary(text: str, limit: int = 4) -> str:
+    """弹窗只展示摘要，完整内容留在结果区。"""
+    lines = text.splitlines()
+    if len(lines) > limit:
+        return "\n".join(lines[:limit]) + "\n……完整清单见结果区。"
+    if len(text) > 500:
+        return text[:500] + "……完整清单见结果区。"
+    return text
+
+
 def friendly_error(exc: Exception) -> str:
     """将输入检查结果简化为表名、单元格和问题。"""
     return format_error(exc)
@@ -254,14 +269,14 @@ def main() -> None:
             directory, text = value
             output[:] = [directory]
             result_text.delete("1.0", "end")
-            result_text.insert("1.0", text + "\n\n结果目录：" + str(directory))
+            result_text.insert("1.0", result_text_content(text, directory))
             status.set("计算完成。")
         else:
             output.clear()
             result_text.delete("1.0", "end")
-            result_text.insert("1.0", str(value))
+            result_text.insert("1.0", result_text_content(str(value)))
             status.set("计算未完成。")
-            messagebox.showerror("输入或计算问题", str(value))
+            messagebox.showerror("输入或计算问题", error_dialog_summary(str(value)))
         root.after(100, poll)
 
     def open_output(report: bool) -> None:
