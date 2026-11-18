@@ -97,7 +97,7 @@ def split_measurands(book: Any, mapping: dict[str, Any] | None = None) -> list[d
     if len(names) > 1 and "参加者结果" in book.sheetnames:
         ws = book["参加者结果"]
         if any(_has_values(ws, row, None) for row in range(2, ws.max_row + 1)):
-            raise InputError("多被测量时参加者结果尚不支持分别归属，不能混用")
+            raise InputError("参加者结果：多被测量时尚不支持分别归属，不能混用")
     options: dict[str, dict[str, Any]] = {name: {} for name in names}
     option_sources: dict[str, dict[str, str]] = {name: {} for name in names}
     if "被测量配置" in book.sheetnames:

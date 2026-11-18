@@ -162,7 +162,11 @@ def assign_value(
     if method == "participant_consensus":
         if consensus_method == "robust_mean":
             if not isinstance(algorithm_a_simplified, bool):
-                raise InputError("algorithm_a_simplified 必须是布尔值")
+                raise InputError(
+                    "algorithm_a_simplified 必须是布尔值",
+                    sheet="方法配置",
+                    field="algorithm_a_simplified",
+                )
             robust = algorithm_a(
                 participants,
                 tolerance=algorithm_a_tolerance,
@@ -217,6 +221,7 @@ def assign_value(
             x = statistics.mean(expert)
             base_u = statistics.stdev(expert) / math.sqrt(len(expert))
         except (OverflowError, ValueError):
+            # 定位豁免：专家公议数值计算溢出，不能归因于单个字段。
             raise InputError("专家公议结果溢出") from None
         formula = "扩展方法（独立同精度专家）：X=均值，u_base=s/√n；GL002 4.3.1 d"
     else:
@@ -240,6 +245,7 @@ def assign_value(
     if ut > 0 and trans_mapping == "none" and not trans_in_base and not trans_via_stab:
         warnings.append("已提供运输分量但未分配且未包含在基础不确定度中，需审核")
     if any(not math.isfinite(v) for v in (x, base_u)):
+        # 定位豁免：指定值数值计算溢出，可能由多个输入共同导致。
         raise InputError("指定值数值溢出")
     u = math.hypot(
         base_u,
@@ -258,6 +264,7 @@ def assign_value(
         else None
     )
     if not math.isfinite(u) or (sigma_prime is not None and not math.isfinite(sigma_prime)):
+        # 定位豁免：不确定度合成溢出，可能由多个输入共同导致。
         raise InputError("不确定度合成溢出")
     return AssignedResult(
         method,

@@ -17,6 +17,7 @@ from ..core.gbt28043 import stability as gbt_stability
 from ..core.robust import algorithm_a
 from ..core.stability import analyze as stability
 from ..core.stability import summary_t
+from ..errors import InputError, locate, sheet_call
 
 
 def display(value: float | Decimal | None, digits: int) -> Decimal | None:
@@ -53,7 +54,9 @@ def _t_reproduction(
         return None, None, "实验设计需审核，不计算候选模型"
     if model in ("repeats_pooled", "repeats_welch"):
         reference = cfg.get("reference")
-        report_result = stability(
+        report_result = sheet_call(
+            "稳定性",
+            stability,
             groups.get("基线"),
             groups[name],
             model=model,
@@ -68,7 +71,9 @@ def _t_reproduction(
     if model == "displayed_summary":
         keys = ("mean1", "mean2", "s1", "s2", "n1", "n2")
         if all(cfg.get(k) not in (None, "") for k in keys):
-            reproduced = summary_t(
+            reproduced = sheet_call(
+                "方法配置",
+                summary_t,
                 float(cfg["mean1"]),
                 float(cfg["mean2"]),
                 float(cfg["s1"]),
@@ -118,7 +123,9 @@ def _standard_value(
                 "extended_limit": None,
             }
         if not h:
-            h = gbt_homogeneity(data["homogeneity"], sigma, delta_e=delta_e, basis=basis)
+            h = sheet_call(
+                "均匀性", gbt_homogeneity, data["homogeneity"], sigma, delta_e=delta_e, basis=basis
+            )
         return h[
             {"Ss": "ss", "均匀性基本限值": "basic_limit", "均匀性扩展限值": "extended_limit"}[name]
         ]
@@ -141,8 +148,10 @@ def _standard_value(
         and baseline
         and group in groups
     ):
-        settings = gbt_period_options(cfg, groups)
-        s = gbt_stability(
+        settings = sheet_call("稳定性", gbt_period_options, cfg, groups)
+        s = sheet_call(
+            "稳定性",
+            gbt_stability,
             baseline,
             groups[group],
             sigma,
@@ -245,7 +254,9 @@ def _values(
         value = result.get("算法A", {}).get(key)
         if claim.get("model") in ("absolute", "gbt28043") and data.get("participants"):
             rule = claim["model"]
-            alternative = algorithm_a([p["value"] for p in data["participants"]], rule=rule)
+            alternative = sheet_call(
+                "参加者结果", algorithm_a, [p["value"] for p in data["participants"]], rule=rule
+            )
             if not alternative.converged:
                 note = (
                     "绝对容差模型未收敛，未评价；报告停止规则待底稿确认"
@@ -349,7 +360,13 @@ def _candidate_models(
         candidates = [
             (
                 label,
-                stability(data["stability"].get("基线"), data["stability"][group], model=m)["t"],
+                sheet_call(
+                    "稳定性",
+                    stability,
+                    data["stability"].get("基线"),
+                    data["stability"][group],
+                    model=m,
+                )["t"],
             )
             for m, label in (
                 ("unit_pooled", "单元均值"),
@@ -378,7 +395,7 @@ def _algorithm_candidates(
     try:
         values = [p["value"] for p in data["participants"]]
         results = [
-            algorithm_a(values, rule=rule)
+            sheet_call("参加者结果", algorithm_a, values, rule=rule)
             for rule in ("gl002", "gbt28043", "absolute", "simplified")
         ]
         valid = [r[name] for r in results if r.converged and r.status == "OK"]
@@ -707,6 +724,19 @@ def _applicable_standard(name: str, note: str, selected: str) -> str:
 def review(
     data: dict[str, Any], result: dict[str, Any], mapping: dict[str, Any] | None = None
 ) -> list[dict[str, Any]]:
+    """比较报告与计算结果，并为声称值错误补充工作表上下文。"""
+    try:
+        return sheet_call("报告声称值", _review, data, result, mapping)
+    except InputError as exc:
+        located = locate(exc, data)
+        if located is exc:
+            raise
+        raise located from None
+
+
+def _review(
+    data: dict[str, Any], result: dict[str, Any], mapping: dict[str, Any] | None = None
+) -> list[dict[str, Any]]:
     """比较 GL002 和 GL003 计算结果、报告模型和声称值。"""
     if data.get("measurands"):
         rows = []
@@ -872,7 +902,7 @@ def review(
                     request["rule_index"] = int(model[5:]) - 1
                 except ValueError:
                     raise ValueError("传递判据序号应为 rule:1 等正整数") from None
-            item = review_transfer(transfer_results[group], request)
+            item = sheet_call("报告声称值", review_transfer, transfer_results[group], request)
             actual = item.get("重算值")
             rows.append(
                 {
@@ -923,7 +953,7 @@ def review(
         from .trend import review_trend
 
         for group, claims in trend_claims.items():
-            for item in review_trend(trend_results[group], claims):
+            for item in sheet_call("报告声称值", review_trend, trend_results[group], claims):
                 corresponding = next(
                     (claim for claim in claims if claim["name"] == item["统计量"]), {}
                 )

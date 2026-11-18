@@ -284,7 +284,7 @@ def _assigned_results(
             )
         h = calculations.get("GB/T均匀性")
         if not h:
-            raise InputError("引用 ss 须提供均匀性数据")
+            raise InputError("引用 ss 须提供均匀性数据", sheet="均匀性")
         if a.get("hom_mapping") not in ("assigned", "sigma_prime", "both"):
             raise InputError(
                 "引用 ss 须明确登记分量映射",
@@ -319,8 +319,12 @@ def _assigned_results(
                 raise InputError(
                     f"{key} 须为逗号分隔的数值列表", field=key, hint="填写逗号分隔数值"
                 ) from None
-    assigned = assign_value(
-        a["method"], participants=[p["value"] for p in data["participants"]], **options
+    assigned = sheet_call(
+        "参加者结果",
+        assign_value,
+        a["method"],
+        participants=[p["value"] for p in data["participants"]],
+        **options,
     )
     disposition_details = {}
     if _option(data["config"], "criterion_standard", "gl003") == "gbt28043":
@@ -369,7 +373,9 @@ def _assigned_results(
                     if name == "En"
                     else ({}, None, "")
                 )
-                score_result = performance_score(
+                score_result = sheet_call(
+                    "参加者结果",
+                    performance_score,
                     name,
                     participant["value"],
                     assigned.value,
@@ -498,6 +504,7 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
                 InputError("输入校验问题：" + json.dumps(problems, ensure_ascii=False, default=str))
             ),
             issues=problems,
+            sheet="方法配置与指定值与不确定度",
         )
     alpha = float(_option(cfg, "alpha", 0.05))
     sigma = criterion_sigma(cfg)
@@ -540,7 +547,7 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
     trend_input = data.get("trend_observations", [])
     trend_method = _option(cfg, "stability_method", "two_sample") == "regression_trend"
     if trend_method and not trend_input:
-        raise InputError("回归趋势法须填写趋势稳定性数据")
+        raise InputError("回归趋势法须填写趋势稳定性数据", sheet="趋势稳定性")
     if trend_input and not trend_method:
         raise InputError(
             "趋势稳定性须选择 regression_trend 方法",
@@ -558,7 +565,7 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
                 allowed="TRUE 或 FALSE",
             )
         if data.get("stability"):
-            raise InputError("回归趋势法不能混用稳定性工作表")
+            raise InputError("回归趋势法不能混用稳定性工作表", sheet="稳定性")
         result["趋势稳定性"] = sheet_call(
             "趋势稳定性",
             fit_series,
@@ -566,15 +573,15 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
             str(_option(cfg, "trend_aggregate", "per_series")),
             alpha,
         )
-        trend_u = configured_uncertainty(result["趋势稳定性"], cfg)
+        trend_u = sheet_call("趋势稳定性", configured_uncertainty, result["趋势稳定性"], cfg)
         if trend_u is not None:
             result["趋势不确定度"] = trend_u
     if cfg.get("design") == "transfer_standard":
         configs = data.get("transfer_config", {})
         if not configs:
-            raise InputError("传递标准设计须登记逐点配置")
+            raise InputError("传递标准设计须登记逐点配置", sheet="传递标准配置")
         result["传递标准稳定性"] = sheet_call(
-            "传递标准复测/配置", assess_transfer, data.get("transfer_observations", []), configs
+            "传递标准配置", assess_transfer, data.get("transfer_observations", []), configs
         )
         result["传递标准汇总"] = summarize_transfer(result["传递标准稳定性"])
     elif data.get("transfer_observations") or data.get("transfer_config"):
@@ -602,7 +609,9 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
             if strict or cfg.get("gl003_hom_criterion") not in (None, ""):
                 raise InputError(
                     "单测采用 GB/T 28043-2019 B.1.2 单测标准差法，不支持 GL003 4.2/4.3 "
-                    "主判据或严格配置；请清空 gl003_hom_criterion 并关闭 strict_homogeneity"
+                    "主判据或严格配置；请清空 gl003_hom_criterion 并关闭 strict_homogeneity",
+                    sheet="方法配置",
+                    fields=["gl003_hom_criterion", "strict_homogeneity"],
                 )
             if not 0 < alpha < 1:
                 raise InputError(
@@ -692,7 +701,7 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
             and _option(cfg, "reference_uncertainty_negligible", True) is True,
         )
         if problem:
-            raise InputError(problem[1])
+            raise InputError(problem[1], sheet="稳定性")
         baseline_data = data["homogeneity"] if source == "homogeneity" else groups.get("基线")
         reference = float(raw) if raw not in (None, "") else None
         if method == "mean_difference":
@@ -704,7 +713,11 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
         if level not in ENUMS["observation_level"]:
             raise ValueError("未知实验层级")
         if level == "all_repeats" and not review_mode:
-            raise InputError("全部重复值仅供复核模型使用，不可用于常规结论")
+            raise InputError(
+                "全部重复值仅供复核模型使用，不可用于常规结论",
+                sheet="方法配置",
+                field="observation_level",
+            )
         primary_group = (
             "稳定期" if "稳定期" in groups else next(name for name in groups if name != "基线")
         )
@@ -781,8 +794,10 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
                 period["design_status"] = "DESIGN_WARNING"
         if standard == "gbt28043":
             if method not in ("two_sample", "mean_difference"):
-                raise InputError("GB/T 28043 稳定性模式需要两组样品")
-            settings = gbt_period_options(cfg, groups)
+                raise InputError(
+                    "GB/T 28043 稳定性模式需要两组样品", sheet="方法配置", field="stability_method"
+                )
+            settings = sheet_call("稳定性", gbt_period_options, cfg, groups)
             independent = design_options["design"] == "independent"
             gbt_periods = {}
             for name, observations in groups.items():
@@ -1166,8 +1181,10 @@ def _check_cli_paths(args: argparse.Namespace) -> None:
         paths.extend(("input", value) for value in args.inputs)
     for name, value in paths:
         if not value or not str(value).strip():
+            # 定位豁免：命令行路径不属于工作簿表格。
             raise InputError(f"{name} 路径不能为空")
         if not Path(value).exists():
+            # 定位豁免：命令行路径不属于工作簿表格。
             raise InputError(f"{name} 路径不存在：{value}")
     output_names = ["output", "docx", "json", "differences", "runs_dir"]
     if args.command == "demo":
@@ -1175,6 +1192,7 @@ def _check_cli_paths(args: argparse.Namespace) -> None:
     for name in output_names:
         value = getattr(args, name, None)
         if value is not None and (not value or not str(value).strip()):
+            # 定位豁免：命令行输出路径不属于工作簿表格。
             raise InputError(f"{name} 路径不能为空")
 
 

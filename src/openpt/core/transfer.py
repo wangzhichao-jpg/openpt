@@ -5,7 +5,7 @@ import math
 from typing import Any
 
 from ..config.catalog import TRANSFER_CRITERION_FIELDS
-from ..errors import InputError
+from ..errors import InputError, sheet_call
 from .decision import compare
 from .stability import analyze
 
@@ -39,8 +39,8 @@ def assess_point(
     for row in observations:
         stage = row.get("stage")
         if stage not in ("传递前", "传递中", "传递后"):
-            raise InputError("阶段应为传递前、传递中或传递后")
-        value = _number(row.get("value"), "复测值")
+            raise InputError("阶段应为传递前、传递中或传递后", sheet="传递标准复测")
+        value = sheet_call("传递标准复测", _number, row.get("value"), "复测值")
         if window == "all" or stage in ("传递中", "传递后"):
             values.append(value)
             selected_rows.append(row)
@@ -52,7 +52,7 @@ def assess_point(
             raise InputError("汇总变差不能为负")
     else:
         if len(values) < 2:
-            raise InputError("所选时间窗口至少需要两次测量")
+            raise InputError("所选时间窗口至少需要两次测量", sheet="传递标准复测")
         delta = max(values) - min(values)
     if not math.isfinite(delta):
         raise InputError("最大变差数值溢出")
@@ -159,9 +159,9 @@ def assess_transfer(
     for row in records:
         key = f"{row['standard']}|{row['point']}"
         if key not in configs:
-            raise InputError(f"传递标准 {key} 未登记逐点配置")
+            raise InputError(f"传递标准 {key} 未登记逐点配置", sheet="传递标准复测")
         if row.get("unit") != configs[key].get("unit"):
-            raise InputError(f"传递标准 {key} 的测量单位与配置不一致")
+            raise InputError(f"传递标准 {key} 的测量单位与配置不一致", sheet="传递标准复测")
         grouped[key].append(row)
     results = {}
     for key, cfg in configs.items():

@@ -32,12 +32,19 @@ class InputError(ValueError):
         self.allowed = allowed
         self.hint = hint
         self.value = value
+        self._located = False
 
 
 def locate(exc: InputError, data: dict[str, Any]) -> InputError:
     """用输入工作簿的字段位置补全错误；无字段时不改变原消息。"""
+    if exc._located:
+        return exc
     if not exc.field and not exc.fields:
-        return InputError(f"『{exc.sheet}』：{exc}") if exc.sheet else exc
+        if exc.issues or not exc.sheet:
+            return exc
+        located = InputError(f"『{exc.sheet}』：{exc}")
+        located._located = True
+        return located
     sheet = exc.sheet or "指定值与不确定度"
     if exc.fields:
         pieces = []
@@ -62,7 +69,9 @@ def locate(exc: InputError, data: dict[str, Any]) -> InputError:
             message += f"；允许值/要求：{exc.allowed}"
         if exc.hint:
             message += f"；修改建议：{exc.hint}"
-        return InputError(message, issues=exc.issues)
+        located = InputError(message, issues=exc.issues)
+        located._located = True
+        return located
     cell_info = data.get("_cells", {}).get((sheet, exc.field))
     value = exc.value
     location = f"『{sheet}』字段 {exc.field}"
@@ -83,7 +92,9 @@ def locate(exc: InputError, data: dict[str, Any]) -> InputError:
         message += f"；允许值/要求：{exc.allowed}"
     if exc.hint:
         message += f"；修改建议：{exc.hint}"
-    return InputError(message, issues=exc.issues)
+    located = InputError(message, issues=exc.issues)
+    located._located = True
+    return located
 
 
 def sheet_call(sheet: str, function: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
@@ -91,7 +102,7 @@ def sheet_call(sheet: str, function: Callable[..., Any], *args: Any, **kwargs: A
     try:
         return function(*args, **kwargs)
     except InputError as exc:
-        if not exc.sheet and not exc.field and not exc.fields:
+        if not exc._located and not exc.sheet and not exc.field and not exc.fields:
             exc.sheet = sheet
         raise
 
