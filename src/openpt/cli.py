@@ -298,11 +298,15 @@ def _assigned_results(
     for key in ("known_components", "expert_values"):
         if a.get(key) not in (None, ""):
             if not isinstance(a[key], str):
-                raise InputError(f"{key} 须为逗号分隔的数值列表")
+                raise InputError(
+                    f"{key} 须为逗号分隔的数值列表", field=key, hint="填写逗号分隔数值"
+                )
             try:
                 options[key] = [float(item.strip()) for item in a[key].split(",")]
             except ValueError:
-                raise InputError(f"{key} 须为逗号分隔的数值列表") from None
+                raise InputError(
+                    f"{key} 须为逗号分隔的数值列表", field=key, hint="填写逗号分隔数值"
+                ) from None
     assigned = assign_value(
         a["method"], participants=[p["value"] for p in data["participants"]], **options
     )
@@ -460,14 +464,25 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
         raise InputError("GB/T 判据应为 basic 或 extended")
     replicate_type = _option(cfg, "replicate_type", "technical")
     if replicate_type not in ENUMS["replicate_type"]:
-        raise InputError("replicate_type 应为 technical、adjacent_specimens、other 或 single")
+        raise InputError(
+            "replicate_type 应为 technical、adjacent_specimens、other 或 single",
+            sheet="方法配置",
+            field="replicate_type",
+            allowed="technical、adjacent_specimens、other 或 single",
+        )
     result: dict[str, Any] = {}
     trend_input = data.get("trend_observations", [])
     trend_method = _option(cfg, "stability_method", "two_sample") == "regression_trend"
     if trend_method and not trend_input:
         raise InputError("回归趋势法须填写趋势稳定性数据")
     if trend_input and not trend_method:
-        raise InputError("趋势稳定性须选择 regression_trend 方法")
+        raise InputError(
+            "趋势稳定性须选择 regression_trend 方法",
+            sheet="方法配置",
+            field="stability_method",
+            allowed="regression_trend",
+            hint="修改稳定性方法",
+        )
     if trend_input:
         if not isinstance(_option(cfg, "trend_plot", False), bool):
             raise InputError(
@@ -491,14 +506,24 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
         result["传递标准稳定性"] = assess_transfer(data.get("transfer_observations", []), configs)
         result["传递标准汇总"] = summarize_transfer(result["传递标准稳定性"])
     elif data.get("transfer_observations") or data.get("transfer_config"):
-        raise InputError("传递标准数据须选择 transfer_standard 设计")
+        raise InputError(
+            "传递标准数据须选择 transfer_standard 设计",
+            sheet="方法配置",
+            field="design",
+            allowed="transfer_standard",
+        )
     if data["homogeneity"]:
         strict = cfg.get("strict_homogeneity", False)
         if not isinstance(strict, bool):
             raise ValueError("strict_homogeneity 必须是布尔值")
         gl_criterion = _option(cfg, "gl003_hom_criterion", "f_test")
         if gl_criterion not in ENUMS["gl003_hom_criterion"]:
-            raise InputError("GL003 均匀性判据应为 f_test、ss_0.3sigma 或 both")
+            raise InputError(
+                "GL003 均匀性判据应为 f_test、ss_0.3sigma 或 both",
+                sheet="方法配置",
+                field="gl003_hom_criterion",
+                allowed="f_test、ss_0.3sigma 或 both",
+            )
         if strict:
             gl_criterion = "both"
         if replicate_type == "single":
@@ -714,7 +739,11 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
         if result.get("趋势不确定度"):
             assigned_config = dict(data["assigned_config"])
             if assigned_config.get("u_stab") not in (None, "", 0, 0.0):
-                raise InputError("趋势 u_stab 与手工 u_stab 不可同时输入")
+                raise InputError(
+                    "趋势 u_stab 与手工 u_stab 不可同时输入",
+                    field="u_stab",
+                    hint="清空手工 u_stab 或移除趋势不确定度配置",
+                )
             assigned_config["u_stab"] = result["趋势不确定度"]["u_stab"]
             assignment_data = {**data, "assigned_config": assigned_config}
         result.update(
@@ -823,7 +852,14 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
     blocked = disposition == "withhold" or (disposition == "pending" and bool(flagged))
     if blocked:
         names = "、".join(flagged) if flagged else "无"
-        cause = "上述判据缺失导致稳定性未评价；" if missing and sigma_items and flagged else ""
+        missing_periods = [
+            name for name in flagged if name in periods and periods[name].get("conclusion") is None
+        ]
+        cause = (
+            "上述判据缺失导致稳定性未评价；"
+            if standard == "gbt28043" and missing and sigma_items and missing_periods
+            else ""
+        )
         diagnostics.append(
             {
                 "类型": "统计量暂停",

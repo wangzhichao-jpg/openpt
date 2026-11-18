@@ -86,15 +86,17 @@ def test_gl003_diagnostic_and_report(tmp_path: Path) -> None:
     assert any("判据 sigma 未填写" in p for p in paragraphs)
 
 
-def test_missing_participant_uncertainty_grouped(tmp_path: Path) -> None:
+@pytest.mark.parametrize("statistic", ["zeta", "En"])
+def test_missing_participant_uncertainty_grouped(tmp_path: Path, statistic: str) -> None:
     book = load_workbook(EXAMPLE)
-    _set(book, "方法配置", "score_type", "zeta")
-    path = tmp_path / "zeta.xlsx"
+    _set(book, "方法配置", "score_type", statistic)
+    path = tmp_path / "score.xlsx"
     book.save(path)
     _, _, result = run_workbook(path, tmp_path / "runs")
     grouped = [d["说明"] for d in result["诊断提示"] if d["类型"] == "参加者统计量未评价"]
     assert len(grouped) == 1
     assert "P01" in grouped[0] and "P12" in grouped[0]
+    assert ("u(x)" if statistic == "zeta" else "包含因子") in grouped[0]
 
 
 def test_unallocated_transport_component_explained(tmp_path: Path) -> None:
@@ -163,6 +165,15 @@ def test_delta_e_missing_rule_in_preflight_and_calculation(tmp_path: Path) -> No
     assert any("delta_e" in issue.message for issue in inspect_input(path))
     data = read_workbook(path)
     with pytest.raises(InputError, match=r"『方法配置』第.*行.*delta_e"):
+        calculate(data)
+
+
+def test_csv_error_location_fallback(tmp_path: Path) -> None:
+    path = tmp_path / "participants.csv"
+    path.write_text("参加者编号,值,单位\nP01,1,mg\nP02,2,mg\n", encoding="utf-8")
+    data = read_workbook(path, csv_sheet="参加者结果", unit="mg")
+    data["config"].update(criterion_standard="gbt28043", gbt_criterion_basis="delta_e")
+    with pytest.raises(InputError, match="『方法配置』字段 delta_e"):
         calculate(data)
 
 
