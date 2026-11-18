@@ -811,24 +811,63 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
                 "指定值表中的 sigma_final/sigma_temporary 仅作为 σ_pt 用于 z 等统计量，"
                 "不作为均匀性或稳定性判据；如需同值请在『方法配置』sigma 填写。"
             )
-        diagnostics.append({"类型": "判据缺失", "说明": message})
+        diagnostics.append({"类型": "判据缺失", "层级": "根因", "说明": message})
     others = [item for item in unevaluated if not (missing and item in sigma_items)]
     if others:
         diagnostics.append(
             {"类型": "未评价", "说明": f"{'、'.join(others)}未评价；请检查数据及设计警告。"}
+        )
+    assigned_result = result.get("指定值与不确定度", {})
+    flagged = assigned_result.get("stability_flagged_periods", [])
+    disposition = assigned_result.get("stability_disposition")
+    blocked = disposition == "withhold" or (disposition == "pending" and bool(flagged))
+    if blocked:
+        names = "、".join(flagged) if flagged else "无"
+        cause = "上述判据缺失导致稳定性未评价；" if missing and sigma_items and flagged else ""
+        diagnostics.append(
+            {
+                "类型": "统计量暂停",
+                "层级": "后果",
+                "说明": f"{cause}稳定性处置为 {disposition}，未得出通过结论的时间组：{names}；"
+                "请补充判据及数据，或由授权人员评定并登记 budgeted、reviewed 或 withhold 处置及依据。",
+            }
         )
     grouped_scores: dict[tuple[str, str], list[str]] = {}
     for participant, scores in result.get("参加者统计量", {}).items():
         for statistic, score in scores.items():
             if score.get("value") is None:
                 reason = score.get("reason") or score.get("status") or "原因未登记"
+                if blocked and reason == "指定值或分量映射未通过审核":
+                    reason = f"稳定性处置为 {disposition}，参加者评价被暂停"
+                    extra = [
+                        w
+                        for w in assigned_result.get("warnings", [])
+                        if w != "稳定性或运输处置未完成，或已登记暂停评价"
+                    ]
+                    if extra:
+                        reason += "；" + "；".join(extra)
                 grouped_scores.setdefault((statistic, str(reason)), []).append(str(participant))
     for (statistic, reason), participants in grouped_scores.items():
+        if "参加者 u(x)" in reason:
+            advice = "请在参加者结果表填写标准不确定度 u(x)，并检查指定值 u(X)。"
+        elif "扩展不确定度" in reason and "包含因子" in reason:
+            advice = "请填写双方扩展不确定度 U 与包含因子 k，并核实独立性。"
+        elif "能力评定标准差" in reason:
+            advice = "请登记正的 σ_pt 及其确定程序。"
+        elif "指定值为零" in reason:
+            advice = "请审核指定值是否为零；零指定值不能计算百分相对差。"
+        elif "分母为零" in reason:
+            advice = "请核实不确定度或标准差输入，避免统计量分母为零。"
+        elif "稳定性处置" in reason:
+            advice = "请先完成上列稳定性处置。"
+        else:
+            advice = "请依据该原因补充输入或由授权人员审核。"
         diagnostics.append(
             {
                 "类型": "参加者统计量未评价",
+                "层级": "后果",
                 "说明": f"{statistic} 未评价：{reason}；参加者：{'、'.join(participants)}。"
-                "请根据原因补充不确定度、包含因子或审核指定值和处置。",
+                + advice,
             }
         )
     for name, trend in result.get("趋势稳定性", {}).items():
@@ -848,19 +887,6 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
                     "说明": f"传递标准 {name} 未评价；请检查判据和复测数据。",
                 }
             )
-    assigned_result = result.get("指定值与不确定度", {})
-    flagged = assigned_result.get("stability_flagged_periods", [])
-    disposition = assigned_result.get("stability_disposition")
-    if disposition == "withhold" or (disposition == "pending" and flagged):
-        names = "、".join(flagged) if flagged else "无"
-        diagnostics.append(
-            {
-                "类型": "统计量暂停",
-                "说明": f"稳定性处置为 {disposition}，未得出通过结论的时间组：{names}；"
-                "请补充判据及数据，或由授权人员评定并登记 "
-                "budgeted、reviewed 或 withhold 处置及依据。",
-            }
-        )
     if assigned_result and assigned_result.get("status") != "OK":
         warnings = "；".join(assigned_result.get("warnings", [])) or "请检查指定值及分量映射"
         diagnostics.append(

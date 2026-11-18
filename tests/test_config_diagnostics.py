@@ -64,6 +64,10 @@ def test_missing_criterion_and_pending_are_explained(tmp_path: Path) -> None:
     text = str(result["诊断提示"])
     assert "sigma_final" in text and "不作为均匀性" in text
     assert "pending" in text and "稳定期" in text
+    assert result["诊断提示"][0]["层级"] == "根因"
+    score = next(d for d in result["诊断提示"] if d["类型"] == "参加者统计量未评价")
+    assert score["层级"] == "后果" and "分量映射" not in score["说明"]
+    assert "稳定性处置" in score["说明"]
     assert summarize(data, result).startswith("【诊断提示】")
 
 
