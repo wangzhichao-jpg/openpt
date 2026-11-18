@@ -29,6 +29,7 @@ from .core.transfer import assess_transfer, summarize_transfer
 from .core.trend import configured_uncertainty, fit_series
 from .core.zscore import zscore
 from .errors import InputError, format_error, locate, sheet_call
+from .formatting import significant
 from .io.excel import template
 from .io.shape import stability_structure_problem
 from .report.docx import make_report
@@ -442,6 +443,8 @@ def _trend_transfer_diagnostics(
 ) -> list[dict[str, str]]:
     """从趋势与传递标准结果提取原因；缺少证据时不臆测数值。"""
     diagnostics: list[dict[str, str]] = []
+    display_config = data.get("_diagnostic_config", data.get("config", {}))
+    digits = int(_option(display_config, "display_sig_digits", 6))
     trends = result.get("趋势稳定性", {})
     for name, trend in trends.items():
         if trend.get("stable") is None:
@@ -483,9 +486,10 @@ def _trend_transfer_diagnostics(
                 reason = _unevaluated_reason(criterion, "")
                 kind = criterion.get("kind", "未知")
                 if criterion.get("pass") is False:
-                    reason = (
-                        f"判据 {kind} 未通过（统计量 {criterion.get('value')}，"
-                        f"限值 {criterion.get('limit')}）" + (f"；{reason}" if reason else "")
+                    value = significant(criterion.get("value"), digits)
+                    limit = significant(criterion.get("limit"), digits)
+                    reason = f"判据 {kind} 未通过（统计量 {value}，限值 {limit}）" + (
+                        f"；{reason}" if reason else ""
                     )
                 elif reason:
                     reason = f"判据 {kind} 未评价：{reason}"
@@ -511,6 +515,15 @@ def _trend_transfer_diagnostics(
                 }
             )
     return diagnostics
+
+
+def _sigma_advice(data: dict[str, Any]) -> str:
+    """按实际指定值路径给出 σ_pt 配置位置。"""
+    if data.get("assigned_config", {}).get("method"):
+        return (
+            "请在『指定值与不确定度』登记正的 sigma_final 或 sigma_temporary 及 sigma_procedure。"
+        )
+    return "请在『方法配置』填写正的 sigma_pt 或 sigma；只填一个时会互相沿用。"
 
 
 def _select_gbt_rule(result: dict[str, Any], rule: str) -> None:
@@ -1065,6 +1078,21 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
                 "说明": f"指定值状态 {assigned_result.get('status')}：{warnings}。",
             }
         )
+    if (
+        data.get("participants")
+        and not assigned_config.get("method")
+        and cfg.get("assigned") not in (None, "")
+        and sigma is None
+        and cfg.get("sigma_pt") in (None, "")
+        and not result.get("参加者z状态")
+    ):
+        diagnostics.append(
+            {
+                "类型": "参加者统计量未评价",
+                "层级": "后果",
+                "说明": "z 未评价：需要正的能力评定标准差 σ_pt。" + _sigma_advice(data),
+            }
+        )
     grouped_scores: dict[tuple[str, str], list[str]] = {}
     for participant, scores in result.get("参加者统计量", {}).items():
         for statistic, score in scores.items():
@@ -1096,10 +1124,7 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
                 "在『参加者结果』填写扩展不确定度U(x)、包含因子k。"
             )
         elif "能力评定标准差" in reason:
-            advice = (
-                "请在『指定值与不确定度』登记正的 sigma_final 或 sigma_temporary "
-                "及 sigma_procedure。"
-            )
+            advice = _sigma_advice(data)
         elif "未绑定唯一的传递标准校准点" in reason:
             advice = (
                 "请在『方法配置』transfer_en_map 中将参加者编号绑定到"

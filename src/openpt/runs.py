@@ -116,10 +116,13 @@ def _calculate_snapshot(root: Path, config: dict[str, Any]) -> tuple[Any, Any, A
         unit=config["unit"],
         project=config["project"],
     )
+    # 诊断显示区分显式输入与运行快照中的展开默认值，不改变计算配置。
+    data["_diagnostic_config"] = data["config"].copy()
     data["config"] = config["expanded_config"]
     if "expanded_assigned_config" in config:
         data["assigned_config"] = config["expanded_assigned_config"]
     for part in data.get("measurands", {}).values():
+        part["_diagnostic_config"] = part["config"].copy()
         part["config"] = {**config["expanded_config"], **part["measurand_overrides"]}
         if "expanded_assigned_config" in config:
             part["assigned_config"] = config["expanded_assigned_config"]

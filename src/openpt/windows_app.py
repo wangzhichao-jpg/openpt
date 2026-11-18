@@ -14,6 +14,7 @@ from typing import Any
 from openpyxl import load_workbook
 
 from .errors import format_error
+from .formatting import significant
 from .runs import create_run
 
 
@@ -72,7 +73,7 @@ def run_workbook(source: Path, root: Path) -> tuple[Path, dict[str, Any], dict[s
 
 
 def _number(value: Any) -> str:
-    return "未计算" if value is None else f"{value:.6g}"
+    return significant(value)
 
 
 def _decision(value: Any) -> str:

@@ -64,9 +64,28 @@ def test_trend_uncertainty_source_missing(tmp_path: Path) -> None:
 def test_transfer_failed_criterion(tmp_path: Path) -> None:
     book = load_workbook(TRANSFER)
     book["传递标准配置"]["E2"] = '[{"kind":"fixed","value":0.01}]'
-    _, text = _run(book, tmp_path)
-    assert "判据 fixed 未通过" in text and "『传递标准配置』" in text
+    result, text = _run(book, tmp_path)
+    assert "判据 fixed 未通过（统计量 0.3，限值 0.01）" in text
+    assert "0000000000" not in text
+    assert result["传递标准稳定性"]["STD1|P1"]["criteria"][0]["value"] == 0.30000000000000004
     assert "传递标准稳定性未通过" in text and "判据JSON" in text
+
+
+def test_transfer_diagnostic_defaults_to_six_significant_digits(tmp_path: Path) -> None:
+    book = load_workbook(TRANSFER)
+    book["传递标准配置"]["E2"] = '[{"kind":"fixed","value":0.01234567}]'
+    result, text = _run(book, tmp_path)
+    assert "统计量 0.3，限值 0.0123457" in text
+    assert result["传递标准稳定性"]["STD1|P1"]["criteria"][0]["limit"] == 0.01234567
+
+
+def test_transfer_diagnostic_uses_explicit_significant_digits(tmp_path: Path) -> None:
+    book = load_workbook(TRANSFER)
+    book["传递标准配置"]["E2"] = '[{"kind":"fixed","value":0.0123456}]'
+    _set(book, "方法配置", "display_sig_digits", 3)
+    result, text = _run(book, tmp_path)
+    assert "统计量 0.3，限值 0.0123" in text
+    assert result["传递标准稳定性"]["STD1|P1"]["criteria"][0]["limit"] == 0.0123456
 
 
 def test_transfer_indeterminate_criterion(tmp_path: Path) -> None:
@@ -151,6 +170,23 @@ def test_z_sigma_missing(tmp_path: Path, statistic: str) -> None:
     _set(book, "指定值与不确定度", "sigma_temporary", None)
     _, text = _run(book, tmp_path)
     assert "需要正的能力评定标准差" in text and "sigma_final" in text
+    assert "sigma_temporary" in text and "sigma_procedure" in text
+    assert "『方法配置』填写正的 sigma_pt" not in text
+
+
+def test_legacy_z_sigma_missing_uses_method_config(tmp_path: Path) -> None:
+    book = load_workbook(BASE)
+    _set(book, "指定值与不确定度", "method", None)
+    _set(book, "指定值与不确定度", "hom_source", "manual")
+    _set(book, "方法配置", "criterion_standard", "gl003")
+    _set(book, "方法配置", "assigned", 100)
+    _set(book, "方法配置", "sigma", None)
+    _set(book, "方法配置", "sigma_pt", None)
+    result, text = _run(book, tmp_path)
+    assert "z 未评价：需要正的能力评定标准差 σ_pt" in text
+    assert "『方法配置』填写正的 sigma_pt 或 sigma" in text
+    assert "sigma_final" not in text and "sigma_procedure" not in text
+    assert "参加者z" not in result
 
 
 def test_fallback_when_no_reason_available() -> None:
