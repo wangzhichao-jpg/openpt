@@ -2,10 +2,10 @@
 
 ## Windows 免安装版下载
 
-- **国内入口：**[Gitee 下载 Windows 免安装版 0.2.3](https://gitee.com/bigtaurus/openpt/releases#release-v0.2.3)（Gitee 本地附件）。
-- **备用入口：**[GitHub 下载 Windows 免安装版 0.2.3](https://github.com/wangzhichao-jpg/openpt/releases/tag/v0.2.3)。
+- **最新版：**[GitHub 下载 Windows 免安装版 0.2.4](https://github.com/wangzhichao-jpg/openpt/releases/tag/v0.2.4)。
+- **国内入口：**[Gitee 下载 Windows 免安装版 0.2.3](https://gitee.com/bigtaurus/openpt/releases#release-v0.2.3)（Gitee 本地附件；0.2.4 附件上传后更新）。
 
-两个入口均提供 0.2.3，包含甲醛、材料抗拉强度、颗粒振实密度和数字多用表四个示例。当前开发源码另含 GB/T 28043 合成检测示例；该示例不在上述已发布安装包中。
+0.2.4 包含甲醛、材料抗拉强度、颗粒振实密度、数字多用表和 GB/T 28043 合成检测五个示例，并在配置有误或未评价时给出带工作表、行号的问题清单和诊断提示；0.2.3 包含前四个示例。
 
 下载 Windows ZIP 后全部解压并双击程序。
 
