@@ -650,6 +650,26 @@ def inspect_input(
                                 invalid_enum,
                             )
                         )
+                    if (
+                        field
+                        in (
+                            "strict_homogeneity",
+                            "reference_uncertainty_negligible",
+                            "algorithm_a_simplified",
+                            "trend_plot",
+                        )
+                        and value not in (None, "")
+                        and not isinstance(value, bool)
+                    ):
+                        issues.append(
+                            Issue(
+                                "INVALID_CONFIG",
+                                "方法配置",
+                                config_cells[field],
+                                value,
+                                f"{field} 须为布尔值 TRUE 或 FALSE；请修改",
+                            )
+                        )
                     if field == "layout":
                         if value not in (None, "") and value not in ENUMS["layout"]:
                             issues.append(
@@ -826,6 +846,74 @@ def inspect_input(
                     category = "FORMULA_NO_CACHE" if cached is None else "FORMULA"
                     message = "公式没有缓存值" if cached is None else "现有计算器不接受公式"
                     issues.append(Issue(category, sheet, cell.coordinate, cell.value, message))
+        if "指定值与不确定度" in book.sheetnames:
+            rows = [list(row) for row in book["指定值与不确定度"].iter_rows(values_only=True)]
+            if rows:
+                pos = _positions(rows[0], "指定值与不确定度", mapping)
+                assigned_values: dict[str, Any] = {}
+                assigned_cells: dict[str, str] = {}
+                for number, row in enumerate(rows[1:], 2):
+                    key = row[pos["字段"]] if pos["字段"] < len(row) else None
+                    if key is not None:
+                        field = str(key)
+                        assigned_values[field] = row[pos["值"]] if pos["值"] < len(row) else None
+                        assigned_cells[field] = f"{get_column_letter(pos['值'] + 1)}{number}"
+
+                def add_assigned(field: str, message: str) -> None:
+                    issues.append(
+                        Issue(
+                            "INVALID_CONFIG",
+                            "指定值与不确定度",
+                            assigned_cells.get(field, ""),
+                            assigned_values.get(field),
+                            f"{field}：{message}",
+                        )
+                    )
+
+                if assigned_values.get("method") not in (None, ""):
+                    for field, label in (
+                        ("source", "指定值来源必填"),
+                        ("uncertainty_source", "不确定度来源必填"),
+                    ):
+                        value = assigned_values.get(field)
+                        if not isinstance(value, str) or not value.strip():
+                            add_assigned(field, f"{label}；请填写文字来源")
+                    for field in (
+                        "independent",
+                        "hom_in_base",
+                        "stab_in_base",
+                        "trans_in_base",
+                        "trans_in_stab",
+                    ):
+                        value = assigned_values.get(field)
+                        if value not in (None, "", "TRUE", "FALSE") and not isinstance(value, bool):
+                            add_assigned(field, "须为布尔值 TRUE 或 FALSE")
+                    if assigned_values.get("hom_source") == "gbt_ss":
+                        if assigned_values.get("hom_mapping") not in (
+                            "assigned",
+                            "sigma_prime",
+                            "both",
+                        ):
+                            add_assigned(
+                                "hom_mapping",
+                                f"hom_source={assigned_values['hom_source']} "
+                                f"（{assigned_cells.get('hom_source', '')}）时，"
+                                "引用 ss 须明确登记分量映射；"
+                                "请选择 assigned、sigma_prime 或 both",
+                            )
+                        if config_values.get("criterion_standard") != "gbt28043":
+                            issues.append(
+                                Issue(
+                                    "INVALID_CONFIG",
+                                    "方法配置",
+                                    config_cells.get("criterion_standard", ""),
+                                    config_values.get("criterion_standard"),
+                                    "hom_source=gbt_ss 时 criterion_standard 须为 "
+                                    "gbt28043；请修改标准模式",
+                                )
+                            )
+                        if assigned_values.get("u_hom") not in (None, "", 0, 0.0):
+                            add_assigned("u_hom", "引用 ss 时不得同时手工输入 u_hom；请清空")
         method = config_values.get("stability_method") or "two_sample"
         baseline_source = config_values.get("baseline_source") or (
             "homogeneity" if method == "mean_difference" else "baseline_group"

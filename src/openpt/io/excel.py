@@ -91,7 +91,13 @@ def template(path: str | Path) -> None:
         (
             "σ 与 σ_pt",
             "sigma 用于均匀性及稳定性判据；sigma_pt 是 z 等评价统计量的分母。"
-            "只填一个时自动沿用，均填写时分别使用。",
+            "仅『方法配置』的 sigma 与 sigma_pt 只填一个时自动沿用，均填写时分别使用；"
+            "指定值表中的 sigma_final 或 sigma_temporary 不用于均匀性和稳定性判据。",
+        ),
+        (
+            "GB/T 均匀性分量",
+            "hom_source=gbt_ss 时须在方法配置中设置 criterion_standard=gbt28043，"
+            "并在指定值表中登记 hom_mapping=assigned、sigma_prime 或 both。",
         ),
     ]:
         instructions.append([title, note])

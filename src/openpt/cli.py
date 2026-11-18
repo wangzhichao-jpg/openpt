@@ -27,7 +27,7 @@ from .core.stability import analyze as stability
 from .core.transfer import assess_transfer, summarize_transfer
 from .core.trend import configured_uncertainty, fit_series
 from .core.zscore import zscore
-from .errors import InputError
+from .errors import InputError, format_error
 from .io.excel import template
 from .io.shape import stability_structure_problem
 from .report.docx import make_report
@@ -671,6 +671,47 @@ def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]
                 for name, s in result.get("GB/T稳定性", {}).items()
             },
         }
+    diagnostics: list[dict[str, str]] = []
+    assigned_config = data.get("assigned_config", {})
+    if standard == "gbt28043" and (result.get("GB/T均匀性") or result.get("GB/T稳定性")):
+        missing = (basis == "sigma_pt" and sigma is None) or (
+            basis == "delta_e" and delta_e is None
+        )
+        if missing:
+            field = "sigma" if basis == "sigma_pt" else "delta_e"
+            message = f"『方法配置』判据 {field} 未填写，均匀性和稳定性可能未评价。"
+            if field == "sigma" and any(
+                assigned_config.get(key) not in (None, "")
+                for key in ("sigma_final", "sigma_temporary")
+            ):
+                message += (
+                    "指定值表中的 sigma_final/sigma_temporary 仅作为 σ_pt 用于 z 等统计量，"
+                    "不作为均匀性或稳定性判据；如需同值请在『方法配置』sigma 填写。"
+                )
+            diagnostics.append({"类型": "判据缺失", "说明": message})
+    assigned_result = result.get("指定值与不确定度", {})
+    flagged = assigned_result.get("stability_flagged_periods", [])
+    disposition = assigned_result.get("stability_disposition")
+    if disposition == "withhold" or (disposition == "pending" and flagged):
+        names = "、".join(flagged) if flagged else "无"
+        diagnostics.append(
+            {
+                "类型": "统计量暂停",
+                "说明": f"稳定性处置为 {disposition}，未得出通过结论的时间组：{names}；"
+                "请补充判据及数据，或由授权人员评定并登记 "
+                "budgeted、reviewed 或 withhold 处置及依据。",
+            }
+        )
+    if assigned_result and assigned_result.get("status") != "OK":
+        warnings = "；".join(assigned_result.get("warnings", [])) or "请检查指定值及分量映射"
+        diagnostics.append(
+            {
+                "类型": "指定值状态",
+                "说明": f"指定值状态 {assigned_result.get('status')}：{warnings}。",
+            }
+        )
+    if diagnostics:
+        result["诊断提示"] = diagnostics
     return result
 
 
@@ -925,6 +966,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"运行记录：{directory}")
         print(f"计算书：{directory / 'report.docx'}")
         print(f"结果 JSON：{directory / 'result.json'}")
+        for item in result.get("诊断提示", []):
+            print(f"诊断提示：{item['说明']}")
         if differences is not None:
             print(f"差异表：{directory / 'differences.csv'}")
             if args.differences is not None:
@@ -946,7 +989,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"错误：文件操作失败（{exc.strerror or '系统错误'}）", file=sys.stderr)
         return 2
     except (ValueError, TypeError, KeyError, OverflowError, BadZipFile) as exc:
-        print(f"错误：{exc}", file=sys.stderr)
+        print(f"错误：{format_error(exc)}", file=sys.stderr)
         return 2
 
 

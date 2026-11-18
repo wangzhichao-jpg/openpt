@@ -160,6 +160,7 @@ def test_visible_package_layout(tmp_path: Path) -> None:
         "数字多用表",
         "材料抗拉强度",
         "颗粒振实密度",
+        "GB-T合成检测",
     }
     index = (target / "示例案例" / "案例说明.txt").read_text(encoding="utf-8")
     assert "数字湿度计" not in index and "直流电能表" not in index

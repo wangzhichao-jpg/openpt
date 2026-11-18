@@ -46,7 +46,7 @@ def test_short_validation_message() -> None:
             '输入校验问题：[{"sheet":"均匀性","cell":"C2","message":"缺少数值","original":null}]'
         )
     )
-    assert text == "均匀性 C2：缺少数值"
+    assert text == "输入校验问题：\n1. 『均匀性』第2行（C2，当前值：None）：缺少数值"
 
 
 def test_smoke_launch_records_failure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import json
 import os
 import queue
 import sys
@@ -14,6 +13,7 @@ from typing import Any
 
 from openpyxl import load_workbook
 
+from .errors import format_error
 from .runs import create_run
 
 
@@ -87,7 +87,10 @@ def summarize(data: dict[str, Any], result: dict[str, Any]) -> str:
             for name, part in result["被测量"].items()
         )
     unit = data.get("info", {}).get("单位", "")
-    lines = [f"项目：{data.get('info', {}).get('项目名称', '')}　单位：{unit}", ""]
+    lines = []
+    if result.get("诊断提示"):
+        lines.extend(["【诊断提示】", *(item["说明"] for item in result["诊断提示"]), ""])
+    lines.extend([f"项目：{data.get('info', {}).get('项目名称', '')}　单位：{unit}", ""])
     hom = result.get("均匀性")
     gbt_hom = result.get("GB/T均匀性")
     transfer = result.get("传递标准稳定性") or {}
@@ -179,18 +182,7 @@ def summarize(data: dict[str, Any], result: dict[str, Any]) -> str:
 
 def friendly_error(exc: Exception) -> str:
     """将输入检查结果简化为表名、单元格和问题。"""
-    message = str(exc)
-    prefix = "输入校验问题："
-    if message.startswith(prefix):
-        try:
-            issues = json.loads(message[len(prefix) :])
-            return "\n".join(
-                f"{issue.get('sheet', '')} {issue.get('cell', '')}：{issue.get('message', '')}"
-                for issue in issues[:3]
-            )
-        except (ValueError, TypeError, AttributeError):
-            return "请检查工作簿中的数据和字段。"
-    return message[:300] or "请检查工作簿中的数据和字段。"
+    return format_error(exc)
 
 
 def main() -> None:
@@ -265,8 +257,11 @@ def main() -> None:
             result_text.insert("1.0", text + "\n\n结果目录：" + str(directory))
             status.set("计算完成。")
         else:
+            output.clear()
+            result_text.delete("1.0", "end")
+            result_text.insert("1.0", str(value))
             status.set("计算未完成。")
-            messagebox.showerror("输入或计算问题", str(value)[:500])
+            messagebox.showerror("输入或计算问题", str(value))
         root.after(100, poll)
 
     def open_output(report: bool) -> None:
