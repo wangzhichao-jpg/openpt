@@ -12,6 +12,7 @@ from zipfile import BadZipFile
 
 from . import __version__
 from .config.catalog import ENUMS
+from .config.rules import check_method_config
 from .config.sigma import criterion_sigma
 from .core.assigned import AssignedResult, assign_value
 from .core.decision import compare
@@ -422,6 +423,17 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
             }
         }
     cfg = data["config"]
+    rule_issues = check_method_config(cfg)
+    if rule_issues:
+        issue = rule_issues[0]
+        raise InputError(
+            issue.message,
+            sheet="方法配置",
+            field=issue.field,
+            value=issue.value,
+            allowed=issue.allowed,
+            hint=issue.hint,
+        )
     alpha = float(_option(cfg, "alpha", 0.05))
     sigma = criterion_sigma(cfg)
     if cfg.get("gbt28043_extension"):

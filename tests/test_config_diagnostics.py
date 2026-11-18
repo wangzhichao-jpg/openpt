@@ -7,7 +7,9 @@ import pytest
 from docx import Document
 from openpyxl import load_workbook
 
+from openpt.cli import calculate
 from openpt.errors import InputError, locate
+from openpt.io.excel import read_workbook
 from openpt.io.validation import inspect_input
 from openpt.windows_app import error_dialog_summary, result_text_content, run_workbook, summarize
 
@@ -146,6 +148,18 @@ def test_calculation_errors_located(tmp_path: Path) -> None:
     book.save(path)
     with pytest.raises(InputError, match=r"『方法配置』第.*行.*transfer_en_map"):
         run_workbook(path, tmp_path / "runs3")
+
+
+def test_delta_e_missing_rule_in_preflight_and_calculation(tmp_path: Path) -> None:
+    book = load_workbook(EXAMPLE)
+    _set(book, "方法配置", "gbt_criterion_basis", "delta_e")
+    _set(book, "方法配置", "delta_e", None)
+    path = tmp_path / "delta.xlsx"
+    book.save(path)
+    assert any("delta_e" in issue.message for issue in inspect_input(path))
+    data = read_workbook(path)
+    with pytest.raises(InputError, match=r"『方法配置』第.*行.*delta_e"):
+        calculate(data)
 
 
 def test_error_location_fallback() -> None:

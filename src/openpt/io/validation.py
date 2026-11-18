@@ -13,6 +13,7 @@ from openpyxl import load_workbook
 from openpyxl.utils.cell import column_index_from_string, coordinate_from_string, get_column_letter
 
 from ..config.catalog import ENUMS
+from ..config.rules import check_method_config
 from ..core.gbt28043 import period_options as gbt_period_options
 from ..core.transfer import assess_transfer
 from ..core.trend import configured_uncertainty, fit_series
@@ -981,6 +982,16 @@ def inspect_input(
                             )
                         if assigned_values.get("u_hom") not in (None, "", 0, 0.0):
                             add_assigned("u_hom", "引用 ss 时不得同时手工输入 u_hom；请清空")
+        for rule in check_method_config(config_values):
+            issues.append(
+                Issue(
+                    "INVALID_CONFIG",
+                    "方法配置",
+                    config_cells.get(rule.field, ""),
+                    rule.value,
+                    f"{rule.field}：{rule.message}；允许值/要求：{rule.allowed}；修改建议：{rule.hint}",
+                )
+            )
         method = config_values.get("stability_method") or "two_sample"
         baseline_source = config_values.get("baseline_source") or (
             "homogeneity" if method == "mean_difference" else "baseline_group"
