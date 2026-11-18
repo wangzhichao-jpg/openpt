@@ -424,6 +424,8 @@ def _unevaluated_reason(item: dict[str, Any], fallback: str) -> str:
     parts.extend(str(warning) for warning in warnings if warning and str(warning) not in parts)
     if item.get("status") == "INDETERMINATE" and item.get("b1") == 0 and item.get("s_b1") == 0:
         parts.append("斜率和斜率标准误均为零，无法进行趋势显著性判定")
+    if item.get("status") == "INDETERMINATE" and item.get("se") == 0 and item.get("t") is None:
+        parts.append("标准误为零，t 统计量无法计算")
     status = item.get("status")
     if status and status != "OK":
         parts.append(f"状态 {status}")
@@ -433,6 +435,82 @@ def _unevaluated_reason(item: dict[str, Any], fallback: str) -> str:
         if nested:
             parts.append(nested)
     return "；".join(parts) if parts else fallback
+
+
+def _trend_transfer_diagnostics(
+    data: dict[str, Any], result: dict[str, Any]
+) -> list[dict[str, str]]:
+    """从趋势与传递标准结果提取原因；缺少证据时不臆测数值。"""
+    diagnostics: list[dict[str, str]] = []
+    trends = result.get("趋势稳定性", {})
+    for name, trend in trends.items():
+        if trend.get("stable") is None:
+            reason = _unevaluated_reason(trend, "结果未提供具体原因")
+            diagnostics.append(
+                {
+                    "类型": "趋势未评价",
+                    "层级": "根因",
+                    "说明": f"趋势序列 {name} 未评价：{reason}；"
+                    "请检查『趋势稳定性』的时间 X、值 Y 及重复测量数据。",
+                }
+            )
+    assigned = data.get("assigned_config", {})
+    if (
+        trends
+        and assigned.get("method")
+        and not result.get("趋势不确定度")
+        and not assigned.get("u_stab")
+        and not assigned.get("stab_in_base")
+    ):
+        diagnostics.append(
+            {
+                "类型": "趋势不确定度未登记",
+                "层级": "根因",
+                "说明": "趋势计算未登记 u_stab 来源；如需将趋势纳入预算，请在『方法配置』填写 "
+                "trend_short_series、trend_short_span、trend_long_series、trend_long_span，"
+                "或在『指定值与不确定度』登记评定后的 u_stab 及 stab_mapping。",
+            }
+        )
+    for name, point in result.get("传递标准稳定性", {}).items():
+        if point.get("conclusion") is not True:
+            criteria = [
+                criterion
+                for criterion in point.get("criteria", [])
+                if criterion.get("pass") is not True
+            ]
+            details = []
+            for criterion in criteria:
+                reason = _unevaluated_reason(criterion, "")
+                kind = criterion.get("kind", "未知")
+                if criterion.get("pass") is False:
+                    reason = (
+                        f"判据 {kind} 未通过（统计量 {criterion.get('value')}，"
+                        f"限值 {criterion.get('limit')}）" + (f"；{reason}" if reason else "")
+                    )
+                elif reason:
+                    reason = f"判据 {kind} 未评价：{reason}"
+                else:
+                    reason = f"判据 {kind} 未评价，结果未提供具体原因"
+                details.append(reason)
+            reason = "；".join(details) or _unevaluated_reason(point, "结果未提供具体原因")
+            diagnostics.append(
+                {
+                    "类型": "传递标准未通过或未评价",
+                    "层级": "根因",
+                    "说明": f"传递标准 {name} 未通过或未评价：{reason}；"
+                    "请检查『传递标准复测』的测量组、区间数据及『传递标准配置』的判据JSON。",
+                }
+            )
+        if point.get("uncertainty_status") == "NOT_EVALUATED":
+            diagnostics.append(
+                {
+                    "类型": "传递标准不确定度未登记",
+                    "层级": "根因",
+                    "说明": f"传递标准 {name} 的稳定性不确定度机制未登记；"
+                    "如需用于 En，请在『传递标准配置』不确定度JSON 登记 mechanism 和 source。",
+                }
+            )
+    return diagnostics
 
 
 def _select_gbt_rule(result: dict[str, Any], rule: str) -> None:
@@ -954,6 +1032,7 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
         diagnostics.append(
             {"类型": "未评价", "说明": f"{'、'.join(others)}未评价；请检查数据及设计警告。"}
         )
+    diagnostics.extend(_trend_transfer_diagnostics(data, result))
     assigned_result = result.get("指定值与不确定度", {})
     flagged = assigned_result.get("stability_flagged_periods", [])
     disposition = assigned_result.get("stability_disposition")
@@ -977,32 +1056,99 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
                 "budgeted、reviewed 或 withhold 处置及依据。",
             }
         )
+    if assigned_result and assigned_result.get("status") != "OK":
+        warnings = "；".join(assigned_result.get("warnings", [])) or "请检查指定值及分量映射"
+        diagnostics.append(
+            {
+                "类型": "指定值状态",
+                "层级": "根因",
+                "说明": f"指定值状态 {assigned_result.get('status')}：{warnings}。",
+            }
+        )
     grouped_scores: dict[tuple[str, str], list[str]] = {}
     for participant, scores in result.get("参加者统计量", {}).items():
         for statistic, score in scores.items():
             if score.get("value") is None:
                 reason = score.get("reason") or _unevaluated_reason(score, "原因未登记")
-                if blocked and reason == "指定值或分量映射未通过审核":
-                    reason = f"稳定性处置为 {disposition}，参加者评价被暂停"
+                if reason == "指定值或分量映射未通过审核":
                     other_warnings = [
                         w
                         for w in assigned_result.get("warnings", [])
                         if w != "稳定性或运输处置未完成，或已登记暂停评价"
                     ]
-                    if other_warnings:
-                        reason += "；" + "；".join(other_warnings)
+                    if blocked:
+                        reason = f"稳定性处置为 {disposition}，参加者评价被暂停"
+                        if other_warnings:
+                            reason += "；" + "；".join(other_warnings)
+                    elif other_warnings:
+                        reason = "；".join(other_warnings)
+                    else:
+                        reason = f"指定值状态 {assigned_result.get('status')}，结果未提供具体原因"
                 grouped_scores.setdefault((statistic, str(reason)), []).append(str(participant))
     for (statistic, reason), participants in grouped_scores.items():
         if "参加者 u(x)" in reason:
-            advice = "请在参加者结果表填写标准不确定度 u(x)，并检查指定值 u(X)。"
+            advice = (
+                "请在『参加者结果』填写标准不确定度u(x)，并在『指定值与不确定度』检查 uncertainty。"
+            )
         elif "扩展不确定度" in reason and "包含因子" in reason:
-            advice = "请填写双方扩展不确定度 U 与包含因子 k，并核实独立性。"
+            advice = (
+                "请在『指定值与不确定度』填写 U_assigned、k_assigned，"
+                "在『参加者结果』填写扩展不确定度U(x)、包含因子k。"
+            )
         elif "能力评定标准差" in reason:
-            advice = "请登记正的 σ_pt 及其确定程序。"
+            advice = (
+                "请在『指定值与不确定度』登记正的 sigma_final 或 sigma_temporary "
+                "及 sigma_procedure。"
+            )
+        elif "未绑定唯一的传递标准校准点" in reason:
+            advice = (
+                "请在『方法配置』transfer_en_map 中将参加者编号绑定到"
+                "『传递标准配置』的标准器|校准点。"
+            )
+        elif "缺少参考值扩展不确定度" in reason:
+            advice = "请在『指定值与不确定度』填写 U_assigned 及 k_assigned。"
+        elif "传递标准稳定性未通过或未评价" in reason:
+            advice = "请检查『传递标准复测』的数据和『传递标准配置』的判据JSON，先完成稳定性审核。"
+        elif "传递标准稳定性衔接条件" in reason:
+            advice = (
+                "请审核『传递标准配置』不确定度JSON 中的 mechanism、source "
+                "及其机制参数，避免重复计入。"
+            )
+        elif "参考扩展不确定度已含稳定性" in reason:
+            advice = (
+                "请审核『传递标准配置』不确定度JSON 的 ref_includes_stability 和 U_E，"
+                "避免重复计入。"
+            )
+        elif "使用 k=2" in reason:
+            advice = (
+                "请核实『指定值与不确定度』k_assigned 与『参加者结果』包含因子k，"
+                "其他因子须采用批准模型。"
+            )
+        elif "不相关" in reason:
+            advice = (
+                "请由授权人员核实相关性，在『指定值与不确定度』登记 independent；"
+                "不能确认时不得强行评价。"
+            )
+        elif "公议" in reason or "参与定值" in reason:
+            advice = "请审核参加者与公议指定值的相关性，必要时使用经批准的评价模型。"
+        elif "指定值标准不确定度" in reason:
+            advice = "请在『指定值与不确定度』登记 uncertainty 及 uncertainty_source。"
         elif "指定值为零" in reason:
-            advice = "请审核指定值是否为零；零指定值不能计算百分相对差。"
+            advice = "请审核『指定值与不确定度』value 是否为零；零指定值不能计算百分相对差。"
         elif "分母为零" in reason:
-            advice = "请核实不确定度或标准差输入，避免统计量分母为零。"
+            advice = (
+                "请核实『指定值与不确定度』的标准差或不确定度，"
+                "以及『参加者结果』中的不确定度，避免分母为零。"
+            )
+        elif "重复计入" in reason:
+            advice = (
+                "请审核『指定值与不确定度』的 hom_mapping、stab_mapping、trans_mapping "
+                "及基础预算标识，消除重复计入。"
+            )
+        elif "未分配" in reason:
+            advice = (
+                "请审核『指定值与不确定度』的 u_trans、trans_mapping 和基础预算标识，登记运输分量。"
+            )
         elif "稳定性处置" in reason:
             advice = "请先完成上列稳定性处置。"
         else:
@@ -1013,39 +1159,6 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
                 "层级": "后果",
                 "说明": f"{statistic} 未评价：{reason}；参加者：{'、'.join(participants)}。"
                 + advice,
-            }
-        )
-    for name, trend in result.get("趋势稳定性", {}).items():
-        if trend.get("stable") is None:
-            reason = _unevaluated_reason(trend, "结果未提供具体原因")
-            diagnostics.append(
-                {
-                    "类型": "趋势未评价",
-                    "说明": f"趋势序列 {name} 未评价：{reason}；请检查时间点、观测数据及拟合结果。",
-                }
-            )
-    for name, point in result.get("传递标准稳定性", {}).items():
-        if point.get("conclusion") is None:
-            reasons = [
-                _unevaluated_reason(criterion, "")
-                for criterion in point.get("criteria", [])
-                if criterion.get("pass") is None
-            ]
-            reason = "；".join(item for item in reasons if item) or _unevaluated_reason(
-                point, "结果未提供具体原因"
-            )
-            diagnostics.append(
-                {
-                    "类型": "传递标准未评价",
-                    "说明": f"传递标准 {name} 未评价：{reason}；请检查逐点判据和复测数据。",
-                }
-            )
-    if assigned_result and assigned_result.get("status") != "OK":
-        warnings = "；".join(assigned_result.get("warnings", [])) or "请检查指定值及分量映射"
-        diagnostics.append(
-            {
-                "类型": "指定值状态",
-                "说明": f"指定值状态 {assigned_result.get('status')}：{warnings}。",
             }
         )
     if diagnostics:
