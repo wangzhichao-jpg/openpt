@@ -28,7 +28,7 @@ from .core.stability import analyze as stability
 from .core.transfer import assess_transfer, summarize_transfer
 from .core.trend import configured_uncertainty, fit_series
 from .core.zscore import zscore
-from .errors import InputError, format_error, locate
+from .errors import InputError, format_error, locate, sheet_call
 from .io.excel import template
 from .io.shape import stability_structure_problem
 from .report.docx import make_report
@@ -555,8 +555,12 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
             )
         if data.get("stability"):
             raise InputError("回归趋势法不能混用稳定性工作表")
-        result["趋势稳定性"] = fit_series(
-            trend_input, str(_option(cfg, "trend_aggregate", "per_series")), alpha
+        result["趋势稳定性"] = sheet_call(
+            "趋势稳定性",
+            fit_series,
+            trend_input,
+            str(_option(cfg, "trend_aggregate", "per_series")),
+            alpha,
         )
         trend_u = configured_uncertainty(result["趋势稳定性"], cfg)
         if trend_u is not None:
@@ -565,7 +569,9 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
         configs = data.get("transfer_config", {})
         if not configs:
             raise InputError("传递标准设计须登记逐点配置")
-        result["传递标准稳定性"] = assess_transfer(data.get("transfer_observations", []), configs)
+        result["传递标准稳定性"] = sheet_call(
+            "传递标准复测/配置", assess_transfer, data.get("transfer_observations", []), configs
+        )
         result["传递标准汇总"] = summarize_transfer(result["传递标准稳定性"])
     elif data.get("transfer_observations") or data.get("transfer_config"):
         raise InputError(
@@ -609,13 +615,15 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
                     field="sigma_stage",
                     allowed="temporary 或 final",
                 )
-            result["均匀性"] = single_homogeneity(data["homogeneity"], sigma)
+            result["均匀性"] = sheet_call("均匀性", single_homogeneity, data["homogeneity"], sigma)
             result["均匀性"]["sigma_source"] = _option(cfg, "sigma_source", None)
             result["均匀性"]["sigma_stage"] = stage if sigma is not None else None
             if sigma is not None and stage == "temporary":
                 result["均匀性"]["Ss_status"] = "PROVISIONAL"
         else:
-            result["均匀性"] = homogeneity(
+            result["均匀性"] = sheet_call(
+                "均匀性",
+                homogeneity,
                 data["homogeneity"],
                 sigma,
                 alpha,
@@ -650,8 +658,13 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
                     ],
                 }
             else:
-                gbt_hom = gbt_homogeneity(
-                    data["homogeneity"], sigma, delta_e=delta_e, basis=basis_option
+                gbt_hom = sheet_call(
+                    "均匀性",
+                    gbt_homogeneity,
+                    data["homogeneity"],
+                    sigma,
+                    delta_e=delta_e,
+                    basis=basis_option,
                 )
             _select_gbt_rule(gbt_hom, hom_rule)
             result["GB/T均匀性"] = gbt_hom
@@ -702,7 +715,9 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
             if method == "mean_difference"
             else _option(cfg, "reference_source", None),
         }
-        result["稳定性"] = stability(
+        result["稳定性"] = sheet_call(
+            "稳定性",
+            stability,
             groups.get("基线"),
             groups[primary_group],
             sigma,
@@ -713,7 +728,9 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
             **design_options,
         ).to_dict()
         if level == "all_repeats":
-            result["报告层级稳定性"] = stability(
+            result["报告层级稳定性"] = sheet_call(
+                "稳定性",
+                stability,
                 groups.get("基线"),
                 groups[primary_group],
                 sigma,
@@ -727,7 +744,9 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
         extra = {}
         for name, observations in groups.items():
             if name not in ("基线", primary_group):
-                extra[name] = stability(
+                extra[name] = sheet_call(
+                    "稳定性",
+                    stability,
                     groups.get("基线"),
                     observations,
                     sigma,
@@ -765,7 +784,9 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
             for name, observations in groups.items():
                 if name == "基线":
                     continue
-                period = gbt_stability(
+                period = sheet_call(
+                    "稳定性",
+                    gbt_stability,
                     baseline_data,
                     observations,
                     sigma,
@@ -793,7 +814,11 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
                 )
             )
         )
-        result.update(_participant_results(data, sigma, legacy_scores=not legacy_blocked))
+        result.update(
+            sheet_call(
+                "参加者结果", _participant_results, data, sigma, legacy_scores=not legacy_blocked
+            )
+        )
         if legacy_blocked and cfg.get("assigned") not in (None, ""):
             result["参加者z状态"] = "DESIGN_REVIEW：稳定性未通过或未评价，须登记指定值和处置依据"
     if data.get("assigned_config", {}).get("method"):
@@ -817,7 +842,9 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
             )
         )
     if data.get("algorithm_s_values"):
-        result["算法S"] = algorithm_s(
+        result["算法S"] = sheet_call(
+            "算法S",
+            algorithm_s,
             data["algorithm_s_values"],
             data["algorithm_s_df"],
             max_iterations=int(_option(cfg, "algorithm_s_max_iterations", 1000)),

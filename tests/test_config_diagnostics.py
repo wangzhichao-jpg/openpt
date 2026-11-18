@@ -7,6 +7,7 @@ import pytest
 from docx import Document
 from openpyxl import load_workbook
 
+import openpt.cli as cli
 from openpt.cli import _unevaluated_reason, calculate
 from openpt.errors import InputError, locate
 from openpt.io.excel import read_workbook
@@ -242,6 +243,35 @@ def test_csv_error_location_fallback(tmp_path: Path) -> None:
     data = read_workbook(path, csv_sheet="参加者结果", unit="mg")
     data["config"].update(criterion_standard="gbt28043", gbt_criterion_basis="delta_e")
     with pytest.raises(InputError, match="『方法配置』字段 delta_e"):
+        calculate(data)
+
+
+@pytest.mark.parametrize(
+    ("function", "sheet"),
+    [
+        ("homogeneity", "均匀性"),
+        ("stability", "稳定性"),
+        ("fit_series", "趋势稳定性"),
+        ("algorithm_s", "算法S"),
+    ],
+)
+def test_calculation_phase_error_names_sheet(
+    monkeypatch: pytest.MonkeyPatch, function: str, sheet: str
+) -> None:
+    data = read_workbook(EXAMPLE)
+    if function == "fit_series":
+        data["config"]["stability_method"] = "regression_trend"
+        data["trend_observations"] = [{"series": "x"}]
+        data["stability"] = {}
+    if function == "algorithm_s":
+        data["algorithm_s_values"] = [1.0, 2.0]
+        data["algorithm_s_df"] = 2
+
+    def fail(*args: object, **kwargs: object) -> None:
+        raise InputError("合成数据错误")
+
+    monkeypatch.setattr(cli, function, fail)
+    with pytest.raises(InputError, match=f"『{sheet}』：合成数据错误"):
         calculate(data)
 
 

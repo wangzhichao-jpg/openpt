@@ -3,6 +3,7 @@
 
 import json
 import re
+from collections.abc import Callable
 from typing import Any
 
 _MISSING = object()
@@ -34,7 +35,7 @@ class InputError(ValueError):
 def locate(exc: InputError, data: dict[str, Any]) -> InputError:
     """用输入工作簿的字段位置补全错误；无字段时不改变原消息。"""
     if not exc.field and not exc.fields:
-        return exc
+        return InputError(f"『{exc.sheet}』：{exc}") if exc.sheet else exc
     sheet = exc.sheet or "指定值与不确定度"
     if exc.fields:
         pieces = []
@@ -81,6 +82,16 @@ def locate(exc: InputError, data: dict[str, Any]) -> InputError:
     if exc.hint:
         message += f"；修改建议：{exc.hint}"
     return InputError(message)
+
+
+def sheet_call(sheet: str, function: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
+    """为测量表计算中缺少定位的输入错误补充工作表。"""
+    try:
+        return function(*args, **kwargs)
+    except InputError as exc:
+        if not exc.sheet and not exc.field and not exc.fields:
+            exc.sheet = sheet
+        raise
 
 
 def format_error(exc: Exception) -> str:
