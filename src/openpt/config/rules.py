@@ -6,6 +6,7 @@ import math
 from dataclasses import dataclass
 from typing import Any, TypeGuard
 
+from ..io.shape import period_enum_problem
 from .catalog import ENUMS
 
 
@@ -258,6 +259,9 @@ def check_method_config(values: dict[str, Any]) -> list[RuleIssue]:
         value = values.get(field)
         if _number(value) and value <= 0:
             add(field, f"{field} 必须为正有限数", "正有限数", "修改数值")
+    period_problem = period_enum_problem(values.get("stability_period_options"))
+    if period_problem:
+        add("stability_period_options", period_problem, "有效逐时点 JSON 配置", "修正逐时点配置")
     raw = values.get("transfer_en_map")
     if raw not in (None, ""):
         try:

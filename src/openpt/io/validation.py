@@ -24,10 +24,8 @@ from .measurands import DATA_SHEETS, split_measurands
 from .new_stability import read_transfer_config, read_transfer_sheet, read_trend_sheet
 from .shape import (
     STABILITY_METHOD_ALIASES,
-    enum_problem,
     insufficient_homogeneity_replicates,
     insufficient_units,
-    period_enum_problem,
     stability_structure_problem,
 )
 
@@ -461,76 +459,6 @@ def _check_batches(rows: list[list[Any]], mapping: dict[str, Any]) -> list[Issue
     return issues
 
 
-def _check_numeric_config(
-    sheet: str, rows: list[list[Any]], mapping: dict[str, Any], formulas: set[str]
-) -> list[Issue]:
-    """检查方法及定值配置中明确要求为数值的字段。"""
-    if not rows:
-        return []
-    positions = _positions(rows[0], sheet, mapping)
-    known = {
-        "alpha",
-        "sigma",
-        "reference",
-        "assigned",
-        "sigma_pt",
-        "delta_e",
-        "stability_u1",
-        "stability_u2",
-        "algorithm_a_tolerance",
-        "algorithm_a_max_iterations",
-        "display_z_decimals",
-        "display_sig_digits",
-        "display_mean_decimals",
-        "display_ss_decimals",
-        "z_satisfactory",
-        "z_unsatisfactory",
-        "en_limit",
-        "algorithm_s_tolerance",
-        "algorithm_s_max_iterations",
-        "mean1",
-        "mean2",
-        "s1",
-        "s2",
-        "n1",
-        "n2",
-        "sigma_composite",
-        "sigma_ss",
-        "sigma_composite_digits",
-        "reported_stability_sigma",
-        "value",
-        "uncertainty",
-        "sigma_temporary",
-        "sigma_final",
-        "u_hom",
-        "u_stab",
-        "u_trans",
-        "U_assigned",
-        "k_assigned",
-    }
-    issues = []
-    for number, row in enumerate(rows[1:], 2):
-        key_col, value_col = positions["字段"], positions["值"]
-        key = row[key_col] if key_col < len(row) else None
-        value = row[value_col] if value_col < len(row) else None
-        match = re.search(r"（([a-zA-Z_][a-zA-Z_0-9]*)）$", str(key))
-        field = match.group(1) if match else str(key)
-        cell = f"{get_column_letter(value_col + 1)}{number}"
-        if field not in known or value in (None, "") or cell in formulas:
-            continue
-        try:
-            valid = (
-                not isinstance(value, bool)
-                and isinstance(value, (int, float))
-                and math.isfinite(value)
-            )
-        except OverflowError:
-            valid = False
-        if not valid:
-            issues.append(Issue("NON_NUMERIC", sheet, cell, value, "配置值必须为有限数"))
-    return issues
-
-
 def inspect_input(
     path: str | Path | BytesIO,
     mapping: dict[str, Any] | None = None,
@@ -636,69 +564,10 @@ def inspect_input(
                         value = value in ("启用", "TRUE")
                     config_values[field] = value
                     config_cells[field] = f"{get_column_letter(col + 1)}{index}"
-                    invalid_enum = (
-                        period_enum_problem(value)
-                        if field == "stability_period_options"
-                        else enum_problem(field, value)
-                    )
-                    if invalid_enum:
-                        issues.append(
-                            Issue(
-                                "INVALID_CONFIG",
-                                "方法配置",
-                                config_cells[field],
-                                value,
-                                invalid_enum,
-                            )
-                        )
-                    if (
-                        field
-                        in (
-                            "strict_homogeneity",
-                            "reference_uncertainty_negligible",
-                            "algorithm_a_simplified",
-                            "trend_plot",
-                        )
-                        and value not in (None, "")
-                        and not isinstance(value, bool)
-                    ):
-                        issues.append(
-                            Issue(
-                                "INVALID_CONFIG",
-                                "方法配置",
-                                config_cells[field],
-                                value,
-                                f"{field} 须为布尔值 TRUE 或 FALSE；请修改",
-                            )
-                        )
-                    if field == "layout":
-                        if value not in (None, "") and value not in ENUMS["layout"]:
-                            issues.append(
-                                Issue(
-                                    "INVALID_CONFIG",
-                                    "方法配置",
-                                    f"{get_column_letter(col + 1)}{index}",
-                                    value,
-                                    "布局应为 long 或 wide",
-                                )
-                            )
-                        else:
-                            layout = value or None
-                        continue
-                    if field != "replicate_type":
-                        continue
-                    if value not in (None, "") and value not in ENUMS["replicate_type"]:
-                        issues.append(
-                            Issue(
-                                "INVALID_CONFIG",
-                                "方法配置",
-                                f"{get_column_letter(col + 1)}{index}",
-                                value,
-                                "重复性质无效",
-                            )
-                        )
-                    else:
-                        replicate_type = value or "technical"
+                    if field == "layout" and value in ENUMS["layout"]:
+                        layout = value
+                    if field == "replicate_type" and value in ENUMS["replicate_type"]:
+                        replicate_type = value
         project_unit: Any = None
         if "项目信息" not in book.sheetnames:
             issues.append(Issue("MISSING_SHEET", "项目信息", "A1", None, "缺少项目信息工作表"))
@@ -818,27 +687,10 @@ def inspect_input(
                     issues.extend(_check_numeric_table(sheet, rows, mapping, formulas))
                 else:
                     if sheet == "指定值与不确定度":
-                        positions = _positions(rows[0], sheet, mapping)
-                        for number, row in enumerate(rows[1:], 2):
-                            field = row[positions["字段"]] if positions["字段"] < len(row) else None
-                            column = positions["值"]
-                            value = row[column] if column < len(row) else None
-                            invalid_enum = enum_problem(str(field), value, assigned=True)
-                            if invalid_enum:
-                                issues.append(
-                                    Issue(
-                                        "INVALID_CONFIG",
-                                        sheet,
-                                        f"{get_column_letter(column + 1)}{number}",
-                                        value,
-                                        invalid_enum,
-                                    )
-                                )
                         calculation_data_present |= any(
                             len(row) >= 2 and row[0] == "method" and row[1] not in (None, "")
                             for row in rows[1:]
                         )
-                    issues.extend(_check_numeric_config(sheet, rows, mapping, formulas))
             for row in book[sheet].iter_rows():
                 for cell in row:
                     if cell.data_type != "f":
@@ -860,117 +712,6 @@ def inspect_input(
                         assigned_values[field] = row[pos["值"]] if pos["值"] < len(row) else None
                         assigned_cells[field] = f"{get_column_letter(pos['值'] + 1)}{number}"
 
-                def add_assigned(field: str, message: str) -> None:
-                    issues.append(
-                        Issue(
-                            "INVALID_CONFIG",
-                            "指定值与不确定度",
-                            assigned_cells.get(field, ""),
-                            assigned_values.get(field),
-                            f"{field}：{message}",
-                        )
-                    )
-
-                if assigned_values.get("method") not in (None, ""):
-                    method_value = assigned_values.get("method")
-                    components = assigned_values.get("known_components")
-                    experts = assigned_values.get("expert_values")
-                    if method_value in (
-                        "known",
-                        "certified",
-                        "reference",
-                        "expert_consensus",
-                    ) and not (method_value == "expert_consensus" and experts not in (None, "")):
-                        if assigned_values.get("value") in (None, ""):
-                            add_assigned("value", "该方法须填写指定值，请填写有限数")
-                        if not (
-                            method_value == "known" and components not in (None, "")
-                        ) and assigned_values.get("uncertainty") in (None, ""):
-                            add_assigned(
-                                "uncertainty", "该方法须填写标准不确定度，请填写非负有限数"
-                            )
-                    for field, expected in (
-                        ("known_components", "known"),
-                        ("expert_values", "expert_consensus"),
-                    ):
-                        raw = assigned_values.get(field)
-                        if raw not in (None, ""):
-                            if method_value != expected:
-                                add_assigned(field, f"仅适用于 {expected} 方法；请清空或修改方法")
-                            try:
-                                numbers = (
-                                    [float(x.strip()) for x in raw.split(",")]
-                                    if isinstance(raw, str)
-                                    else []
-                                )
-                                valid = bool(numbers) and all(math.isfinite(x) for x in numbers)
-                                valid = valid and (
-                                    field != "known_components" or all(x >= 0 for x in numbers)
-                                )
-                                valid = valid and (field != "expert_values" or len(numbers) >= 2)
-                            except (ValueError, OverflowError):
-                                valid = False
-                            if not valid:
-                                add_assigned(
-                                    field, "须填写逗号分隔的有限数；专家结果至少两个，制备分量非负"
-                                )
-                    for field in ("sigma_temporary", "sigma_final"):
-                        value = assigned_values.get(field)
-                        if (
-                            isinstance(value, (int, float))
-                            and not isinstance(value, bool)
-                            and value <= 0
-                        ):
-                            add_assigned(field, "须为正有限数，请修改")
-                    if any(
-                        assigned_values.get(k) not in (None, "")
-                        for k in ("sigma_temporary", "sigma_final")
-                    ):
-                        procedure = assigned_values.get("sigma_procedure")
-                        if not isinstance(procedure, str) or not procedure.strip():
-                            add_assigned(
-                                "sigma_procedure", "填写 σ_pt 时须登记确定程序，请填写文字"
-                            )
-                    for field in ("uncertainty", "u_hom", "u_stab", "u_trans", "U_assigned"):
-                        value = assigned_values.get(field)
-                        if (
-                            isinstance(value, (int, float))
-                            and not isinstance(value, bool)
-                            and value < 0
-                        ):
-                            add_assigned(field, "须为非负有限数，请修改")
-                    for field, label in (
-                        ("source", "指定值来源必填"),
-                        ("uncertainty_source", "不确定度来源必填"),
-                    ):
-                        value = assigned_values.get(field)
-                        if not isinstance(value, str) or not value.strip():
-                            add_assigned(field, f"{label}；请填写文字来源")
-                    for field in (
-                        "independent",
-                        "hom_in_base",
-                        "stab_in_base",
-                        "trans_in_base",
-                        "trans_in_stab",
-                    ):
-                        value = assigned_values.get(field)
-                        if value not in (None, "", "TRUE", "FALSE") and not isinstance(value, bool):
-                            add_assigned(field, "须为布尔值 TRUE 或 FALSE")
-                    if assigned_values.get("hom_source") == "gbt_ss":
-                        if assigned_values.get("hom_mapping") not in (
-                            "assigned",
-                            "sigma_prime",
-                            "both",
-                        ):
-                            add_assigned(
-                                "hom_mapping",
-                                f"hom_source={assigned_values['hom_source']} "
-                                f"（{assigned_cells.get('hom_source', '')}）时，"
-                                "引用 ss 须明确登记分量映射；"
-                                "请选择 assigned、sigma_prime 或 both",
-                            )
-                        if assigned_values.get("u_hom") not in (None, "", 0, 0.0):
-                            add_assigned("u_hom", "引用 ss 时不得同时手工输入 u_hom；请清空")
         if "指定值与不确定度" in book.sheetnames and rows:
             for rule in check_assigned(assigned_values, config_values):
                 if not any(
@@ -994,7 +735,7 @@ def inspect_input(
         for rule in [*check_method_config(config_values), *cross_issues]:
             issues.append(
                 Issue(
-                    "INVALID_CONFIG",
+                    "NON_NUMERIC" if rule.message.endswith("必须为有限数") else "INVALID_CONFIG",
                     "方法配置",
                     config_cells.get(rule.field, ""),
                     rule.value,
