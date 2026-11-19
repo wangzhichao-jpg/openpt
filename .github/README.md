@@ -14,6 +14,8 @@ Version 0.2.4 includes five examples: formaldehyde, tensile strength of material
 
 Unzip the whole Windows ZIP and double-click the program. No Python, other runtime or administrator rights are needed. Licensed under Apache-2.0.
 
+Windows 11 Smart App Control may block unsigned applications; see the [user guide (Chinese)](../docs/使用手册.md#smart-app-control) for options.
+
 ## Windows quick start
 
 1. Unzip `能力验证样品评价与定值工具_Windows.zip` and double-click `能力验证样品评价与定值工具.exe` in the extracted folder.

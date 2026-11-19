@@ -140,11 +140,11 @@ def test_examples_independent_recalculation(name: str, tmp_path: Path) -> None:
 
 def test_version_in_frozen_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(sys, "frozen", True, raising=False)
-    assert __version__ == "0.2.4"
+    assert __version__ == "0.2.5"
     assert environment()["openpt"] == __version__
     assert environment()["git_commit"] is None
-    assert 'version = "0.2.4"' in (ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    assert "version: 0.2.4" in (ROOT / "CITATION.cff").read_text(encoding="utf-8")
+    assert 'version = "0.2.5"' in (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    assert "version: 0.2.5" in (ROOT / "CITATION.cff").read_text(encoding="utf-8")
 
 
 def test_visible_package_layout(tmp_path: Path) -> None:

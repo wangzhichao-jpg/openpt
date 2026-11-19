@@ -16,6 +16,7 @@ from openpyxl import load_workbook
 from .errors import format_error
 from .formatting import display_value
 from .io.period_table import create_period_sheet
+from .report.period_criteria import has_period_overrides, period_fields, selected_periods
 from .runs import create_run
 
 
@@ -147,6 +148,19 @@ def summarize(data: dict[str, Any], result: dict[str, Any]) -> str:
     groups = {result.get("稳定性时间组", "稳定期"): stability} if stability else {}
     groups.update(result.get("其他稳定性") or {})
     gbt_groups = result.get("GB/T稳定性") or {}
+    _, selected_groups = selected_periods(result)
+    show_criteria = has_period_overrides(selected_groups)
+
+    def criteria_suffix(item: dict[str, Any], gbt: bool) -> str:
+        if not show_criteria:
+            return ""
+        fields = period_fields(item, gbt, sig)
+        delta = f"；δE={fields['delta_e']}" if gbt and fields["basis"].startswith("δE") else ""
+        return (
+            f"；方法={fields['method']}；判据={fields['rule']}；"
+            f"依据={fields['basis']}{delta}；基线={fields['baseline_source']}"
+        )
+
     if gbt_groups:
         groups = {}
         for name, item in gbt_groups.items():
@@ -155,6 +169,7 @@ def summarize(data: dict[str, Any], result: dict[str, Any]) -> str:
             lines.append(
                 f"{name}（GB/T 28043 {clause}）：差值 = {_number(item.get('difference'))}；"
                 f"限值 = {_number(item.get(rule + '_limit'))}；{_decision(item.get('conclusion'))}"
+                f"{criteria_suffix(item, True)}"
             )
     if not groups and not gbt_groups and not transfer:
         lines.append("稳定性：未计算")
@@ -167,7 +182,7 @@ def summarize(data: dict[str, Any], result: dict[str, Any]) -> str:
         method_name = "GL003 5.3 均值差" if mean_difference else item.get("method", "")
         lines.append(
             f"{name}（{method_name}）：{label} = {_number(statistic)}；"
-            f"限值 = {_number(limit)}；{_decision(conclusion)}"
+            f"限值 = {_number(limit)}；{_decision(conclusion)}{criteria_suffix(item, False)}"
         )
     for name, point in transfer.items():
         lines.append(

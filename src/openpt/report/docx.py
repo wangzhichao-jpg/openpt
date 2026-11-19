@@ -17,6 +17,7 @@ from openpyxl.utils.cell import column_index_from_string, coordinate_from_string
 
 from .. import __version__
 from ..formatting import display_value
+from .period_criteria import has_period_overrides, period_fields, selected_periods
 
 
 def _shown(value: Any, digits: int = 4, places: int | None = None) -> str:
@@ -517,6 +518,27 @@ def _other_results(
 ) -> None:
     """显示稳定性、稳健统计和参加者评价。"""
     doc.add_heading("稳定性评价", 1)
+    gbt, groups = selected_periods(result)
+    if has_period_overrides(groups):
+        doc.add_heading("逐组评价准则", 2)
+        rows = []
+        for name, item in groups.items():
+            fields = period_fields(item, gbt, sig)
+            rows.append(
+                [
+                    name,
+                    fields["kind"],
+                    fields["method"],
+                    fields["rule"],
+                    fields["basis"],
+                    fields["delta_e"],
+                    fields["baseline_source"],
+                    fields["origins"],
+                ]
+            )
+        _table(
+            doc, ["时间组", "类型", "方法", "判据规则", "依据", "δE", "基线来源", "各项来源"], rows
+        )
     s = result.get("稳定性")
     if s:
         _stability_table(doc, str(result.get("稳定性时间组") or "稳定期"), s, sig)

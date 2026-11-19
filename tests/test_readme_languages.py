@@ -31,14 +31,24 @@ def test_relative_links_resolve() -> None:
     for name in ("README.md", "README.en.md", ".github/README.md"):
         path = ROOT / name
         for target in pattern.findall(path.read_text(encoding="utf-8")):
-            assert (path.parent / target).resolve().exists(), f"{name} -> {target}"
+            filename, _, fragment = target.partition("#")
+            resolved = (path.parent / filename).resolve()
+            assert resolved.exists(), f"{name} -> {target}"
+            if fragment:
+                assert f'id="{fragment}"' in resolved.read_text(encoding="utf-8")
 
 
-def test_download_versions_match_project_version() -> None:
-    version = re.search(
-        r'^version = "([^"]+)"', (ROOT / "pyproject.toml").read_text(encoding="utf-8"), re.M
+def test_download_versions_match_latest_published_windows_manifest() -> None:
+    """源码版本可领先已验收发布的 Windows 包。"""
+    manifests = (ROOT / "releases").glob("windows-*.json")
+    versions = [p.stem.removeprefix("windows-") for p in manifests]
+    latest = max(versions, key=lambda value: tuple(int(part) for part in value.split(".")))
+    project = re.search(
+        r'^version = "([^\"]+)"', (ROOT / "pyproject.toml").read_text(encoding="utf-8"), re.M
     )
-    assert version
+    assert project
     for name in ("README.md", "README.en.md"):
         text = (ROOT / name).read_text(encoding="utf-8")
-        assert f"releases/tag/v{version.group(1)}" in text
+        assert f"releases/tag/v{latest}" in text
+        if project.group(1) != latest:
+            assert f"releases/tag/v{project.group(1)}" not in text

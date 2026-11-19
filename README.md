@@ -11,6 +11,8 @@
 
 下载 Windows ZIP 后全部解压并双击程序。
 
+Windows 11 的智能应用控制可能阻止未签名程序，处理方式见[使用手册](docs/使用手册.md#smart-app-control)。
+
 本工具提供均匀性、稳定性和指定值计算。本项目采用 Apache-2.0 许可证。
 
 ## Windows 快速开始
