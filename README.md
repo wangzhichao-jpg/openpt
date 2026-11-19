@@ -1,11 +1,13 @@
 # 能力验证样品评价与定值工具
 
+简体中文 | [English](README.en.md)
+
 ## Windows 免安装版下载
 
-- **最新版：**[GitHub 下载 Windows 免安装版 0.2.4](https://github.com/wangzhichao-jpg/openpt/releases/tag/v0.2.4)。
-- **国内入口：**[Gitee 下载 Windows 免安装版 0.2.3](https://gitee.com/bigtaurus/openpt/releases#release-v0.2.3)（Gitee 本地附件；0.2.4 附件上传后更新）。
+- **国内入口：**[Gitee 下载 Windows 免安装版 0.2.4](https://gitee.com/bigtaurus/openpt/releases/tag/v0.2.4)（Gitee 本地附件）。
+- **备用入口：**[GitHub 下载 Windows 免安装版 0.2.4](https://github.com/wangzhichao-jpg/openpt/releases/tag/v0.2.4)。
 
-0.2.4 包含甲醛、材料抗拉强度、颗粒振实密度、数字多用表和 GB/T 28043 合成检测五个示例，并在配置有误或未评价时给出带工作表、行号的问题清单和诊断提示；0.2.3 包含前四个示例。
+两个入口均提供 0.2.4，包含甲醛、材料抗拉强度、颗粒振实密度、数字多用表和 GB/T 28043 合成检测五个示例；配置有误或未评价时，程序会给出带工作表、行号的问题清单和诊断提示。
 
 下载 Windows ZIP 后全部解压并双击程序。
 
