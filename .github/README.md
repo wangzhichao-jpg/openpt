@@ -7,10 +7,10 @@ OpenPT (能力验证样品评价与定值工具) is a free, open-source tool for
 
 ## Download the Windows portable version
 
-- **GitHub:** [Download Windows portable 0.2.4](https://github.com/wangzhichao-jpg/openpt/releases/tag/v0.2.4)
-- **Gitee (mirror in mainland China):** [Download Windows portable 0.2.4](https://gitee.com/bigtaurus/openpt/releases/tag/v0.2.4)
+- **GitHub:** [Download Windows portable 0.2.5](https://github.com/wangzhichao-jpg/openpt/releases/tag/v0.2.5)
+- **Gitee (mirror in mainland China):** [Download Windows portable 0.2.4](https://gitee.com/bigtaurus/openpt/releases/tag/v0.2.4) (0.2.5 will follow)
 
-Version 0.2.4 includes five examples: formaldehyde, tensile strength of materials, tapped density of granules, digital multimeter, and a GB/T 28043 synthetic testing example. When a workbook is misconfigured or a result cannot be evaluated, the program lists every problem with its worksheet, row and current value, and explains why, with a suggested fix.
+Version 0.2.5 includes five examples: formaldehyde, tensile strength of materials, tapped density of granules, digital multimeter, and a GB/T 28043 synthetic testing example. The window lists σ_pt and every participant's score with its evaluation, display decimals are configurable, and stability criteria can be chosen per time group (e.g. storage vs. transport). When a workbook is misconfigured or a result cannot be evaluated, the program lists every problem with its worksheet, row and current value, and explains why, with a suggested fix.
 
 Unzip the whole Windows ZIP and double-click the program. No Python, other runtime or administrator rights are needed. Licensed under Apache-2.0.
 
