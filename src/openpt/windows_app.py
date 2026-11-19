@@ -15,6 +15,7 @@ from openpyxl import load_workbook
 
 from .errors import format_error
 from .formatting import display_value
+from .io.period_table import create_period_sheet
 from .runs import create_run
 
 
@@ -29,6 +30,7 @@ def make_template(target: Path) -> None:
     if target.resolve() == example_path().resolve():
         raise ValueError("不能覆盖示例文件")
     book = load_workbook(example_path())
+    create_period_sheet(book)
     book["项目信息"]["B2"] = None
     book["项目信息"]["B3"] = None
     if not any(

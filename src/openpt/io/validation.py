@@ -23,6 +23,8 @@ from .excel import PARTICIPANT_OPTIONAL, SHEETS
 from .layout import wide_to_long
 from .measurands import DATA_SHEETS, split_measurands
 from .new_stability import read_transfer_config, read_transfer_sheet, read_trend_sheet
+from .period_table import SHEET as PERIOD_SHEET
+from .period_table import merge_period_table
 from .shape import (
     STABILITY_METHOD_ALIASES,
     insufficient_homogeneity_replicates,
@@ -673,6 +675,19 @@ def inspect_input(
                                     "单位与项目或其他测量表不一致",
                                 )
                             )
+        config_values, period_issues = merge_period_table(book, config_values, stability_groups)
+        for period_issue in period_issues:
+            issues.append(
+                Issue(
+                    "INVALID_CONFIG",
+                    PERIOD_SHEET,
+                    period_issue.cell,
+                    period_issue.value,
+                    period_issue.message,
+                    period_issue.code,
+                    period_issue.field,
+                )
+            )
         for sheet in sorted(set(book.sheetnames) - set(MEASUREMENT_SHEETS) - {"填写说明"}):
             if sheet in ("报告声称值", "算法S", "方法配置", "指定值与不确定度", "候选批次"):
                 cells = list(book[sheet].iter_rows())

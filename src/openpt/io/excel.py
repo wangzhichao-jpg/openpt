@@ -2,6 +2,7 @@
 """固定模板、输入校验及来源定位。"""
 
 import csv
+import json
 import re
 import statistics
 from collections import defaultdict
@@ -23,6 +24,8 @@ from ..errors import InputError
 from .layout import wide_to_long
 from .measurands import split_measurands
 from .new_stability import read_transfer_config, read_transfer_sheet, read_trend_sheet
+from .period_table import SHEET as PERIOD_SHEET
+from .period_table import create_period_sheet, merge_period_table
 from .shape import (
     STABILITY_METHOD_ALIASES,
     enum_problem,
@@ -76,6 +79,10 @@ def template(path: str | Path) -> None:
         ("方法配置", "选填：需要修改默认方法或提供判据参数时填写。"),
         ("均匀性", "选填：需评价均匀性时填写；至少填写一张可计算的数据表。"),
         ("稳定性", "选填：需评价稳定性时填写；不填写则不会评价。"),
+        (
+            "稳定性时间组配置",
+            "选填：每组一行；分别选择稳定期、运输期判据，留空继承全局。不得与 JSON 重复同一字段。",
+        ),
         ("参加者结果", "选填：需进行参加者评价或稳健统计时填写。"),
         ("报告声称值", "选填：需要复核报告数值时填写。"),
         ("指定值与不确定度", "选填：需要指定值建模和不确定度评定时填写。"),
@@ -185,6 +192,7 @@ def template(path: str | Path) -> None:
     window_options = DataValidation(type="list", formula1='"all,transfer_only"')
     transfer_config.add_data_validation(window_options)
     window_options.add("D2:D1048576")
+    create_period_sheet(book)
     options_sheet = book.create_sheet("被测量配置")
     options_sheet.append(["被测量", "字段", "值", "（选填）"])
     for name in set(SHEETS) - {"项目信息"}:
@@ -714,6 +722,22 @@ def read_workbook(
         book, "均匀性", info["单位"], precision, replicate_type=replicate_type, layout=layout
     )
     stab, ss, stab_ids = _observations(book, "稳定性", info["单位"], precision, True, layout=layout)
+    config, period_issues = merge_period_table(book, config, stab)
+    if period_issues:
+        issues = [
+            {
+                "sheet": PERIOD_SHEET,
+                "cell": issue.cell,
+                "original": issue.value,
+                "message": issue.message,
+                "code": issue.code,
+                "field": issue.field,
+            }
+            for issue in period_issues
+        ]
+        raise InputError(
+            "输入校验问题：" + json.dumps(issues, ensure_ascii=False, default=str), issues=issues
+        )
     assigned = {}
     if "指定值与不确定度" in book.sheetnames:
         assigned = {

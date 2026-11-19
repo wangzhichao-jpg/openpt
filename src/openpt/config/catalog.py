@@ -154,6 +154,11 @@ REPORT_MODELS: dict[str, str] = {
 
 
 DISPLAY_VALUE_DECIMALS_DESCRIPTION = "0 至 12 的整数；留空按 display_sig_digits 有效数字显示量值。"
+PERIOD_TABLE_DESCRIPTION = (
+    "优先填写稳定性时间组配置表，每组一行，时间组须与稳定性数据一致；"
+    "稳定期和运输期分别选择 rule、basis 等，留空沿用全局；"
+    "可与 stability_period_options JSON 合并不同字段，不可重复同组同字段。"
+)
 
 
 def template_rows() -> list[tuple[str, str]]:
@@ -172,6 +177,7 @@ def template_rows() -> list[tuple[str, str]]:
         for kind, fields in TRANSFER_CRITERION_FIELDS.items()
     )
     rows.append(("display_value_decimals", DISPLAY_VALUE_DECIMALS_DESCRIPTION))
+    rows.append(("稳定性时间组配置", PERIOD_TABLE_DESCRIPTION))
     rows.append(("报告声称统计量", "、".join(CLAIM_NAMES)))
     rows.extend(("报告模型 " + name, description) for name, description in REPORT_MODELS.items())
     return rows
@@ -187,6 +193,7 @@ def markdown() -> str:
     lines.extend(
         ["", "### 显示精度", "", "`display_value_decimals`：" + DISPLAY_VALUE_DECIMALS_DESCRIPTION]
     )
+    lines.extend(["", "### 稳定性时间组配置", "", PERIOD_TABLE_DESCRIPTION])
     lines.extend(["", "### 传递标准判据 JSON 字段", "", "| kind | 字段 |", "|---|---|"])
     lines.extend(
         f"| `{kind}` | " + "、".join(f"`{field}`" for field in fields) + " |"
