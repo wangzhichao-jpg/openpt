@@ -191,6 +191,8 @@ def summarize(data: dict[str, Any], result: dict[str, Any]) -> str:
             f"指定值（{method}）：X = {value_text(assigned.get('value'))}；"
             f"u = {value_text(assigned.get('u'))} {unit}"
         )
+        if places is None:
+            lines.append("可在『方法配置』display_value_decimals 设置指定值、σ_pt 及结果值的小数位")
     elif cfg.get("assigned") not in (None, ""):
         lines.append(f"指定值（方法配置）：X = {value_text(cfg['assigned'])} {unit}；u = 未计算")
     else:
@@ -222,7 +224,12 @@ def summarize(data: dict[str, Any], result: dict[str, Any]) -> str:
             prime != sigma
             or any(assigned.get(k) == "sigma_prime" for k in ("hom_mapping", "stab_mapping"))
         ):
-            lines.append(f"σ′ = {value_text(prime)} {unit}（含分量映射）")
+            suffix = (
+                "（与 σ_pt 的差异小于显示精度）"
+                if prime != sigma and value_text(prime) == value_text(sigma)
+                else "（含分量映射）"
+            )
+            lines.append(f"σ′ = {value_text(prime)} {unit}{suffix}")
     scores = result.get("参加者统计量")
     if scores is None and result.get("参加者z"):
         scores = {

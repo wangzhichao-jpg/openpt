@@ -10,7 +10,9 @@ def display_value(value: Any, digits: int = 4, places: int | None = None) -> str
         return "未计算"
     if places is not None:
         return f"{value:.{places}f}"
-    return f"{value:#.{digits}g}"
+    text = f"{value:#.{digits}g}"
+    mantissa, separator, exponent = text.partition("e")
+    return mantissa.removesuffix(".") + (separator + exponent if separator else "")
 
 
 def significant(value: Any, digits: int = 6) -> str:

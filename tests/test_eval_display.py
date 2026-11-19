@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """窗口、计算书和输入规则的量值显示一致性。"""
 
+import re
 from pathlib import Path
 
 import pytest
@@ -13,7 +14,55 @@ from openpt.io.validation import inspect_input
 from openpt.report.docx import make_report
 from openpt.windows_app import run_workbook, summarize
 
-EXAMPLE = Path(__file__).resolve().parents[1] / "windows/examples/GB-T合成检测.xlsx"
+ROOT = Path(__file__).resolve().parents[1]
+EXAMPLE = ROOT / "windows/examples/GB-T合成检测.xlsx"
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (5990.7, "5991"),
+        (-5990.7, "-5991"),
+        (110.04, "110.0"),
+        (33, "33.00"),
+        (0, "0.000"),
+        (1e-12, "1.000e-12"),
+        (1e30, "1.000e+30"),
+        (1e99, "1.000e+99"),
+    ],
+)
+def test_significant_format(value: float, expected: str) -> None:
+    assert display_value(value) == expected
+
+
+@pytest.mark.parametrize(
+    "example", [*sorted((ROOT / "windows/examples").glob("*.xlsx")), ROOT / "windows/甲醛示例.xlsx"]
+)
+def test_no_orphan_decimal_in_outputs(tmp_path: Path, example: Path) -> None:
+    directory, data, result = run_workbook(example, tmp_path / "run")
+    doc = Document(directory / "report.docx")
+    text = "\n".join(
+        [summarize(data, result)]
+        + [p.text for p in doc.paragraphs]
+        + [c.text for t in doc.tables for row in t.rows for c in row.cells]
+    )
+    # 只检查等号后的数值；排除标准条款、编号和中文正文中的句号。
+    assert not re.search(r"[=\uFF1D]\s*[-+]?\d+\.(?=\s|[；，）]|$)", text)
+
+
+def test_precision_hint_and_hidden_difference() -> None:
+    data = {"config": {}, "info": {}}
+    result = {
+        "指定值与不确定度": {"value": 5990.7, "u": 1, "sigma_final": 110, "sigma_prime": 110.04}
+    }
+    text = summarize(data, result)
+    assert "X = 5991；" in text
+    assert "可在『方法配置』display_value_decimals" in text
+    assert "与 σ_pt 的差异小于显示精度" in text
+    data["config"]["display_value_decimals"] = 2
+    text = summarize(data, result)
+    assert "可在『方法配置』display_value_decimals" not in text
+    assert "与 σ_pt 的差异小于显示精度" not in text
 
 
 @pytest.mark.parametrize("places", [0, 2, 4, None])
