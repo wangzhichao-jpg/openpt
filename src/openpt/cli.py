@@ -536,6 +536,74 @@ def _select_gbt_rule(result: dict[str, Any], rule: str) -> None:
         result["warnings"].append("预选主判据未通过，须由授权人员审核并记录处置")
 
 
+def _gbt_extended_diagnostics(
+    data: dict[str, Any], result: dict[str, Any], basis: str
+) -> tuple[list[dict[str, str]], set[str]]:
+    """说明预选扩展判据缺少输入或不适用的具体原因。"""
+    diagnostics: list[dict[str, str]] = []
+    explained: set[str] = set()
+    hom = result.get("GB/T均匀性") or {}
+    if hom.get("selected_rule") == "extended" and hom.get("conclusion") is None:
+        reasons = []
+        hom_basis = hom.get("criterion_basis", basis)
+        if hom_basis == "delta_e":
+            reasons.append("δE 依据不适用 B.2.3 扩展判据")
+        if hom.get("m") == 1:
+            reasons.append("单测设计不提供 B.2.3 扩展判据")
+        elif hom.get("f1") is None:
+            reasons.append(f"样品数 g={hom.get('g')} 不在表 B.1 的 7 至 20 范围内")
+        if hom.get("sigma") is None and hom_basis != "delta_e":
+            reasons.append("缺少判据 sigma，请在『方法配置』sigma 填写正值")
+        if reasons:
+            diagnostics.append(
+                {
+                    "类型": "扩展判据未评价",
+                    "层级": "根因",
+                    "说明": "均匀性选择了扩展判据（全局设置），未评价："
+                    + "；".join(reasons)
+                    + "；请审核方法及数据；如不需要扩展判据，"
+                    "可在『方法配置』gbt_hom_rule 改用 basic。",
+                }
+            )
+            explained.add("均匀性")
+    for name, period in result.get("GB/T稳定性", {}).items():
+        if period.get("selected_rule") != "extended" or period.get("conclusion") is not None:
+            continue
+        settings = period.get("criterion_settings") or {}
+        origin = settings.get("rule", {}).get("source") or "全局设置"
+        reasons = []
+        if period.get("criterion_basis") == "delta_e":
+            reasons.append("δE 依据不适用 B.5.2 扩展判据")
+        elif period.get("sigma") is None:
+            reasons.append("缺少判据 sigma，请在『方法配置』sigma 填写正值")
+        if (data.get("config", {}).get("stability_design") or "independent") != "independent":
+            reasons.append(
+                "相关或配对设计不适用独立样品扩展判据，"
+                "请审核『方法配置』stability_design 及实验设计"
+            )
+        if period.get("u1") is None:
+            reasons.append("缺少 u1，请在『方法配置』stability_u1 填写基线均值标准不确定度")
+        if period.get("u2") is None:
+            advice = (
+                "缺少 u2，请在『稳定性时间组配置』u2 列或逐时点 JSON 的 u2 填写后续均值标准不确定度"
+            )
+            if name == "稳定期":
+                advice += "，也可在『方法配置』stability_u2 填写"
+            reasons.append(advice)
+        if reasons:
+            diagnostics.append(
+                {
+                    "类型": "扩展判据未评价",
+                    "层级": "根因",
+                    "说明": f"稳定性（{name}）选择了扩展判据（{origin}），未评价："
+                    + "；".join(reasons)
+                    + "；如不需要扩展判据，可改用 basic。",
+                }
+            )
+            explained.add(f"稳定性（{name}）")
+    return diagnostics, explained
+
+
 def calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any]:
     """计算并为结构化输入错误补充来源位置。"""
     try:
@@ -1097,10 +1165,24 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
         )
         if period.get(conclusion_key) is None:
             unevaluated.append(f"稳定性（{name}）")
+    explained: set[str] = set()
+    if standard == "gbt28043":
+        specific, explained = _gbt_extended_diagnostics(data, result, basis)
+        diagnostics.extend(specific)
     missing = (basis == "sigma_pt" and sigma is None) or (basis == "delta_e" and delta_e is None)
     sigma_items: list[str] = []
     if standard == "gbt28043":
-        sigma_items = unevaluated.copy()
+        if (
+            hom_result
+            and hom_result.get("conclusion") is None
+            and hom_result.get("criterion_basis", basis) == basis
+        ):
+            sigma_items.append("均匀性")
+        sigma_items.extend(
+            f"稳定性（{name}）"
+            for name, period in periods.items()
+            if period.get("conclusion") is None and period.get("criterion_basis") == basis
+        )
     else:
         if (
             hom_result
@@ -1125,7 +1207,11 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
                 "不作为均匀性或稳定性判据；如需同值请在『方法配置』sigma 填写。"
             )
         diagnostics.append({"类型": "判据缺失", "层级": "根因", "说明": message})
-    others = [item for item in unevaluated if not (missing and item in sigma_items)]
+    others = [
+        item
+        for item in unevaluated
+        if item not in explained and not (missing and item in sigma_items)
+    ]
     if others:
         diagnostics.append(
             {"类型": "未评价", "说明": f"{'、'.join(others)}未评价；请检查数据及设计警告。"}
@@ -1141,8 +1227,12 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
             name for name in flagged if name in periods and periods[name].get("conclusion") is None
         ]
         cause = (
-            "上述判据缺失导致稳定性未评价；"
-            if standard == "gbt28043" and missing and sigma_items and missing_periods
+            "上述判据问题导致稳定性未评价；"
+            if standard == "gbt28043"
+            and any(
+                f"稳定性（{name}）" in explained or (missing and f"稳定性（{name}）" in sigma_items)
+                for name in missing_periods
+            )
             else ""
         )
         diagnostics.append(

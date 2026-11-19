@@ -361,6 +361,24 @@ def period_criteria_problem(values: dict[str, Any]) -> str | None:
             key in entry for key in ("rule", "basis", "delta_e")
         ):
             return f"{name}：rule、basis、delta_e 逐组设置仅适用于 GB/T 模式"
+        effective_basis = entry.get("basis", values.get("gbt_criterion_basis"))
+        effective_delta = entry.get("delta_e", values.get("delta_e"))
+        if (
+            (values.get("criterion_standard") or "gl003") == "gbt28043"
+            and effective_basis == "delta_e"
+            and effective_delta in (None, "")
+        ):
+            origin = "逐组设置" if "basis" in entry else "全局设置"
+            advice = (
+                "先在『方法配置』delta_e 填写正有限数；如该组需要不同值，可另在"
+                "『稳定性时间组配置』delta_e 列或逐时点 JSON 的 delta_e 填写。"
+                if origin == "全局设置"
+                else "请在『稳定性时间组配置』delta_e 列、逐时点 JSON 的 delta_e，"
+                "或『方法配置』delta_e 填写正有限数。"
+            )
+            if origin == "逐组设置" and values.get("gbt_criterion_basis") == "delta_e":
+                advice += "全局 δE 依据仍须在『方法配置』delta_e 填写，或修改全局判据依据。"
+            return f"{name}：选择 basis=delta_e（{origin}），缺少 delta_e；" + advice
         method = entry.get("stability_method", global_method)
         if (
             "stability_method" in entry
@@ -376,24 +394,46 @@ def period_criteria_problem(values: dict[str, Any]) -> str | None:
 
 
 def check_period_groups(values: dict[str, Any], groups: Any) -> list[RuleIssue]:
-    """检查逐时点配置是否引用已存在的非基线组。"""
+    """检查时间组引用及各组使用全局 δE 时的缺失输入。"""
     raw = values.get("stability_period_options")
-    if raw in (None, "") or period_enum_problem(raw):
+    if period_enum_problem(raw):
         return []
-    entries = json.loads(raw) if isinstance(raw, str) else raw
-    unknown = set(entries) - (set(groups) - {"基线"})
-    if not unknown:
-        return []
-    return [
-        RuleIssue(
-            "stability_period_options",
-            raw,
-            "逐时点配置包含不存在的时间组：" + "、".join(sorted(unknown)),
-            "稳定性表中已登记的时间组",
-            "修改时间组名称",
-            "PERIOD_CRITERIA",
+    entries = (json.loads(raw) if isinstance(raw, str) else raw) or {}
+    names = set(groups) - {"基线"}
+    unknown = set(entries) - names
+    issues = []
+    if unknown:
+        issues.append(
+            RuleIssue(
+                "stability_period_options",
+                raw,
+                "逐时点配置包含不存在的时间组：" + "、".join(sorted(unknown)),
+                "稳定性表中已登记的时间组",
+                "修改时间组名称",
+                "PERIOD_CRITERIA",
+            )
         )
-    ]
+    if (
+        values.get("criterion_standard") == "gbt28043"
+        and values.get("gbt_criterion_basis") == "delta_e"
+        and values.get("delta_e") in (None, "")
+    ):
+        for name in sorted(names):
+            entry = entries.get(name, {})
+            if entry.get("basis", "delta_e") == "delta_e" and entry.get("delta_e") in (None, ""):
+                origin = "逐组设置" if "basis" in entry else "全局设置"
+                issues.append(
+                    RuleIssue(
+                        "delta_e",
+                        None,
+                        f"稳定性（{name}）使用 delta_e 依据（{origin}），缺少 delta_e",
+                        "正有限数",
+                        "先在『方法配置』delta_e 填写；如需该组使用不同值，可另在"
+                        "『稳定性时间组配置』delta_e 列或逐时点 JSON 的 delta_e 填写",
+                        "PERIOD_CRITERIA",
+                    )
+                )
+    return issues
 
 
 def check_method_config(values: dict[str, Any]) -> list[RuleIssue]:
@@ -493,9 +533,9 @@ def check_method_config(values: dict[str, Any]) -> list[RuleIssue]:
     ):
         add(
             "delta_e",
-            "所选 gbt_criterion_basis 缺少对应输入",
+            "所选全局 gbt_criterion_basis=delta_e 缺少 delta_e",
             "正有限数",
-            "填写 delta_e，或选择有对应输入的判据依据",
+            "在『方法配置』delta_e 填写最大允许偏差，或选择有对应输入的判据依据",
             "DELTA_REQUIRED",
         )
     return issues
