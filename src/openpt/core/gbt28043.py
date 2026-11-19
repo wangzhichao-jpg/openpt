@@ -192,8 +192,16 @@ def period_options(config: dict[str, Any], groups: Any) -> dict[str, dict[str, A
     resolved = {}
     for name in names:
         entry = raw.get(name, {})
-        if not isinstance(entry, dict) or set(entry) - {"kind", "u2"}:
-            raise InputError("逐时点配置仅支持 kind 和 u2")
+        if not isinstance(entry, dict) or set(entry) - {
+            "kind",
+            "u2",
+            "rule",
+            "basis",
+            "delta_e",
+            "stability_method",
+            "baseline_source",
+        }:
+            raise InputError("逐时点配置含未知字段")
         kind = entry.get("kind", "storage")
         if kind not in ENUMS["stability_period_options.kind"]:
             raise InputError("稳定性类型应为 storage 或 transport")

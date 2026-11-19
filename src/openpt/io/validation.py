@@ -2,6 +2,7 @@
 """只读检查 Excel 或 CSV 测量表；问题不改变原始数据。"""
 
 import csv
+import json
 import math
 import re
 from dataclasses import asdict, dataclass, replace
@@ -13,7 +14,7 @@ from openpyxl import load_workbook
 from openpyxl.utils.cell import column_index_from_string, coordinate_from_string, get_column_letter
 
 from ..config.catalog import ENUMS
-from ..config.rules import check_assigned, check_cross, check_method_config
+from ..config.rules import check_assigned, check_cross, check_method_config, check_period_groups
 from ..core.gbt28043 import period_options as gbt_period_options
 from ..core.transfer import assess_transfer
 from ..core.trend import configured_uncertainty, fit_series
@@ -736,7 +737,11 @@ def inspect_input(
             if "指定值与不确定度" in book.sheetnames and rows
             else []
         )
-        for rule in [*check_method_config(config_values), *cross_issues]:
+        for rule in [
+            *check_method_config(config_values),
+            *check_period_groups(config_values, stability_groups),
+            *cross_issues,
+        ]:
             issues.append(
                 Issue(
                     "NON_NUMERIC" if rule.message.endswith("必须为有限数") else "INVALID_CONFIG",
@@ -763,6 +768,19 @@ def inspect_input(
             == "independent"
             and config_values.get("reference_uncertainty_negligible", True) is not False,
         )
+        raw_periods = config_values.get("stability_period_options")
+        try:
+            parsed_periods = (
+                json.loads(raw_periods) if isinstance(raw_periods, str) else raw_periods
+            )
+        except (ValueError, TypeError):
+            parsed_periods = None
+        if isinstance(parsed_periods, dict) and any(
+            isinstance(entry, dict) and ("stability_method" in entry or "baseline_source" in entry)
+            for entry in parsed_periods.values()
+        ):
+            # 逐组配置由计算入口按各组生效方法检查；不能以全局方法误判。
+            problem = None
         if problem:
             category, message = problem
             field = "reference" if category == "MISSING_CONFIG" else "stability_method"

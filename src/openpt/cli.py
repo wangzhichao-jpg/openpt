@@ -12,7 +12,7 @@ from zipfile import BadZipFile
 
 from . import __version__
 from .config.catalog import ENUMS
-from .config.rules import check_assigned, check_cross, check_method_config
+from .config.rules import check_assigned, check_cross, check_method_config, check_period_groups
 from .config.sigma import criterion_sigma
 from .core.assigned import AssignedResult, assign_value
 from .core.decision import compare
@@ -559,7 +559,12 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
     cfg = data["config"]
     assignment = data.get("assigned_config", {})
     rule_groups = (
-        ("方法配置", check_method_config(cfg) + check_cross(assignment, cfg)),
+        (
+            "方法配置",
+            check_method_config(cfg)
+            + check_period_groups(cfg, data["stability"])
+            + check_cross(assignment, cfg),
+        ),
         ("指定值与不确定度", check_assigned(assignment, cfg)),
     )
     problems = []
@@ -774,6 +779,12 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
             result["GB/T均匀性"] = gbt_hom
     groups = data["stability"]
     method = cfg.get("stability_method") or "two_sample"
+    raw_periods = cfg.get("stability_period_options") or {}
+    periods = json.loads(raw_periods) if isinstance(raw_periods, str) else raw_periods
+    if set(periods) - (set(groups) - {"基线"}):
+        raise InputError(
+            "逐时点配置包含不存在的时间组", sheet="方法配置", field="stability_period_options"
+        )
     if groups:
         source = _option(
             cfg,
@@ -791,14 +802,16 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
             requires_reference=_option(cfg, "stability_design", "independent") == "independent"
             and _option(cfg, "reference_uncertainty_negligible", True) is True,
         )
-        if problem:
+        if problem and not any(
+            "stability_method" in entry or "baseline_source" in entry for entry in periods.values()
+        ):
             raise InputError(problem[1], sheet="稳定性")
         baseline_data = data["homogeneity"] if source == "homogeneity" else groups.get("基线")
         reference = float(raw) if raw not in (None, "") else None
         if method == "mean_difference":
-            if source == "homogeneity":
+            if source == "homogeneity" and result.get("均匀性"):
                 reference = result["均匀性"]["mean"]
-            else:
+            elif baseline_data:
                 reference = sum(sum(row) / len(row) for row in baseline_data) / len(baseline_data)
         level = _option(cfg, "observation_level", "unit_means")
         if level not in ENUMS["observation_level"]:
@@ -823,62 +836,123 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
             if method == "mean_difference"
             else _option(cfg, "reference_source", None),
         }
-        result["稳定性"] = sheet_call(
-            "稳定性",
-            stability,
-            groups.get("基线"),
-            groups[primary_group],
-            sigma,
-            alpha,
-            method,
-            reference,
-            group_name=primary_group,
-            **design_options,
-        ).to_dict()
-        if level == "all_repeats":
-            result["报告层级稳定性"] = sheet_call(
+
+        use_group_criteria = any(
+            set(entry) & {"stability_method", "baseline_source"} for entry in periods.values()
+        )
+
+        def group_settings(name: str) -> dict[str, Any]:
+            entry = periods.get(name, {})
+
+            def choose(key: str, global_key: str | None, default: Any) -> dict[str, Any]:
+                if key in entry:
+                    return {"value": entry[key], "source": "逐组设置"}
+                if global_key and cfg.get(global_key) not in (None, ""):
+                    explicit = data.get("_diagnostic_config", cfg).get(global_key) not in (None, "")
+                    return {
+                        "value": cfg[global_key],
+                        "source": "全局设置" if explicit else "方法默认",
+                    }
+                return {"value": default, "source": "方法默认"}
+
+            group_method = choose("stability_method", "stability_method", "two_sample")
+            group_source = choose(
+                "baseline_source",
+                "baseline_source",
+                "homogeneity" if group_method["value"] == "mean_difference" else "baseline_group",
+            )
+            if (
+                standard == "gl003"
+                and not use_group_criteria
+                and group_method["value"] == "two_sample"
+                and group_source["value"] != "baseline_group"
+            ):
+                # 旧两样本计算实际固定使用稳定性基线组，保留原数值并如实登记。
+                group_source = {"value": "baseline_group", "source": "方法默认"}
+            return {
+                "stability_method": group_method,
+                "baseline_source": group_source,
+                "rule": choose("rule", "gbt_stability_rule", "basic"),
+                "basis": choose("basis", "gbt_criterion_basis", basis),
+                "delta_e": choose("delta_e", "delta_e", None),
+                "kind": choose("kind", None, "storage"),
+                "u2": choose("u2", "stability_u2" if name == "稳定期" else None, None),
+            }
+
+        def calculate_group(name: str, *, model: str = "unit_pooled") -> Any:
+            resolved = group_settings(name)
+            selected_method = resolved["stability_method"]["value"]
+            selected_source = resolved["baseline_source"]["value"]
+            group_shape = set(groups)
+            if use_group_criteria:
+                group_shape.add("稳定期")
+                if selected_source == "homogeneity" and data["homogeneity"]:
+                    group_shape.add("基线")
+            problem = stability_structure_problem(
+                group_shape,
+                selected_method,
+                selected_source,
+                bool(data["homogeneity"]),
+                raw,
+                standard,
+                requires_reference=_option(cfg, "stability_design", "independent") == "independent"
+                and _option(cfg, "reference_uncertainty_negligible", True) is True,
+            )
+            if problem:
+                raise InputError(problem[1], sheet="方法配置", field="stability_period_options")
+            selected_baseline = (
+                data["homogeneity"] if selected_source == "homogeneity" else groups.get("基线")
+            )
+            selected_reference = float(raw) if raw not in (None, "") else None
+            if selected_method == "mean_difference":
+                selected_reference = (
+                    reference
+                    if selected_method == method and selected_source == source
+                    else sum(sum(row) / len(row) for row in selected_baseline)
+                    / len(selected_baseline)
+                )
+            options = {
+                **design_options,
+                "reference_source": selected_source
+                if selected_method == "mean_difference"
+                else _option(cfg, "reference_source", None),
+            }
+            calculated = sheet_call(
                 "稳定性",
                 stability,
-                groups.get("基线"),
-                groups[primary_group],
+                selected_baseline if use_group_criteria else groups.get("基线"),
+                groups[name],
                 sigma,
                 alpha,
-                method,
-                reference,
-                model="repeats_pooled",
-                group_name=primary_group,
-                **design_options,
+                selected_method,
+                selected_reference,
+                model=model,
+                group_name=name,
+                **options,
             ).to_dict()
+            calculated["criterion_settings"] = resolved
+            return calculated
+
+        result["稳定性"] = calculate_group(primary_group)
+        if level == "all_repeats":
+            result["报告层级稳定性"] = calculate_group(primary_group, model="repeats_pooled")
         extra = {}
-        for name, observations in groups.items():
+        for name in groups:
             if name not in ("基线", primary_group):
-                extra[name] = sheet_call(
-                    "稳定性",
-                    stability,
-                    groups.get("基线"),
-                    observations,
-                    sigma,
-                    alpha,
-                    method,
-                    reference,
-                    group_name=name,
-                    **design_options,
-                ).to_dict()
+                extra[name] = calculate_group(name)
         if extra:
             result["其他稳定性"] = extra
         all_periods = [result["稳定性"], *extra.values()]
-        if (
-            method == "mean_difference"
-            and groups.get("基线")
-            and any(p.get("t") is not None for p in all_periods)
-        ):
+        if groups.get("基线") and any(p.get("t") is not None for p in all_periods):
             baseline_mean = sum(sum(row) / len(row) for row in groups["基线"]) / len(groups["基线"])
             for period in all_periods:
-                if period.get("t") is not None:
+                if period.get("method") == "mean_difference" and period.get("t") is not None:
                     period["t_reference_baseline_mean"] = baseline_mean
                     period["t_reference_baseline_source"] = "稳定性表基线"
-        if replicate_type == "adjacent_specimens" and method == "mean_difference":
+        if replicate_type == "adjacent_specimens":
             for period in [result["稳定性"], *extra.values()]:
+                if period.get("method") != "mean_difference":
+                    continue
                 period["design_warnings"].append(
                     "GL003 5.3 注要求每个样品重复测试2次；相邻试件是破坏性检测的替代设计，须审核"
                 )
@@ -897,20 +971,31 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
                 period = sheet_call(
                     "稳定性",
                     gbt_stability,
-                    baseline_data,
+                    data["homogeneity"]
+                    if group_settings(name)["baseline_source"]["value"] == "homogeneity"
+                    else groups.get("基线"),
                     observations,
                     sigma,
-                    delta_e=delta_e,
-                    basis=basis_option,
+                    delta_e=group_settings(name)["delta_e"]["value"],
+                    basis=(
+                        None
+                        if group_settings(name)["basis"]["source"] == "方法默认"
+                        else group_settings(name)["basis"]["value"]
+                    ),
                     independent=independent,
-                    allow_single_baseline=source == "homogeneity" and replicate_type == "single",
+                    allow_single_baseline=group_settings(name)["baseline_source"]["value"]
+                    == "homogeneity"
+                    and replicate_type == "single",
                     **settings[name],
                 )
                 if period["m2"] == 1:
                     period["warnings"].append(f"{name}组内重复性不可评价（单次测量）")
                 if name != "稳定期" and settings[name]["u2"] is None:
                     period["warnings"].append("额外时点不复用稳定期均值不确定度；须分别评定")
-                _select_gbt_rule(period, stab_rule)
+                resolved = group_settings(name)
+                resolved["basis"]["value"] = period["criterion_basis"]
+                _select_gbt_rule(period, resolved["rule"]["value"])
+                period["criterion_settings"] = resolved
                 gbt_periods[name] = period
             result["GB/T稳定性"] = gbt_periods
     if data["participants"]:

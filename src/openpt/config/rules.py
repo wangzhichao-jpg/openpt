@@ -33,6 +33,7 @@ RULE_CODES: dict[str, str] = {
     "CONFIG_POSITIVE": "方法配置数值应为正",
     "DISPLAY_VALUE_DECIMALS": "量值显示小数位无效",
     "PERIOD_OPTIONS": "逐时点配置无效",
+    "PERIOD_CRITERIA": "逐时间组准则配置无效",
     "TRANSFER_MAP": "参加者传递标准映射无效",
     "DELTA_REQUIRED": "所选依据缺少 delta_e",
 }
@@ -317,6 +318,84 @@ def check_cross(assigned: dict[str, Any], config: dict[str, Any]) -> list[RuleIs
     return []
 
 
+def period_criteria_problem(values: dict[str, Any]) -> str | None:
+    """检查逐组准则；JSON 结构错误由 PERIOD_OPTIONS 报告。"""
+    raw = values.get("stability_period_options")
+    if raw in (None, ""):
+        return None
+    try:
+        entries = json.loads(raw) if isinstance(raw, str) else raw
+    except (ValueError, TypeError):
+        return None
+    if not isinstance(entries, dict) or not all(isinstance(v, dict) for v in entries.values()):
+        return None
+    enums = {
+        "rule": ("basic", "extended"),
+        "basis": ("sigma_pt", "delta_e"),
+        "stability_method": ("one_sample", "two_sample", "mean_difference"),
+        "baseline_source": ("homogeneity", "baseline_group"),
+    }
+    allowed = {"kind", "u2", "delta_e", *enums}
+    global_method = values.get("stability_method") or "two_sample"
+    for name, entry in entries.items():
+        if set(entry) - allowed:
+            return f"{name}：未知逐时间组字段：{', '.join(sorted(set(entry) - allowed))}"
+        for field, options in enums.items():
+            if field in entry and entry[field] not in options:
+                if field == "stability_method" and entry[field] == "regression_trend":
+                    return f"{name}：趋势法只能全局设置"
+                return f"{name}：{field} 应为 {'、'.join(options)}"
+        for field, positive in (("delta_e", True), ("u2", False)):
+            if (
+                field in entry
+                and not (field == "u2" and entry[field] in (None, ""))
+                and (
+                    not _number(entry[field])
+                    or (entry[field] <= 0 if positive else entry[field] < 0)
+                )
+            ):
+                return f"{name}：{field} 须为{'正' if positive else '非负'}有限数"
+        if "stability_method" in entry and values.get("criterion_standard", "gl003") == "gbt28043":
+            return f"{name}：逐组 stability_method 仅适用于 GL003"
+        if (values.get("criterion_standard") or "gl003") == "gl003" and any(
+            key in entry for key in ("rule", "basis", "delta_e")
+        ):
+            return f"{name}：rule、basis、delta_e 逐组设置仅适用于 GB/T 模式"
+        method = entry.get("stability_method", global_method)
+        if (
+            "stability_method" in entry
+            and not entry.get("baseline_source")
+            and values.get("baseline_source") in (None, "")
+            and (method == "mean_difference") != (global_method == "mean_difference")
+        ):
+            return (
+                f"{name}：须明确登记 baseline_source；homogeneity 使用均匀性数据，"
+                "baseline_group 使用稳定性基线组"
+            )
+    return None
+
+
+def check_period_groups(values: dict[str, Any], groups: Any) -> list[RuleIssue]:
+    """检查逐时点配置是否引用已存在的非基线组。"""
+    raw = values.get("stability_period_options")
+    if raw in (None, "") or period_enum_problem(raw):
+        return []
+    entries = json.loads(raw) if isinstance(raw, str) else raw
+    unknown = set(entries) - (set(groups) - {"基线"})
+    if not unknown:
+        return []
+    return [
+        RuleIssue(
+            "stability_period_options",
+            raw,
+            "逐时点配置包含不存在的时间组：" + "、".join(sorted(unknown)),
+            "稳定性表中已登记的时间组",
+            "修改时间组名称",
+            "PERIOD_CRITERIA",
+        )
+    ]
+
+
 def check_method_config(values: dict[str, Any]) -> list[RuleIssue]:
     """检查方法表内可静态判断的字段。"""
     issues: list[RuleIssue] = []
@@ -372,6 +451,15 @@ def check_method_config(values: dict[str, Any]) -> list[RuleIssue]:
             "有效逐时点 JSON 配置",
             "修正逐时点配置",
             "PERIOD_OPTIONS",
+        )
+    criteria_problem = period_criteria_problem(values)
+    if criteria_problem:
+        add(
+            "stability_period_options",
+            criteria_problem,
+            "有效逐时间组准则",
+            "修改逐时间组配置",
+            "PERIOD_CRITERIA",
         )
     raw = values.get("transfer_en_map")
     if raw not in (None, ""):
