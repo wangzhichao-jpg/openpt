@@ -31,6 +31,7 @@ RULE_CODES: dict[str, str] = {
     "CONFIG_NUMBER": "方法配置数值非有限数",
     "ALPHA_RANGE": "显著性水平超出范围",
     "CONFIG_POSITIVE": "方法配置数值应为正",
+    "DISPLAY_VALUE_DECIMALS": "量值显示小数位无效",
     "PERIOD_OPTIONS": "逐时点配置无效",
     "TRANSFER_MAP": "参加者传递标准映射无效",
     "DELTA_REQUIRED": "所选依据缺少 delta_e",
@@ -345,6 +346,17 @@ def check_method_config(values: dict[str, Any]) -> list[RuleIssue]:
         value = values.get(field)
         if value not in (None, "") and not _number(value):
             add(field, f"{field} 必须为有限数", "有限数", "修改数值", "CONFIG_NUMBER")
+    places = values.get("display_value_decimals")
+    if places not in (None, "") and (
+        not _number(places) or places != int(places) or not 0 <= places <= 12
+    ):
+        add(
+            "display_value_decimals",
+            "量值显示小数位须为 0 至 12 的整数",
+            "0 至 12 的整数",
+            "修改小数位",
+            "DISPLAY_VALUE_DECIMALS",
+        )
     alpha = values.get("alpha")
     if _number(alpha) and not 0 < alpha < 1:
         add("alpha", "alpha 必须在 0 和 1 之间", "0 < alpha < 1", "修改显著性水平", "ALPHA_RANGE")

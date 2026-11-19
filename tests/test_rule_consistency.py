@@ -67,6 +67,7 @@ CASES: dict[str, Callable[[Workbook], None]] = {
     "CONFIG_NUMBER": _case((M, "alpha", "invalid")),
     "ALPHA_RANGE": _case((M, "alpha", 2)),
     "CONFIG_POSITIVE": _case((M, "sigma", -1)),
+    "DISPLAY_VALUE_DECIMALS": _case((M, "display_value_decimals", -1)),
     "PERIOD_OPTIONS": _case((M, "stability_period_options", '{"稳定期":{"kind":"bad"}}')),
     "TRANSFER_MAP": _case((M, "transfer_en_map", "{bad")),
     "DELTA_REQUIRED": _case((M, "gbt_criterion_basis", "delta_e"), (M, "delta_e", None)),

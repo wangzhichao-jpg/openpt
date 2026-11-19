@@ -16,6 +16,7 @@ from docx.shared import Cm, Pt
 from openpyxl.utils.cell import column_index_from_string, coordinate_from_string, get_column_letter
 
 from .. import __version__
+from ..formatting import display_value
 
 
 def _shown(value: Any, digits: int = 4, places: int | None = None) -> str:
@@ -24,13 +25,16 @@ def _shown(value: Any, digits: int = 4, places: int | None = None) -> str:
         return "未评价（未提供数据或无法计算）"
     if isinstance(value, bool):
         return "通过" if value else "不通过"
-    if isinstance(value, (int, float)) and places is not None:
-        return f"{value:.{places}f}"
-    if isinstance(value, int):
+    if isinstance(value, int) and places is None:
         return str(value)
-    if isinstance(value, float):
-        return f"{value:#.{digits}g}"
+    if isinstance(value, (int, float)):
+        return display_value(value, digits, places)
     return str(value)
+
+
+def _shown_value(value: Any, digits: int, places: int | None) -> str:
+    """与窗口一致的量值格式，保留计算书的缺失值说明。"""
+    return _shown(value) if value is None else display_value(value, digits, places)
 
 
 def _table(doc: Any, headers: list[str], rows: list[list[Any]]) -> None:
@@ -620,7 +624,7 @@ def _other_results(
             f"中位数={_shown(niqr['median'], sig)}，Q1={_shown(niqr['q1'], sig)}，"
             f"Q3={_shown(niqr['q3'], sig)}，NIQR={_shown(niqr['niqr'], sig)}。"
         )
-    _assigned_table(doc, result)
+    _assigned_table(doc, result, data.get("config", {}))
     _participant_table(doc, data, result, z_places)
 
 
@@ -667,7 +671,7 @@ def _robust_results(doc: Any, result: dict[str, Any], sig: int, mean_places: int
         doc.add_paragraph(str(result.get("稳健统计状态", "未提供参加者结果。")))
 
 
-def _assigned_table(doc: Any, result: dict[str, Any]) -> None:
+def _assigned_table(doc: Any, result: dict[str, Any], cfg: dict[str, Any]) -> None:
     """展示 GL002 4.3 定值与扩展方法的不确定度及映射。"""
     assigned = result.get("指定值与不确定度")
     if not assigned:
@@ -714,6 +718,21 @@ def _assigned_table(doc: Any, result: dict[str, Any]) -> None:
             ]
         )
     boolean_keys = {"independent", "hom_in_base", "stab_in_base", "trans_in_base", "trans_in_stab"}
+    raw_places = cfg.get("display_value_decimals")
+    places = int(raw_places) if raw_places not in (None, "") else None
+    sig = int(cfg.get("display_sig_digits") or 4)
+    value_keys = {
+        "value",
+        "u",
+        "base_u",
+        "U_assigned",
+        "sigma_temporary",
+        "sigma_final",
+        "sigma_prime",
+        "u_hom",
+        "u_stab",
+        "u_trans",
+    }
     _table(
         doc,
         ["项目", "结果"],
@@ -722,7 +741,9 @@ def _assigned_table(doc: Any, result: dict[str, Any]) -> None:
                 label,
                 ("是" if assigned[key] else "否")
                 if key in boolean_keys and assigned.get(key) is not None
-                else _shown(assigned.get(key)),
+                else _shown_value(assigned.get(key), sig, places)
+                if key in value_keys
+                else _shown(assigned.get(key), sig),
             ]
             for label, key in labels
         ],
@@ -742,6 +763,10 @@ def _participant_table(
 ) -> None:
     """按参加者显示 z、评价及原始数据来源。"""
     doc.add_heading("参加者评价", 1)
+    cfg = data.get("config", {})
+    raw_places = cfg.get("display_value_decimals")
+    places = int(raw_places) if raw_places not in (None, "") else None
+    sig = int(cfg.get("display_sig_digits") or 4)
     new_scores = result.get("参加者统计量")
     if new_scores is not None:
         rows = []
@@ -769,7 +794,7 @@ def _participant_table(
                 [
                     [
                         p["id"],
-                        _shown(p["value"]),
+                        _shown_value(p["value"], sig, places),
                         _shown(p.get("u")),
                         _shown(p.get("U")),
                         _shown(p.get("k")),
@@ -793,7 +818,7 @@ def _participant_table(
             [
                 [
                     p["id"],
-                    _shown(p["value"]),
+                    _shown_value(p["value"], sig, places),
                     _shown(scores[p["id"]]["z"], places=z_places),
                     scores[p["id"]]["classification"],
                     p.get("source", "未提供来源"),
@@ -1025,10 +1050,14 @@ def _assigned_summary(result: dict[str, Any], data: dict[str, Any], sig: int = 4
         if method == "known" and assigned.get("known_components") is not None:
             source += "，制备不确定度分量由程序合成"
     unit = str(data.get("info", {}).get("单位") or "")
+    cfg = data.get("config", {})
+    sig = int(cfg.get("display_sig_digits") or sig)
+    raw_places = cfg.get("display_value_decimals")
+    places = int(raw_places) if raw_places not in (None, "") else None
     return (
         f"指定值（{names.get(method, str(method))}；{source}）："
-        f"X={_shown(assigned.get('value'), sig)} {unit}；"
-        f"标准不确定度 u(X)={_shown(assigned.get('u'), sig)} {unit}；"
+        f"X={_shown_value(assigned.get('value'), sig, places)} {unit}；"
+        f"标准不确定度 u(X)={_shown_value(assigned.get('u'), sig, places)} {unit}；"
         f"状态：{assigned.get('status', '未提供')}。"
     )
 

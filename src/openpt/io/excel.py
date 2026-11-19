@@ -236,6 +236,7 @@ def template(path: str | Path) -> None:
         ("实验设计类型（design）", ""),
         ("参加者传递点映射JSON（transfer_en_map）", ""),
         ("趋势绘图（trend_plot）", False),
+        ("量值显示小数位（display_value_decimals）", ""),
     ]:
         book["方法配置"].append(config_row)
 

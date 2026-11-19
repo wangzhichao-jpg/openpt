@@ -26,7 +26,7 @@ def test_missing_core_items_are_listed_without_blocking(tmp_path: Path) -> None:
     assert "未提供均匀性数据" in text and "未提供稳定性数据" in text
     assert "没有未评价或需设计审查的条目" not in text
     assert "已知值；外部已评定值登记" in text
-    assert "X=10 mg" in text and "u(X)=0.2000 mg" in text and "状态：OK" in text
+    assert "X=10.00 mg" in text and "u(X)=0.2000 mg" in text and "状态：OK" in text
 
 
 def test_consensus_summary_and_unavailable_u(tmp_path: Path) -> None:

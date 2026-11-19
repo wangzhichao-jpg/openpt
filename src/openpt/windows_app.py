@@ -14,7 +14,7 @@ from typing import Any
 from openpyxl import load_workbook
 
 from .errors import format_error
-from .formatting import significant
+from .formatting import display_value
 from .runs import create_run
 
 
@@ -31,6 +31,11 @@ def make_template(target: Path) -> None:
     book = load_workbook(example_path())
     book["项目信息"]["B2"] = None
     book["项目信息"]["B3"] = None
+    if not any(
+        "（display_value_decimals）" in str(row[0].value)
+        for row in book["方法配置"].iter_rows(min_row=2)
+    ):
+        book["方法配置"].append(["量值显示小数位（display_value_decimals）", None])
     for row in book["方法配置"].iter_rows(min_row=2):
         if row[0].value and any(
             key in str(row[0].value) for key in ("（sigma）", "（sigma_source）", "（sigma_stage）")
@@ -72,10 +77,6 @@ def run_workbook(source: Path, root: Path) -> tuple[Path, dict[str, Any], dict[s
     return directory, data, result
 
 
-def _number(value: Any) -> str:
-    return significant(value)
-
-
 def _decision(value: Any) -> str:
     return "通过" if value is True else "未通过" if value is False else "未计算"
 
@@ -88,6 +89,20 @@ def summarize(data: dict[str, Any], result: dict[str, Any]) -> str:
             for name, part in result["被测量"].items()
         )
     unit = data.get("info", {}).get("单位", "")
+    cfg = data.get("config", {})
+    sig = int(cfg.get("display_sig_digits") or 4)
+    raw_places = cfg.get("display_value_decimals")
+    places = int(raw_places) if raw_places not in (None, "") else None
+    z_places = (
+        int(cfg["display_z_decimals"]) if cfg.get("display_z_decimals") not in (None, "") else 2
+    )
+
+    def value_text(value: Any) -> str:
+        return display_value(value, sig, places)
+
+    def _number(value: Any) -> str:
+        return display_value(value, sig)
+
     lines = []
     if result.get("诊断提示"):
         lines.extend(["【诊断提示】", *(item["说明"] for item in result["诊断提示"]), ""])
@@ -173,11 +188,67 @@ def summarize(data: dict[str, Any], result: dict[str, Any]) -> str:
                 else "参加者公议 / " + str(assigned.get("consensus_method", ""))
             )
         lines.append(
-            f"指定值（{method}）：X = {_number(assigned.get('value'))}；"
-            f"u = {_number(assigned.get('u'))} {unit}"
+            f"指定值（{method}）：X = {value_text(assigned.get('value'))}；"
+            f"u = {value_text(assigned.get('u'))} {unit}"
         )
+    elif cfg.get("assigned") not in (None, ""):
+        lines.append(f"指定值（方法配置）：X = {value_text(cfg['assigned'])} {unit}；u = 未计算")
     else:
         lines.append("指定值：未计算")
+    if (
+        assigned
+        or result.get("参加者z")
+        or any(cfg.get(key) not in (None, "") for key in ("sigma_pt", "sigma"))
+    ):
+        assigned = assigned or {}
+        sigma = assigned.get("sigma_final")
+        source = "sigma_final"
+        if sigma is None:
+            sigma = assigned.get("sigma_temporary")
+            source = "sigma_temporary"
+        if sigma is None:
+            sigma = cfg.get("sigma_pt")
+            source = "方法配置 sigma_pt"
+            if assigned:
+                source += "；未用于指定值表的参加者统计量"
+        if sigma is None and cfg.get("sigma") is not None:
+            sigma, source = cfg["sigma"], "方法配置 sigma（沿用）"
+            if assigned:
+                source += "；未用于指定值表的参加者统计量"
+        source_label = source if sigma is not None else "未提供"
+        lines.append(f"σ_pt = {value_text(sigma)} {unit}（来源：{source_label}）")
+        prime = assigned.get("sigma_prime")
+        if prime is not None and (
+            prime != sigma
+            or any(assigned.get(k) == "sigma_prime" for k in ("hom_mapping", "stab_mapping"))
+        ):
+            lines.append(f"σ′ = {value_text(prime)} {unit}（含分量映射）")
+    scores = result.get("参加者统计量")
+    if scores is None and result.get("参加者z"):
+        scores = {
+            participant: {"z": {**score, "value": score.get("z")}}
+            for participant, score in result["参加者z"].items()
+        }
+    if scores is not None:
+        lines.extend(["", "【参加者统计量】"])
+        warnings: set[str] = set()
+        participants = {str(p["id"]): p for p in data.get("participants", [])}
+        for participant, statistics in scores.items():
+            p = participants.get(str(participant), {})
+            for name, score in statistics.items():
+                classification = score.get("classification") or "未评价"
+                reason = score.get("reason")
+                if reason:
+                    classification += f"（{reason}）"
+                number = score.get("value")
+                shown = display_value(number, places=z_places) if number is not None else "未计算"
+                lines.append(
+                    f"{participant} | 结果值 {value_text(p.get('value'))} | "
+                    f"{name} = {shown} | {classification}"
+                )
+                warnings.update(score.get("warnings") or [])
+        for warning in sorted(warnings):
+            lines.append("提示：" + warning)
     return "\n".join(lines)
 
 
@@ -219,8 +290,19 @@ def main() -> None:
     ttk.Label(frame, textvariable=selected, wraplength=740).pack(anchor="w", pady=12)
     buttons = ttk.Frame(frame)
     buttons.pack(anchor="w")
-    result_text = tk.Text(frame, height=17, wrap="word", font=("Microsoft YaHei", 10))
-    result_text.pack(fill="both", expand=True, pady=15)
+    result_frame = ttk.Frame(frame)
+    result_frame.pack(fill="both", expand=True, pady=15)
+    scrollbar = ttk.Scrollbar(result_frame, orient="vertical")
+    scrollbar.pack(side="right", fill="y")
+    result_text = tk.Text(
+        result_frame,
+        height=17,
+        wrap="word",
+        font=("Microsoft YaHei", 10),
+        yscrollcommand=scrollbar.set,
+    )
+    result_text.pack(side="left", fill="both", expand=True)
+    scrollbar.config(command=result_text.yview)
     status = tk.StringVar(value="载入示例或选择数据文件。")
     ttk.Label(frame, textvariable=status).pack(anchor="w")
 

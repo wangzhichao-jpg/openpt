@@ -23,7 +23,7 @@ def test_example_chinese_path_and_results(tmp_path: Path) -> None:
     assert result["指定值与不确定度"]["value"] == pytest.approx(100.0405652277587)
     assert result["指定值与不确定度"]["u"] == pytest.approx(0.22326622377769484)
     summary = summarize(data, result)
-    assert all(x in summary for x in ("甲醛样品", "稳定期", "运输期", "算法A稳健公议", "0.223266"))
+    assert all(x in summary for x in ("甲醛样品", "稳定期", "运输期", "算法A稳健公议", "0.2233"))
 
 
 def test_template_has_no_measurements(tmp_path: Path) -> None:
@@ -79,7 +79,7 @@ def test_transfer_and_gbt_summary() -> None:
         },
     )
     assert "单台传递标准：不适用样品间均匀性检验" in text
-    assert "Δmax = 0.3 V" in text and "限值 = 1；通过" in text
+    assert "Δmax = 0.3000 V" in text and "限值 = 1.000；通过" in text
     assert "稳定性：未计算" not in text
     gbt = summarize(
         {},
