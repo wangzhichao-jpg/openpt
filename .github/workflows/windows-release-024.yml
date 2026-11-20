@@ -21,7 +21,7 @@ jobs:
       contents: write
       actions: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Verify source run and download its fixed artifact
         env:
           GH_TOKEN: ${{ github.token }}
