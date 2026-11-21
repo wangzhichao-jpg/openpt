@@ -1,0 +1,16 @@
+{
+  "source_sha": "fc9a85476bb34bbdb369dd5640fc35c9f5a2b6f0",
+  "native_run_id": 44898013019,
+  "artifact": "OpenPT-Windows-x64",
+  "app": "能力验证样品评价与定值工具",
+  "bundle": "能力验证样品评价与定值工具_Windows.zip",
+  "bytes": 59829617,
+  "sha256": "64a0842c5c85dda5ef3c04d02ca9beb514f61dde97a7bdd8eb8e2761561f9b09",
+  "cases": [
+    "GB-T合成检测",
+    "数字多用表",
+    "材料抗拉强度",
+    "甲醛示例",
+    "颗粒振实密度"
+  ]
+}
