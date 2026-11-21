@@ -79,7 +79,37 @@
     "design_status": "DESIGN_WARNING",
     "design_warnings": [
       "GL003 5.2.2 注：n1、n2 均≥6；当前基线 10 个、稳定期 3 个包装单元"
-    ]
+    ],
+    "criterion_settings": {
+      "stability_method": {
+        "value": "two_sample",
+        "source": "全局设置"
+      },
+      "baseline_source": {
+        "value": "baseline_group",
+        "source": "方法默认"
+      },
+      "rule": {
+        "value": "basic",
+        "source": "方法默认"
+      },
+      "basis": {
+        "value": "sigma_pt",
+        "source": "方法默认"
+      },
+      "delta_e": {
+        "value": null,
+        "source": "方法默认"
+      },
+      "kind": {
+        "value": "storage",
+        "source": "方法默认"
+      },
+      "u2": {
+        "value": null,
+        "source": "方法默认"
+      }
+    }
   },
   "其他稳定性": {
     "后期": {
@@ -108,8 +138,50 @@
       "design_status": "DESIGN_WARNING",
       "design_warnings": [
         "GL003 5.2.2 注：n1、n2 均≥6；当前基线 10 个、后期 3 个包装单元"
-      ]
+      ],
+      "criterion_settings": {
+        "stability_method": {
+          "value": "two_sample",
+          "source": "全局设置"
+        },
+        "baseline_source": {
+          "value": "baseline_group",
+          "source": "方法默认"
+        },
+        "rule": {
+          "value": "basic",
+          "source": "方法默认"
+        },
+        "basis": {
+          "value": "sigma_pt",
+          "source": "方法默认"
+        },
+        "delta_e": {
+          "value": null,
+          "source": "方法默认"
+        },
+        "kind": {
+          "value": "storage",
+          "source": "方法默认"
+        },
+        "u2": {
+          "value": null,
+          "source": "方法默认"
+        }
+      }
     }
+  },
+  "参加者结果统计量": {
+    "n": 2,
+    "median": 105.5,
+    "niqr": 0.37065,
+    "robust_cv_percent": 0.3513270142180095,
+    "min": 105.0,
+    "max": 106.0,
+    "range": 1.0,
+    "mean": 105.5,
+    "sd": 0.7071067811865476,
+    "quantile_method": "linear"
   },
   "算法A": {
     "x": 105.5,
