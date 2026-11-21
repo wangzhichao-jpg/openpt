@@ -208,6 +208,19 @@ def summarize(data: dict[str, Any], result: dict[str, Any]) -> str:
             f"指定值（{method}）：X = {value_text(assigned.get('value'))}；"
             f"u = {value_text(assigned.get('u'))} {unit}"
         )
+        if (
+            assigned.get("method") == "participant_consensus"
+            and assigned.get("consensus_method") == "robust_mean"
+            and result.get("算法A")
+        ):
+            algorithm = result["算法A"]
+            rule = {
+                "gl002": "GL002 停止规则",
+                "gbt28043": "GB/T 28043 停止规则",
+                "absolute": "绝对容差停止规则",
+                "simplified": "简化法",
+            }.get(algorithm.get("rule"), str(algorithm.get("rule")))
+            lines.append(f"算法A：迭代 {algorithm['iterations']} 次（{rule}）")
         if places is None:
             lines.append("可在『方法配置』display_value_decimals 设置指定值、σ_pt 及结果值的小数位")
     elif cfg.get("assigned") not in (None, ""):

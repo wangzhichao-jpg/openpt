@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 from docx import Document
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -15,6 +16,7 @@ from docx.shared import Cm, Pt
 from openpyxl.utils.cell import column_index_from_string, coordinate_from_string, get_column_letter
 
 from .. import __version__
+from ..core.robust import ALG_A_CLIP, MAD_FACTOR
 from ..formatting import display_value
 from .period_criteria import has_period_overrides, period_fields, selected_periods
 
@@ -22,7 +24,7 @@ from .period_criteria import has_period_overrides, period_fields, selected_perio
 def _shown(value: Any, digits: int = 4, places: int | None = None) -> str:
     """输出指定精度，空值和布尔值使用中文。"""
     if value is None:
-        return "未评价（未提供数据或无法计算）"
+        return "未评价"
     if isinstance(value, bool):
         return "通过" if value else "不通过"
     if isinstance(value, int) and places is None:
@@ -42,7 +44,7 @@ def _table(doc: Any, headers: list[str], rows: list[list[Any]]) -> None:
     body = doc.element.body
     if len(body) >= 2 and body[-2].tag == qn("w:tbl"):
         paragraph = doc.add_paragraph()
-        paragraph.paragraph_format.space_after = Pt(0)
+        paragraph.paragraph_format.space_after = Pt(6)
         paragraph.paragraph_format.space_before = Pt(0)
         paragraph.paragraph_format.line_spacing = Pt(2)
     table = doc.add_table(rows=1, cols=len(headers))
@@ -385,6 +387,41 @@ def _stability_table(doc: Any, name: str, s: dict[str, Any], sig: int) -> None:
         doc.add_paragraph("设计提示：" + warning)
 
 
+def _gbt_missing_reason(item: dict[str, Any], *, stability: bool) -> str:
+    """解释已选主判据缺失的原因，不把未选用的扩展项当作错误。"""
+    if item.get("selected_rule") == "extended":
+        if item.get("criterion_basis") == "delta_e":
+            return "δ_E 依据不支持扩展判据"
+        if stability and (item.get("u1") is None or item.get("u2") is None):
+            return "缺少基线或后续均值标准不确定度"
+        if not stability and item.get("m") == 1:
+            return "单次测量不适用扩展判据"
+        if not stability and item.get("f1") is None:
+            return "样品数超出扩展判据系数表范围"
+    if item.get("basic_limit") is None:
+        return "未提供所需判据依据"
+    if stability and any("不适用独立样品模型" in w for w in item.get("warnings", [])):
+        return "相关或配对数据不适用独立样品模型"
+    return "所需统计量不可计算，见表下提示"
+
+
+def _gbt_display(item: dict[str, Any], key: str, sig: int, *, stability: bool) -> str:
+    value = item.get(key)
+    if value is not None:
+        return _shown(value, sig)
+    selected = item.get("selected_rule") or "basic"
+    extended_fields = {"u1", "u2", "f1", "f2_or_fm", "c", "extended_limit", "extended_pass"}
+    if key in extended_fields and selected != "extended":
+        return "—"
+    if key in {"sw1", "sw2"}:
+        return "未评价（单次测量）"
+    if key in {"u1", "u2"}:
+        return "未提供（扩展判据需要）"
+    if key in extended_fields or key in {"conclusion", "basic_limit", "basic_pass"}:
+        return "未评价（" + _gbt_missing_reason(item, stability=stability) + "）"
+    return "—"
+
+
 def _gbt_homogeneity_results(
     doc: Any, result: dict[str, Any], cfg: dict[str, Any], sig: int
 ) -> None:
@@ -406,8 +443,9 @@ def _gbt_homogeneity_results(
         if sigma_field
         else "本次 GB/T 判据未提供 σ_pt。"
     )
+    delta_text = _shown(cfg["delta_e"], sig) if cfg.get("delta_e") is not None else "—"
     doc.add_paragraph(
-        f"基本判据依据：{basis}；δ_E={_shown(cfg.get('delta_e'), sig)}；"
+        f"基本判据依据：{basis}；δ_E={delta_text}；"
         f"σ_pt 阶段：{cfg.get('sigma_stage') or '未登记'}；"
         f"来源：{cfg.get('sigma_source') or '未登记'}。"
     )
@@ -434,7 +472,12 @@ def _gbt_homogeneity_results(
             ("主结论", "conclusion"),
             ("重复性检查", "repeatability_check"),
         ]
-        _table(doc, ["项目", "结果"], [[label, _shown(h.get(key), sig)] for label, key in items])
+        _table(
+            doc,
+            ["项目", "结果"],
+            [[label, _gbt_display(h, key, sig, stability=False)] for label, key in items],
+        )
+        doc.add_paragraph("—：未提供或未选用；未选用的扩展判据无法计算时不作主评价。")
         if h.get("m") == 1:
             doc.add_paragraph("B.1.2：以单测标准差 s_x 作为 s_s；s_x 含测量误差，结论偏保守。")
         else:
@@ -478,7 +521,12 @@ def _gbt_stability_results(doc: Any, result: dict[str, Any], sig: int) -> None:
             ("预选主判据", "selected_rule"),
             ("主结论", "conclusion"),
         ]
-        _table(doc, ["项目", "结果"], [[label, _shown(s.get(key), sig)] for label, key in items])
+        _table(
+            doc,
+            ["项目", "结果"],
+            [[label, _gbt_display(s, key, sig, stability=True)] for label, key in items],
+        )
+        doc.add_paragraph("—：未提供或未选用；未选用的扩展判据无法计算时不作主评价。")
         repeatability = s.get("repeatability_exceeded")
         repeatability_text = (
             "未评价"
@@ -612,7 +660,7 @@ def _other_results(
                     f"U_E={_shown(point.get('U_E'), sig)}；"
                     f"忽略条件依据={options.get('condition_source') or '未登记'}。"
                 )
-    _robust_results(doc, result, sig, mean_places)
+    _robust_results(doc, data, result, sig, mean_places)
     algorithm_s_result = result.get("算法S")
     if algorithm_s_result:
         doc.add_paragraph(
@@ -640,48 +688,114 @@ def _other_results(
     _participant_table(doc, data, result, z_places)
 
 
-def _robust_results(doc: Any, result: dict[str, Any], sig: int, mean_places: int | None) -> None:
-    """显示稳健统计及停止规则敏感性。"""
+def _robust_results(
+    doc: Any, data: dict[str, Any], result: dict[str, Any], sig: int, mean_places: int | None
+) -> None:
+    """显示算法 A 的公式、迭代、停止条件和收敛对照。"""
     doc.add_heading("稳健统计", 1)
     a = result.get("算法A")
-    if a:
-        names = [
-            ("稳健平均值", "x"),
-            ("稳健标准差", "s"),
-            ("标准不确定度", "u_x"),
-            ("迭代次数", "iterations"),
-            ("收敛", "converged"),
-        ]
-        _table(
-            doc,
-            ["项目", "结果"],
-            [
-                [label, _shown(a.get(key), sig, places=mean_places if key == "x" else None)]
-                for label, key in names
-            ],
-        )
-        rules = {
-            "gl002": "GL002 第三有效位规则",
-            "gbt28043": "GB/T 28043-2019 C.3.1 各自三位有效数字（半偶舍入）",
-            "absolute": "绝对容差",
-            "simplified": "简化法",
-        }
-        doc.add_paragraph("停止规则：" + rules.get(a.get("rule"), "未提供"))
-        converged = result.get("算法A_收敛对照")
-        if converged and not converged.get("converged"):
-            doc.add_paragraph("停止规则敏感性未评价：绝对容差对照未收敛。")
-        elif converged and (
-            _shown(a.get("x"), sig, places=mean_places)
-            != _shown(converged.get("x"), sig, places=mean_places)
-            or _shown(a.get("s"), sig) != _shown(converged.get("s"), sig)
-        ):
-            doc.add_paragraph(
-                f"停止规则敏感：选定规则的稳健标准差为 {_shown(a.get('s'), sig)}，"
-                f"绝对容差收敛对照为 {_shown(converged.get('s'), sig)}；"
-                "两者在显示位数下不同，不据此认定报告错误。"
-            )
-    else:
+    if not a:
         doc.add_paragraph(str(result.get("稳健统计状态", "未提供参加者结果。")))
+        return
+    doc.add_heading("算法 A", 2)
+    assigned = result.get("指定值与不确定度") or {}
+    if not (
+        assigned.get("method") == "participant_consensus"
+        and assigned.get("consensus_method") == "robust_mean"
+    ):
+        doc.add_paragraph("本节结果仅供参考，未用于指定值。")
+    rules = {
+        "gl002": "GL002 A.2：s* 第三位有效数字及 x* 对应位在连续两次迭代中不再变化",
+        "gbt28043": "GB/T 28043-2019 C.3.1：x* 和 s* 各自三位有效数字"
+        "在连续两次迭代中不再变化（半偶舍入）",
+        "absolute": "软件附加绝对容差规则：x*、s* 的相邻变化量均不超过容差 "
+        + _shown(a.get("tolerance"), 6),
+        "simplified": "GL002 A.2 简化法：使用初值，不进行迭代",
+    }
+    doc.add_paragraph(
+        f"停止规则 algorithm_a_rule={a.get('rule')}：{rules.get(a.get('rule'), '未提供')}。"
+    )
+    doc.add_paragraph(
+        "初值（CNAS-GL002:2018 A.2 式 A.1、A.2）：x*=median(xᵢ)，s*=1.483·median(|xᵢ-x*|)。"
+    )
+    doc.add_paragraph(
+        "更新（CNAS-GL002:2018 A.2 式 A.3—A.6）：δ=1.5s*；"
+        "将 xᵢ 限制在 [x*-δ, x*+δ] 得 xᵢ*；"
+        "新 x*=Σxᵢ*/p，新 s*=1.134·√[Σ(xᵢ*-新 x*)²/(p-1)]。"
+    )
+    names = [
+        ("稳健平均值", "x"),
+        ("稳健标准差", "s"),
+        ("标准不确定度", "u_x"),
+        ("迭代次数", "iterations"),
+        ("收敛", "converged"),
+    ]
+    _table(
+        doc,
+        ["项目", "结果"],
+        [
+            [label, _shown(a.get(key), sig, places=mean_places if key == "x" else None)]
+            for label, key in names
+        ],
+    )
+    values = np.asarray([p["value"] for p in data.get("participants", [])], dtype=float)
+    history = a.get("history", [])
+    if len(values) >= 2:
+        x = float(np.median(values))
+        s = float(MAD_FACTOR * np.median(np.abs(values - x)))
+        rows: list[list[Any]] = [
+            ["初值", _shown(x, 8), _shown(s, 8), _shown(ALG_A_CLIP * s, 8), "—", "—"]
+        ]
+        for index, step in enumerate(history):
+            count = int(
+                np.count_nonzero((values < x - ALG_A_CLIP * s) | (values > x + ALG_A_CLIP * s))
+            )
+            x, s = step["x"], step["s"]
+            if len(history) > 23 and 20 <= index < len(history) - 3:
+                if index == 20:
+                    rows.append(["…", "…", "…", "…", "…", "…"])
+                continue
+            stop = "满足停止条件" if index == len(history) - 1 and a.get("converged") else "—"
+            rows.append(
+                [
+                    step["iteration"],
+                    _shown(x, 8),
+                    _shown(s, 8),
+                    _shown(ALG_A_CLIP * s, 8),
+                    count,
+                    stop,
+                ]
+            )
+        doc.add_paragraph(
+            "逐次迭代：每行 x*、s* 为本次更新后的值，δ=1.5s* 用于下一次；"
+            "被修正个数按本次更新前的 x*、δ 统计。初值行不修正数据。"
+        )
+        if len(history) > 23:
+            doc.add_paragraph(
+                f"共迭代 {len(history)} 次；表中列前 20 次及最后 3 次，完整迭代见 result.json。"
+            )
+        elif not history:
+            doc.add_paragraph("未进行迭代（简化法或无迭代记录）。")
+        _table(doc, ["迭代序号", "x*", "s*", "δ=1.5s*", "被修正个数", "停止条件"], rows)
+    doc.add_paragraph(
+        f"u(x*)=1.25·s*/√p=1.25×{_shown(a.get('s'), 8)}/√{a.get('n')}"
+        f"={_shown(a.get('u_x'), 8)}；依据 GB/T 28043-2019 7.7.3 式(6)。"
+    )
+    converged = result.get("算法A_收敛对照")
+    if converged:
+        doc.add_paragraph(
+            f"完全收敛对照值（绝对容差 {_shown(converged.get('tolerance'), 6)}，"
+            f"迭代 {converged.get('iterations')} 次）：x*={_shown(converged.get('x'), 8)}，"
+            f"s*={_shown(converged.get('s'), 8)}；"
+            + ("对照已收敛。" if converged.get("converged") else "对照未收敛，不可视为完全收敛。")
+            + "与选定停止规则的差别源于停止条件不同，不据此认定报告错误。"
+        )
+        if not converged.get("converged"):
+            doc.add_paragraph("停止规则敏感性未评价：绝对容差对照未收敛。")
+        elif _shown(a.get("x"), sig, places=mean_places) != _shown(
+            converged.get("x"), sig, places=mean_places
+        ) or _shown(a.get("s"), sig) != _shown(converged.get("s"), sig):
+            doc.add_paragraph("停止规则敏感：选定规则和收敛对照在显示位数下不同，须人工复核。")
 
 
 def _assigned_table(doc: Any, result: dict[str, Any], cfg: dict[str, Any]) -> None:

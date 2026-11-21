@@ -313,7 +313,7 @@ def test_preselected_primary_rule_and_no_fallback(tmp_path: Path) -> None:
         cell.text for table in Document(target).tables for row in table.rows for cell in row.cells
     )
     assert "预选主判据" in table_text and "主结论" in table_text
-    assert "未评价（未提供数据或无法计算）" in table_text
+    assert "未评价（缺少基线或后续均值标准不确定度）" in table_text
     data["config"].update({"stability_u1": 0.1, "stability_u2": 0.1})
     assert calculate(data)["GB/T稳定性"]["稳定期"]["conclusion"] is True
     data["homogeneity"] = data["homogeneity"][:6]
