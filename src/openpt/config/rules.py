@@ -84,8 +84,6 @@ METHOD_NUMBERS = (
     "algorithm_a_max_iterations",
     "display_z_decimals",
     "display_sig_digits",
-    "display_mean_decimals",
-    "display_ss_decimals",
     "z_satisfactory",
     "z_unsatisfactory",
     "en_limit",

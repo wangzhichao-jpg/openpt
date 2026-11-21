@@ -196,8 +196,6 @@ def create_run(args: Any, root: Path) -> tuple[Path, Any, Any, Any, str]:
             "algorithm_s_stop_rule": "gl002",
             "algorithm_s_tolerance": 1e-12,
             "display_sig_digits": 4,
-            "display_mean_decimals": None,
-            "display_ss_decimals": 3,
             "display_z_decimals": 2,
             "assigned": None,
             "sigma_pt": None,

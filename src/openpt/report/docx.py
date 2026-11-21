@@ -3,7 +3,6 @@
 
 import json
 from datetime import datetime, timezone
-from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -40,6 +39,12 @@ def _shown_value(value: Any, digits: int, places: int | None) -> str:
 
 def _table(doc: Any, headers: list[str], rows: list[list[Any]]) -> None:
     """创建带底纹和重复表头的可跨页表格。"""
+    body = doc.element.body
+    if len(body) >= 2 and body[-2].tag == qn("w:tbl"):
+        paragraph = doc.add_paragraph()
+        paragraph.paragraph_format.space_after = Pt(0)
+        paragraph.paragraph_format.space_before = Pt(0)
+        paragraph.paragraph_format.line_spacing = Pt(2)
     table = doc.add_table(rows=1, cols=len(headers))
     table.style = "Table Grid"
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
@@ -77,23 +82,6 @@ def _table(doc: Any, headers: list[str], rows: list[list[Any]]) -> None:
                 isinstance(value, str) and value.lstrip("-+").replace(".", "", 1).isdigit()
             ):
                 cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
-
-
-def _data_places(data: dict[str, Any]) -> int:
-    """以已导入数字的十进制表示估计原始小数位。"""
-    recorded = data.get("data_decimal_places")
-    if isinstance(recorded, int):
-        return min(12, recorded + 1)
-    values = [v for group in data.get("homogeneity", []) for v in group]
-    for groups in data.get("stability", {}).values():
-        values.extend(v for group in groups for v in group)
-    if not values:
-        return 2
-    places = []
-    for value in values:
-        exponent = Decimal(str(value)).as_tuple().exponent
-        places.append(-exponent if isinstance(exponent, int) else 0)
-    return min(12, max(0, max(places)) + 1)
 
 
 def _source_ranges(sources: list[str]) -> list[str]:
@@ -197,9 +185,9 @@ def _raw_tables(doc: Any, data: dict[str, Any]) -> None:
 def _homogeneity(
     doc: Any,
     result: dict[str, Any],
-    mean_places: int,
+    mean_places: int | None,
     sig: int,
-    ss_places: int,
+    ss_places: int | None,
     alpha: float,
 ) -> None:
     """按 GL003 4.2、4.3 显示方差分析和用途判据。"""
@@ -229,8 +217,8 @@ def _homogeneity(
             [
                 "样品间",
                 h["df_between"],
-                _shown(h["SS_between"]),
-                _shown(h["MS_between"]),
+                _shown(h["SS_between"], sig),
+                _shown(h["MS_between"], sig),
                 _shown(h["F"], sig),
                 _shown(h["F_critical"], sig),
                 _shown(h["p"], sig),
@@ -238,8 +226,8 @@ def _homogeneity(
             [
                 "样品内",
                 h["df_within"],
-                _shown(h["SS_within"]),
-                _shown(h["MS_within"]),
+                _shown(h["SS_within"], sig),
+                _shown(h["MS_within"], sig),
                 "—",
                 "—",
                 "—",
@@ -250,14 +238,14 @@ def _homogeneity(
         doc,
         ["统计量", "结果"],
         [
-            ["总平均值", _shown(h["mean"], places=mean_places)],
+            ["总平均值", _shown(h["mean"], sig, places=mean_places)],
             ["F 值", _shown(h["F"], sig)],
             ["F 临界值", _shown(h["F_critical"], sig)],
             ["p 值", _shown(h["p"], sig)],
-            ["样品间标准差", _shown(h["Ss"], places=ss_places)],
+            ["样品间标准差", _shown(h["Ss"], sig, places=ss_places)],
             [
                 "用途判据限值",
-                _shown(h["threshold"], places=ss_places)
+                _shown(h["threshold"], sig, places=ss_places)
                 if h["threshold"] is not None
                 else "未评价（未提供 σ）",
             ],
@@ -277,7 +265,7 @@ def _homogeneity_conclusion(
     doc: Any,
     h: dict[str, Any],
     sig: int,
-    ss_places: int,
+    ss_places: int | None,
     alpha: float,
 ) -> None:
     """按 GL003 4.2 和 4.3 说明统计量、判定与未评价原因。"""
@@ -299,7 +287,9 @@ def _homogeneity_conclusion(
             f"{judgement}；按未修约值及相对容差 1e-12 比较。"
         )
     if h["threshold"] is None:
-        doc.add_paragraph(f"并列提示：Ss={_shown(h['Ss'], places=ss_places)}；未评价：未提供 σ。")
+        doc.add_paragraph(
+            f"并列提示：Ss={_shown(h['Ss'], sig, places=ss_places)}；未评价：未提供 σ。"
+        )
     else:
         relation = "≤" if h["Ss_pass"] else ">"
         judgement = "通过" if h["Ss_pass"] else "不通过"
@@ -311,8 +301,8 @@ def _homogeneity_conclusion(
             else "并列提示"
         )
         doc.add_paragraph(
-            f"{label}（GL003 4.3）：Ss={_shown(h['Ss'], places=ss_places)} {relation} "
-            f"0.3σ={_shown(h['threshold'], places=ss_places)}，用途判据{judgement}。"
+            f"{label}（GL003 4.3）：Ss={_shown(h['Ss'], sig, places=ss_places)} {relation} "
+            f"0.3σ={_shown(h['threshold'], sig, places=ss_places)}，用途判据{judgement}。"
         )
     if h.get("strict"):
         conclusion = (
@@ -513,7 +503,7 @@ def _other_results(
     data: dict[str, Any],
     result: dict[str, Any],
     sig: int,
-    mean_places: int,
+    mean_places: int | None,
     z_places: int,
 ) -> None:
     """显示稳定性、稳健统计和参加者评价。"""
@@ -650,7 +640,7 @@ def _other_results(
     _participant_table(doc, data, result, z_places)
 
 
-def _robust_results(doc: Any, result: dict[str, Any], sig: int, mean_places: int) -> None:
+def _robust_results(doc: Any, result: dict[str, Any], sig: int, mean_places: int | None) -> None:
     """显示稳健统计及停止规则敏感性。"""
     doc.add_heading("稳健统计", 1)
     a = result.get("算法A")
@@ -681,7 +671,8 @@ def _robust_results(doc: Any, result: dict[str, Any], sig: int, mean_places: int
         if converged and not converged.get("converged"):
             doc.add_paragraph("停止规则敏感性未评价：绝对容差对照未收敛。")
         elif converged and (
-            _shown(a.get("x"), places=mean_places) != _shown(converged.get("x"), places=mean_places)
+            _shown(a.get("x"), sig, places=mean_places)
+            != _shown(converged.get("x"), sig, places=mean_places)
             or _shown(a.get("s"), sig) != _shown(converged.get("s"), sig)
         ):
             doc.add_paragraph(
@@ -761,8 +752,11 @@ def _assigned_table(doc: Any, result: dict[str, Any], cfg: dict[str, Any]) -> No
         [
             [
                 label,
-                ("是" if assigned[key] else "否")
-                if key in boolean_keys and assigned.get(key) is not None
+                "—"
+                if assigned.get(key) in (None, "")
+                and key not in {"value", "u", "base_u", "sigma_prime", "status"}
+                else ("是" if assigned[key] else "否")
+                if key in boolean_keys
                 else _shown_value(assigned.get(key), sig, places)
                 if key in value_keys
                 else _shown(assigned.get(key), sig),
@@ -770,6 +764,7 @@ def _assigned_table(doc: Any, result: dict[str, Any], cfg: dict[str, Any]) -> No
             for label, key in labels
         ],
     )
+    doc.add_paragraph("—：未提供")
     doc.add_paragraph(assigned.get("formula", ""))
     doc.add_paragraph(
         "扩展方法：u(X)=√(u_base²+Σu分量²)，σ′=√(σ_pt²+Σu分量²)；"
@@ -800,7 +795,9 @@ def _participant_table(
                     [
                         participant["id"],
                         name,
-                        _shown(score.get("value"), places=z_places),
+                        _shown(score["value"], places=z_places)
+                        if score.get("value") is not None
+                        else "—",
                         score.get("status"),
                         score.get("classification") or "未评价",
                         score.get("reason") or "—",
@@ -810,6 +807,7 @@ def _participant_table(
                 warnings.update(score.get("warnings", []))
         if rows:
             _table(doc, ["参加者", "统计量", "值", "状态", "评价", "原因"], rows)
+            doc.add_paragraph("统计量中的 —：无法计算，原因见表内说明。")
             _table(
                 doc,
                 ["参加者", "测量值", "u(x)", "U(x)", "k", "数据来源"],
@@ -817,14 +815,15 @@ def _participant_table(
                     [
                         p["id"],
                         _shown_value(p["value"], sig, places),
-                        _shown(p.get("u")),
-                        _shown(p.get("U")),
-                        _shown(p.get("k")),
+                        _shown(p["u"], sig) if p.get("u") is not None else "—",
+                        _shown(p["U"], sig) if p.get("U") is not None else "—",
+                        _shown(p["k"], sig) if p.get("k") is not None else "—",
                         p.get("source", "未提供来源"),
                     ]
                     for p in data["participants"]
                 ],
             )
+            doc.add_paragraph("—：未提供")
         else:
             doc.add_paragraph("未提供参加者结果。")
         for formula in sorted(formulas):
@@ -1176,22 +1175,16 @@ def make_report(
     style.font.size = Pt(9)
     cfg = data.get("config", {})
     sig = int(cfg["display_sig_digits"]) if cfg.get("display_sig_digits") not in (None, "") else 4
-    mean_places = (
-        int(cfg["display_mean_decimals"])
-        if cfg.get("display_mean_decimals") not in (None, "")
-        else _data_places(data)
-    )
-    ss_places = (
-        int(cfg["display_ss_decimals"]) if cfg.get("display_ss_decimals") not in (None, "") else 3
-    )
+    raw_value_places = cfg.get("display_value_decimals")
+    mean_places = int(raw_value_places) if raw_value_places not in (None, "") else None
+    ss_places = mean_places
     raw_z_places = cfg.get("display_z_decimals")
     z_places = int(raw_z_places) if raw_z_places not in (None, "") else 2
     if (
         isinstance(raw_z_places, bool)
         or (raw_z_places not in (None, "") and float(raw_z_places) != z_places)
         or not 1 <= sig <= 15
-        or not 0 <= mean_places <= 12
-        or not 0 <= ss_places <= 12
+        or (mean_places is not None and not 0 <= mean_places <= 12)
         or not 0 <= z_places <= 12
     ):
         raise ValueError("输出精度配置超出范围，z 小数位须为 0 至 12 的整数")

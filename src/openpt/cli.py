@@ -1144,6 +1144,16 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
             },
         }
     diagnostics: list[dict[str, str]] = []
+    for field in ("display_mean_decimals", "display_ss_decimals"):
+        if cfg.get(field) not in (None, ""):
+            diagnostics.append(
+                {
+                    "类型": "显示配置",
+                    "层级": "提示",
+                    "说明": f"『方法配置』{field} 已废弃并忽略，"
+                    "改用 display_value_decimals 或 display_sig_digits。",
+                }
+            )
     assigned_config = data.get("assigned_config", {})
     unevaluated: list[str] = []
     hom_result = result.get("GB/T均匀性") if standard == "gbt28043" else result.get("均匀性")
