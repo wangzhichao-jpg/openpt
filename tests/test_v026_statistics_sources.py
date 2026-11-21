@@ -13,6 +13,7 @@ from docx.oxml.ns import qn
 from openpyxl import load_workbook
 
 from openpt.cli import calculate, main
+from openpt.config.field_labels import field_key
 from openpt.config.source_diagnostics import source_diagnostics
 from openpt.io.excel import read_workbook, template
 from openpt.io.validation import inspect_input
@@ -205,8 +206,8 @@ def test_changed_example_sources_are_nonblocking_end_to_end(tmp_path: Path) -> N
     sheet = book["指定值与不确定度"]
     values = {"method": "certified", "value": 100, "uncertainty": 0.1}
     for row in sheet.iter_rows(min_row=2):
-        if row[0].value in values:
-            row[1].value = values[row[0].value]
+        if field_key(row[0].value) in values:
+            row[1].value = values[field_key(row[0].value)]
     path = tmp_path / "copy.xlsx"
     book.save(path)
     assert inspect_input(path) == []

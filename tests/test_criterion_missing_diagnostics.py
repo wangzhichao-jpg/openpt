@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 from openpyxl import load_workbook
 
+from openpt.config.field_labels import field_key
 from openpt.errors import InputError
 from openpt.io.period_table import FIELDS, SHEET, create_period_sheet
 from openpt.windows_app import friendly_error, run_workbook, summarize
@@ -225,7 +226,7 @@ def test_unused_gbt_delta_config_does_not_block_gl003(tmp_path: Path) -> None:
     set_config(book, "gbt_criterion_basis", "delta_e")
     set_config(book, "delta_e", None)
     for row in book["指定值与不确定度"].iter_rows(min_row=2):
-        if row[0].value == "hom_source":
+        if field_key(row[0].value) == "hom_source":
             row[1].value = "manual"
     add_period(book, "运输期", kind="transport")
     result, _ = run(book, tmp_path)

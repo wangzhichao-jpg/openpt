@@ -8,6 +8,7 @@ from docx import Document
 from openpyxl import load_workbook
 
 from openpt.cli import calculate, main
+from openpt.config.field_labels import field_key
 from openpt.io.excel import read_workbook, template
 from openpt.io.validation import inspect_input
 from openpt.report.docx import make_report
@@ -91,7 +92,7 @@ def test_trend_uncertainty_is_mapped_and_duplicate_reviewed(tmp_path: Path) -> N
         for x, y in ((0, 1.0), (1, 1.2), (2, 1.1), (3, 1.3)):
             book["趋势稳定性"].append([name, x, unit, y])
     assigned = book["指定值与不确定度"]
-    fields = {assigned.cell(i, 1).value: i for i in range(2, assigned.max_row + 1)}
+    fields = {field_key(assigned.cell(i, 1).value): i for i in range(2, assigned.max_row + 1)}
     for key, value in {
         "method": "certified",
         "value": 1,

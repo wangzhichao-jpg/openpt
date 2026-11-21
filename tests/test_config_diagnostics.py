@@ -170,10 +170,11 @@ def test_calculation_errors_located(tmp_path: Path) -> None:
         Path(__file__).resolve().parents[1] / "examples/synthetic/transfer_synthetic.xlsx"
     )
     book["方法配置"].append(["transfer_en_map", "{bad"])
+    row = book["方法配置"].max_row
     book.save(path)
     with pytest.raises(InputError) as error:
         run_workbook(path, tmp_path / "runs3")
-    assert "『方法配置』第45行" in friendly_error(error.value)
+    assert f"『方法配置』第{row}行" in friendly_error(error.value)
     assert "transfer_en_map" in friendly_error(error.value)
 
 
@@ -304,7 +305,8 @@ def test_error_location_fallback() -> None:
             },
         )
     )
-    assert "第13行 hom_mapping" in text and "第14行 stab_mapping" in text
+    assert "第13行 均匀性分量映射（hom_mapping）" in text
+    assert "第14行 稳定性分量映射（stab_mapping）" in text
 
 
 def test_synthetic_gbt_example_scores(tmp_path: Path) -> None:

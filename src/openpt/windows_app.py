@@ -13,9 +13,11 @@ from typing import Any
 
 from openpyxl import load_workbook
 
+from .config.field_labels import field_key
 from .errors import format_error
 from .formatting import display_value
 from .io.period_table import create_period_sheet
+from .io.workbook_hints import apply_workbook_hints
 from .report.period_criteria import has_period_overrides, period_fields, selected_periods
 from .runs import create_run
 
@@ -49,7 +51,10 @@ def make_template(target: Path) -> None:
         ):
             book["方法配置"].append([f"{label}（{field}）", None])
     for field in ("sigma_pt_method", "sigma_pt_sig_digits"):
-        if not any(row[0].value == field for row in book["指定值与不确定度"].iter_rows(min_row=2)):
+        if not any(
+            field_key(row[0].value) == field
+            for row in book["指定值与不确定度"].iter_rows(min_row=2)
+        ):
             book["指定值与不确定度"].append([field, None])
     for row in book["方法配置"].iter_rows(min_row=2):
         if row[0].value and any(
@@ -57,7 +62,7 @@ def make_template(target: Path) -> None:
         ):
             row[1].value = None
     for row in book["指定值与不确定度"].iter_rows(min_row=2):
-        if row[0].value in (
+        if field_key(row[0].value) in (
             "source",
             "uncertainty_source",
             "sigma_final",
@@ -66,12 +71,13 @@ def make_template(target: Path) -> None:
             "u_stab",
         ):
             row[1].value = None
-        elif row[0].value in ("hom_mapping", "stab_mapping"):
+        elif field_key(row[0].value) in ("hom_mapping", "stab_mapping"):
             row[1].value = "none"
     for name in ("均匀性", "稳定性", "参加者结果"):
         sheet = book[name]
         if sheet.max_row > 1:
             sheet.delete_rows(2, sheet.max_row - 1)
+    apply_workbook_hints(book, example=False)
     book.save(target)
 
 

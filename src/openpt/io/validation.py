@@ -14,6 +14,7 @@ from openpyxl import load_workbook
 from openpyxl.utils.cell import column_index_from_string, coordinate_from_string, get_column_letter
 
 from ..config.catalog import ENUMS
+from ..config.field_labels import field_key, field_label
 from ..config.rules import check_assigned, check_cross, check_method_config, check_period_groups
 from ..core.gbt28043 import period_options as gbt_period_options
 from ..core.transfer import assess_transfer
@@ -540,6 +541,7 @@ def inspect_input(
         layout = None
         config_values: dict[str, Any] = {}
         config_cells: dict[str, str] = {}
+        config_labels: dict[str, str] = {}
         stability_groups: set[str] = set()
         homogeneity_present = False
         calculation_data_present = False
@@ -568,6 +570,7 @@ def inspect_input(
                     ):
                         value = value in ("启用", "TRUE")
                     config_values[field] = value
+                    config_labels[field] = str(key)
                     config_cells[field] = f"{get_column_letter(col + 1)}{index}"
                     if field == "layout" and value in ENUMS["layout"]:
                         layout = value
@@ -706,7 +709,9 @@ def inspect_input(
                 else:
                     if sheet == "指定值与不确定度":
                         calculation_data_present |= any(
-                            len(row) >= 2 and row[0] == "method" and row[1] not in (None, "")
+                            len(row) >= 2
+                            and field_key(row[0]) == "method"
+                            and row[1] not in (None, "")
                             for row in rows[1:]
                         )
             for row in book[sheet].iter_rows():
@@ -726,7 +731,7 @@ def inspect_input(
                 for number, row in enumerate(rows[1:], 2):
                     key = row[pos["字段"]] if pos["字段"] < len(row) else None
                     if key is not None:
-                        field = str(key)
+                        field = field_key(key)
                         assigned_values[field] = row[pos["值"]] if pos["值"] < len(row) else None
                         assigned_cells[field] = f"{get_column_letter(pos['值'] + 1)}{number}"
 
@@ -742,7 +747,7 @@ def inspect_input(
                             "指定值与不确定度",
                             assigned_cells.get(rule.field, ""),
                             rule.value,
-                            f"{rule.field}：{rule.message}；允许值/要求：{rule.allowed}；修改建议：{rule.hint}",
+                            f"{field_label(rule.field)}：{rule.message}；允许值/要求：{rule.allowed}；修改建议：{rule.hint}",
                             code=rule.code,
                             field=rule.field,
                         )
@@ -763,7 +768,8 @@ def inspect_input(
                     "方法配置",
                     config_cells.get(rule.field, ""),
                     rule.value,
-                    f"{rule.field}：{rule.message}；允许值/要求：{rule.allowed}；修改建议：{rule.hint}",
+                    f"{config_labels.get(rule.field, rule.field)}：{rule.message}；"
+                    f"允许值/要求：{rule.allowed}；修改建议：{rule.hint}",
                     code=rule.code,
                     field=rule.field,
                 )

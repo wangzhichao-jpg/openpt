@@ -12,6 +12,7 @@ from zipfile import BadZipFile
 
 from . import __version__
 from .config.catalog import ENUMS
+from .config.field_labels import field_label
 from .config.rules import check_assigned, check_cross, check_method_config, check_period_groups
 from .config.sigma import criterion_sigma
 from .config.source_diagnostics import source_diagnostics
@@ -655,6 +656,10 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
     for sheet, rule_issues in rule_groups:
         for issue in rule_issues:
             cell, value = data.get("_cells", {}).get((sheet, issue.field), ("", issue.value))
+            label = data.get("_field_labels", {}).get(
+                (sheet, issue.field),
+                field_label(issue.field) if sheet == "指定值与不确定度" else issue.field,
+            )
             problems.append(
                 {
                     "sheet": sheet,
@@ -662,7 +667,7 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
                     "original": value,
                     "code": issue.code,
                     "field": issue.field,
-                    "message": f"{issue.field}：{issue.message}；允许值/要求：{issue.allowed}；"
+                    "message": f"{label}：{issue.message}；允许值/要求：{issue.allowed}；"
                     f"修改建议：{issue.hint}",
                 }
             )

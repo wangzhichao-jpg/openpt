@@ -9,6 +9,7 @@ from openpyxl import load_workbook
 
 from openpt.cli import main
 from openpt.config.catalog import ENUMS
+from openpt.config.field_labels import field_key
 from openpt.io.excel import template
 from openpt.io.validation import inspect_input
 
@@ -36,7 +37,7 @@ def test_invalid_sigma_pt_method_in_assigned_sheet(tmp_path: Path) -> None:
     book["项目信息"]["B2"] = "合成"
     book["项目信息"]["B3"] = "mg"
     for row in book["指定值与不确定度"].iter_rows(min_row=2):
-        if row[0].value == "sigma_pt_method":
+        if field_key(row[0].value) == "sigma_pt_method":
             row[1].value = "invalid"
     book.save(path)
     assert any(

@@ -9,6 +9,7 @@ import pytest
 from openpyxl import load_workbook
 
 from openpt.cli import calculate
+from openpt.config.field_labels import field_key
 from openpt.errors import InputError, format_error
 from openpt.io.excel import read_workbook, template
 from openpt.io.period_table import FIELDS, HEADERS, SHEET, create_period_sheet
@@ -86,7 +87,7 @@ def test_mixed_method_and_baseline_across_json_and_table(tmp_path: Path) -> None
     book = sample()
     set_config(book, "criterion_standard", "gl003")
     for row in book["指定值与不确定度"].iter_rows(min_row=2):
-        if row[0].value == "hom_source":
+        if field_key(row[0].value) == "hom_source":
             row[1].value = "manual"
     set_config(
         book, "stability_period_options", '{"运输期":{"stability_method":"mean_difference"}}'

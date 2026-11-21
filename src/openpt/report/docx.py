@@ -560,6 +560,17 @@ def _other_results(
     """显示稳定性、稳健统计和参加者评价。"""
     doc.add_heading("稳定性评价", 1)
     gbt, groups = selected_periods(result)
+    if groups:
+        doc.add_heading("稳定性时间组类型", 2)
+        type_rows = []
+        for name, item in groups.items():
+            setting = item.get("criterion_settings", {}).get("kind", {})
+            kind = setting.get("value", item.get("kind", "storage"))
+            label = {"storage": "储存稳定性", "transport": "运输稳定性"}.get(kind, str(kind))
+            origin = "逐组设置" if setting.get("source") == "逐组设置" else "默认"
+            type_rows.append([name, label, origin])
+        _table(doc, ["时间组", "类型", "类型来源"], type_rows)
+        doc.add_paragraph("时间组类型留空时默认为储存稳定性；时间组名称不自动决定类型。")
     if has_period_overrides(groups):
         doc.add_heading("逐组评价准则", 2)
         rows = []

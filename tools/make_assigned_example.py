@@ -7,6 +7,7 @@ from pathlib import Path
 from openpyxl import load_workbook
 
 from openpt.cli import main
+from openpt.config.field_labels import field_key
 from openpt.io.excel import template
 
 
@@ -20,7 +21,7 @@ def generate(directory: Path) -> None:
     book["项目信息"]["B3"] = "mg/kg"
     book["方法配置"]["B17"] = "all"
     sheet = book["指定值与不确定度"]
-    rows = {sheet.cell(i, 1).value: i for i in range(2, sheet.max_row + 1)}
+    rows = {field_key(sheet.cell(i, 1).value): i for i in range(2, sheet.max_row + 1)}
     for key, value in {
         "method": "certified",
         "value": 100,

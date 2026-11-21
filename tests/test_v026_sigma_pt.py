@@ -9,6 +9,7 @@ from docx import Document
 from openpyxl import load_workbook
 
 from openpt.cli import calculate, main
+from openpt.config.field_labels import field_key
 from openpt.core.robust import median_niqr
 from openpt.core.sigma_pt import round_significant
 from openpt.errors import InputError
@@ -185,8 +186,8 @@ def test_workbook_snapshot_and_reproduce(tmp_path: Path) -> None:
         "sigma_final": None,
     }
     for row in assigned.iter_rows(min_row=2):
-        if row[0].value in updates:
-            row[1].value = updates[row[0].value]
+        if field_key(row[0].value) in updates:
+            row[1].value = updates[field_key(row[0].value)]
     assigned.append(["sigma_pt_method", "niqr"])
     assigned.append(["sigma_pt_sig_digits", 3])
     book["项目信息"]["B3"] = "合成单位"

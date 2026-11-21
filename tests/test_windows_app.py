@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 from openpyxl import load_workbook
 
+from openpt.config.field_labels import field_key
 from openpt.windows_app import example_path, friendly_error, make_template, run_workbook, summarize
 
 
@@ -33,7 +34,10 @@ def test_template_has_no_measurements(tmp_path: Path) -> None:
     assert all(book[name].max_row == 1 for name in ("均匀性", "稳定性", "参加者结果"))
     assert book["项目信息"]["B2"].value is None
     assert book["项目信息"]["B3"].value is None
-    assigned = {row[0].value: row[1].value for row in book["指定值与不确定度"].iter_rows(min_row=2)}
+    assigned = {
+        field_key(row[0].value): row[1].value
+        for row in book["指定值与不确定度"].iter_rows(min_row=2)
+    }
     assert assigned["sigma_final"] is None and assigned["u_hom"] is None
     assert assigned["hom_mapping"] == "none"
     with pytest.raises(ValueError):

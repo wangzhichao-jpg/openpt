@@ -6,6 +6,8 @@ import re
 from collections.abc import Callable
 from typing import Any
 
+from .config.field_labels import field_label
+
 _MISSING = object()
 
 
@@ -61,9 +63,13 @@ def locate(exc: InputError, data: dict[str, Any]) -> InputError:
                     if isinstance(value, str)
                     else str(value)
                 )
-                pieces.append(f"{row} {field}（{cell}，当前值：{shown}）")
+                label = data.get("_field_labels", {}).get(
+                    (sheet, field), field_label(field) if sheet == "指定值与不确定度" else field
+                )
+                pieces.append(f"{row} {label}（{cell}，当前值：{shown}）")
             else:
-                pieces.append(f"字段 {field}")
+                label = field_label(field) if sheet == "指定值与不确定度" else field
+                pieces.append(f"字段 {label}")
         message = f"『{sheet}』" + "、".join(pieces) + f"：{exc}"
         if exc.allowed:
             message += f"；允许值/要求：{exc.allowed}"
@@ -74,7 +80,11 @@ def locate(exc: InputError, data: dict[str, Any]) -> InputError:
         return located
     cell_info = data.get("_cells", {}).get((sheet, exc.field))
     value = exc.value
-    location = f"『{sheet}』字段 {exc.field}"
+    label = data.get("_field_labels", {}).get(
+        (sheet, exc.field),
+        field_label(exc.field or "") if sheet == "指定值与不确定度" else (exc.field or ""),
+    )
+    location = f"『{sheet}』字段 {label}"
     if cell_info:
         cell, value = cell_info
         match = re.search(r"\d+", cell)
@@ -86,7 +96,7 @@ def locate(exc: InputError, data: dict[str, Any]) -> InputError:
             if isinstance(value, str)
             else str(value)
         )
-        location = f"『{sheet}』{row}（{cell}，当前值：{shown}）：{exc.field}"
+        location = f"『{sheet}』{row}（{cell}，当前值：{shown}）：{label}"
     message = f"{location}：{exc}"
     if exc.allowed:
         message += f"；允许值/要求：{exc.allowed}"

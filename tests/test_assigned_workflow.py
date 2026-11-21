@@ -9,6 +9,7 @@ from docx import Document
 from openpyxl import load_workbook
 
 from openpt.cli import main as cli_main
+from openpt.config.field_labels import field_key
 from openpt.io.excel import template
 
 
@@ -36,7 +37,7 @@ def make_input(path: Path, duplicate: bool = False) -> None:
     book["项目信息"]["B3"] = "mg/kg"
     book["方法配置"]["B17"] = "all"
     ws = book["指定值与不确定度"]
-    fields = {ws.cell(row, 1).value: row for row in range(2, ws.max_row + 1)}
+    fields = {field_key(ws.cell(row, 1).value): row for row in range(2, ws.max_row + 1)}
     for key, value in {
         "method": "certified",
         "value": 100,
@@ -88,7 +89,7 @@ def test_workbook_expert_consensus(tmp_path: Path) -> None:
     make_input(path)
     book = load_workbook(path)
     sheet = book["指定值与不确定度"]
-    fields = {sheet.cell(row, 1).value: row for row in range(2, sheet.max_row + 1)}
+    fields = {field_key(sheet.cell(row, 1).value): row for row in range(2, sheet.max_row + 1)}
     sheet.cell(fields["method"], 2, "expert_consensus")
     sheet.cell(fields["value"], 2).value = None
     sheet.cell(fields["uncertainty"], 2).value = None
@@ -108,7 +109,7 @@ def test_consensus_uses_selected_algorithm_rule(tmp_path: Path, rule: str) -> No
     book = load_workbook(path)
     book["方法配置"]["B9"] = rule
     sheet = book["指定值与不确定度"]
-    fields = {sheet.cell(row, 1).value: row for row in range(2, sheet.max_row + 1)}
+    fields = {field_key(sheet.cell(row, 1).value): row for row in range(2, sheet.max_row + 1)}
     sheet.cell(fields["method"], 2, "participant_consensus")
     sheet.cell(fields["value"], 2).value = None
     sheet.cell(fields["uncertainty"], 2).value = None
@@ -146,7 +147,7 @@ def test_transport_uncertainty_workbook(tmp_path: Path) -> None:
     make_input(path)
     book = load_workbook(path)
     sheet = book["指定值与不确定度"]
-    fields = {sheet.cell(row, 1).value: row for row in range(2, sheet.max_row + 1)}
+    fields = {field_key(sheet.cell(row, 1).value): row for row in range(2, sheet.max_row + 1)}
     sheet.cell(fields["u_trans"], 2, 2.0)
     sheet.cell(fields["trans_mapping"], 2, "assigned")
     book.save(path)

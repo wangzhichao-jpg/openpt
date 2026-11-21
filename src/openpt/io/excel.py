@@ -20,6 +20,7 @@ from openpyxl.styles import Alignment
 from openpyxl.worksheet.datavalidation import DataValidation
 
 from ..config.catalog import ENUMS, template_rows
+from ..config.field_labels import field_key, field_label
 from ..errors import InputError
 from .layout import wide_to_long
 from .measurands import split_measurands
@@ -322,7 +323,7 @@ def template(path: str | Path) -> None:
         ("sigma_pt_method", ""),
         ("sigma_pt_sig_digits", ""),
     ]:
-        assigned.append(assigned_row)
+        assigned.append((field_label(assigned_row[0]), assigned_row[1]))
     for cell, options in [
         ("B2", options_for("assigned_method")),
         ("B7", options_for("consensus_method")),
@@ -355,6 +356,9 @@ def template(path: str | Path) -> None:
         validation = DataValidation(type="list", formula1=options_for(field))
         ws.add_data_validation(validation)
         validation.add(cell)
+    from .workbook_hints import apply_workbook_hints
+
+    apply_workbook_hints(book)
     book.save(path)
 
 
@@ -769,14 +773,17 @@ def read_workbook(
     assigned = {}
     if "指定值与不确定度" in book.sheetnames:
         assigned = {
-            str(row[0].value): row[1].value
+            field_key(row[0].value): row[1].value
             for row in _rows(book, "指定值与不确定度")
             if row[0].value and row[1].value not in (None, "")
         }
         for row in _rows(book, "指定值与不确定度"):
-            problem = enum_problem(str(row[0].value), row[1].value, assigned=True)
+            key = field_key(row[0].value)
+            problem = enum_problem(key, row[1].value, assigned=True)
             if problem:
-                raise InputError(f"指定值与不确定度!{row[1].coordinate}: {problem}")
+                raise InputError(
+                    f"指定值与不确定度!{row[1].coordinate}: {field_label(key)}：{problem}"
+                )
         for key in ("independent", "hom_in_base", "stab_in_base", "trans_in_base", "trans_in_stab"):
             if assigned.get(key) in ("TRUE", "FALSE"):
                 assigned[key] = assigned[key] == "TRUE"
@@ -799,6 +806,7 @@ def read_workbook(
         if isinstance(cell.value, (int, float)) and not isinstance(cell.value, bool)
     }
     cells: dict[tuple[str, str], tuple[str, Any]] = {}
+    field_labels: dict[tuple[str, str], str] = {}
     if suffix != ".csv":
         for sheet in ("项目信息", "方法配置", "指定值与不确定度"):
             for row in _rows(book, sheet):
@@ -807,9 +815,13 @@ def read_workbook(
                     match = re.search(r"（([a-zA-Z_][a-zA-Z_0-9]*)）$", label)
                     key = match.group(1) if match else label
                     cells[(sheet, key)] = (row[1].coordinate, row[1].value)
+                    field_labels[(sheet, key)] = (
+                        field_label(key) if sheet == "指定值与不确定度" else label
+                    )
     return {
         "info": info,
         "_cells": cells,
+        "_field_labels": field_labels,
         "numeric_sources": numeric_sources,
         "batches": _batches(book),
         "assigned_config": assigned,

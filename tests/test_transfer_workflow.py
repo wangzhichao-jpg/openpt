@@ -10,6 +10,7 @@ from docx import Document
 from openpyxl import load_workbook
 
 from openpt.cli import calculate, main
+from openpt.config.field_labels import field_key
 from openpt.io.excel import read_workbook, template
 from openpt.io.validation import inspect_input
 from openpt.report.docx import make_report
@@ -49,7 +50,7 @@ def _workbook(path: Path, mechanism: str = "B") -> None:
     )
     book["报告声称值"].append(["Δmax", 0.2, 2, "合成报告", "", "STD1|P1"])
     assigned = book["指定值与不确定度"]
-    fields = {assigned.cell(i, 1).value: i for i in range(2, assigned.max_row + 1)}
+    fields = {field_key(assigned.cell(i, 1).value): i for i in range(2, assigned.max_row + 1)}
     for key, value in {
         "method": "certified",
         "value": 1,
