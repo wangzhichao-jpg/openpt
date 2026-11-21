@@ -14,7 +14,7 @@ Version 0.2.5 includes five examples: formaldehyde, tensile strength of material
 
 Unzip the whole Windows ZIP and double-click the program. No Python, other runtime or administrator rights are needed. Licensed under Apache-2.0.
 
-Windows 11 Smart App Control may block unsigned applications; see the [user guide (Chinese)](../docs/使用手册.md#smart-app-control) for options.
+Windows 11 Smart App Control may block unsigned applications. This program is not currently code-signed: the project has selected SignPath Foundation's free code signing for open-source projects as the future option, but the application has not been submitted yet. See the [user guide (Chinese)](../docs/使用手册.md#smart-app-control) for options.
 
 ## Windows quick start
 
