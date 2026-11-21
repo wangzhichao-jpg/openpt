@@ -14,6 +14,7 @@ from . import __version__
 from .config.catalog import ENUMS
 from .config.rules import check_assigned, check_cross, check_method_config, check_period_groups
 from .config.sigma import criterion_sigma
+from .config.source_diagnostics import source_diagnostics
 from .core.assigned import AssignedResult, assign_value
 from .core.decision import compare
 from .core.gbt28043 import criterion_limit as gbt_criterion_limit
@@ -22,6 +23,7 @@ from .core.gbt28043 import period_options as gbt_period_options
 from .core.gbt28043 import stability as gbt_stability
 from .core.homogeneity import analyze as homogeneity
 from .core.homogeneity import analyze_single as single_homogeneity
+from .core.participant_statistics import participant_statistics
 from .core.robust import algorithm_a, algorithm_s, median_niqr
 from .core.scores import performance_score
 from .core.sigma_pt import determine as determine_sigma_pt
@@ -50,7 +52,9 @@ def _participant_results(
     if not isinstance(simplified, bool):
         raise ValueError("algorithm_a_simplified 必须是布尔值")
     values = [p["value"] for p in data["participants"]]
-    result: dict[str, Any] = {}
+    result: dict[str, Any] = {
+        "参加者结果统计量": participant_statistics(values, cfg.get("quantile_method") or "linear")
+    }
     if len(values) >= 2:
         result["算法A"] = algorithm_a(
             values,
@@ -1198,7 +1202,7 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
                 for name, s in result.get("GB/T稳定性", {}).items()
             },
         }
-    diagnostics: list[dict[str, str]] = []
+    diagnostics: list[dict[str, str]] = source_diagnostics(data)
     if sigma_info and sigma_info["method"] in ("niqr", "made") and sigma_info["p"] < 30:
         diagnostics.append(
             {

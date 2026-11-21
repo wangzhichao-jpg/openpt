@@ -961,6 +961,38 @@ def _participant_table(
     raw_places = cfg.get("display_value_decimals")
     places = int(raw_places) if raw_places not in (None, "") else None
     sig = int(cfg.get("display_sig_digits") or 4)
+    descriptive = result.get("参加者结果统计量")
+    if descriptive:
+        doc.add_heading("参加者结果统计量", 2)
+        descriptive_rows = [
+            ("结果数 p", "n"),
+            ("中位值", "median"),
+            ("NIQR", "niqr"),
+            ("稳健 CV（%）", "robust_cv_percent"),
+            ("最小值", "min"),
+            ("最大值", "max"),
+            ("极差", "range"),
+            ("算术平均值（参考）", "mean"),
+            ("样本标准差（参考）", "sd"),
+        ]
+        _table(
+            doc,
+            ["统计量", "结果"],
+            [
+                [label, _shown(descriptive[key], sig) if descriptive.get(key) is not None else "—"]
+                for label, key in descriptive_rows
+            ],
+        )
+        algorithm = QUANTILE_LABELS[descriptive["quantile_method"]]
+        doc.add_paragraph(
+            f"分位数算法：{algorithm}；稳健 CV=NIQR/中位值×100%。"
+            "依据 CNAS-GL002:2018 附录 B 表 B1 及表注 2。"
+        )
+        if descriptive["median"] == 0:
+            doc.add_paragraph("稳健 CV 为 —：中位值为零，无法作为分母。")
+        if descriptive["n"] < 2:
+            doc.add_paragraph("NIQR、稳健 CV 和样本标准差为 —：至少需要两个结果。")
+        doc.add_paragraph("算术平均值与样本标准差仅供参考，未剔除离群值，不参与判定。")
     new_scores = result.get("参加者统计量")
     if new_scores is not None:
         rows = []

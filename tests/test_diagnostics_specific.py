@@ -185,7 +185,10 @@ def test_legacy_z_sigma_missing_uses_method_config(tmp_path: Path) -> None:
     result, text = _run(book, tmp_path)
     assert "z 未评价：需要正的能力评定标准差 σ_pt" in text
     assert "『方法配置』填写正的 sigma_pt 或 sigma" in text
-    assert "sigma_final" not in text and "sigma_procedure" not in text
+    sigma_message = next(
+        item["说明"] for item in result["诊断提示"] if "z 未评价：需要正的" in item["说明"]
+    )
+    assert "sigma_final" not in sigma_message and "sigma_procedure" not in sigma_message
     assert "参加者z" not in result
 
 

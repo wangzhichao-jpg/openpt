@@ -1,0 +1,95 @@
+[
+  {
+    "project": "合成",
+    "method": "certified",
+    "participants_sha256": "f2514de1227adcf639b2122d0ba63742dd1027c31656952fb473d995370a9a58",
+    "fields": {
+      "source": "合成证书",
+      "uncertainty_source": "预算"
+    }
+  },
+  {
+    "project": "合成检测示例",
+    "method": "participant_consensus",
+    "participants_sha256": "7ea4572d63ea6f7c3d659acb70b5d9f155837507665a2f4450d7354db19e4708",
+    "fields": {
+      "source": "合成数据参加者公议",
+      "uncertainty_source": "算法A估计",
+      "sigma_procedure": "教学设定"
+    }
+  },
+  {
+    "project": "完全虚构的核心示例A",
+    "method": "known",
+    "participants_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "fields": {
+      "source": "完全虚构：外部已评定的已知值",
+      "uncertainty_source": "完全虚构：外部已评定基础标准不确定度及均稳分量",
+      "sigma_procedure": "虚构用途目标；试验前假定已确定",
+      "sigma_source": "合成示例：项目预定目标标准差"
+    }
+  },
+  {
+    "project": "完全虚构的核心示例B（均稳数据复用A）",
+    "method": "participant_consensus",
+    "participants_sha256": "035ca8eb3fcb826b44d07f30bee8855b0220f43e0af9d203201e41c66eb151c5",
+    "fields": {
+      "source": "完全虚构：参加者测量结果",
+      "uncertainty_source": "完全虚构：算法A公议及外部假定的均稳分量",
+      "sigma_procedure": "虚构用途目标；试验前假定已确定",
+      "sigma_source": "合成示例：项目预定目标标准差"
+    }
+  },
+  {
+    "project": "数字多用表",
+    "method": "reference",
+    "participants_sha256": "208d8bfcae2e99eb604a1a3673e72d225258a2f0eb3cdedc0f295954132dac7c",
+    "fields": {
+      "source": "教学示例：直流8V点首尾参考测量平均值",
+      "uncertainty_source": "教学示例：不确定度预算"
+    }
+  },
+  {
+    "project": "材料抗拉强度",
+    "method": "participant_consensus",
+    "participants_sha256": "6d7b4ed55f082d72b2f00032ab15a345ac720047606d2f8e89a58de6fcd7b50b",
+    "fields": {
+      "source": "教学示例：参加者结果算法A稳健公议",
+      "uncertainty_source": "教学示例：算法A稳健标准差与结果数",
+      "sigma_procedure": "教学示例：预设能力评定标准差",
+      "sigma_source": "其他"
+    }
+  },
+  {
+    "project": "甲醛样品",
+    "method": "participant_consensus",
+    "participants_sha256": "035ca8eb3fcb826b44d07f30bee8855b0220f43e0af9d203201e41c66eb151c5",
+    "fields": {
+      "source": "合成参加者测量结果",
+      "uncertainty_source": "算法A稳健公议及合成的均稳分量",
+      "sigma_procedure": "合成示例目标标准差",
+      "sigma_source": "合成示例：项目预定目标标准差"
+    }
+  },
+  {
+    "project": "虚构指定值演示",
+    "method": "certified",
+    "participants_sha256": "1af260a429f0f1c7510412065bc18c534dbea2c442284a3805e57b7c8f887b29",
+    "fields": {
+      "source": "虚构参考证书",
+      "uncertainty_source": "虚构标准不确定度预算",
+      "sigma_procedure": "虚构的预设程序"
+    }
+  },
+  {
+    "project": "颗粒振实密度",
+    "method": "participant_consensus",
+    "participants_sha256": "9f06d440194051bae27002e7573b102275ddd5b302d854aee29498fd75195767",
+    "fields": {
+      "source": "教学示例：参加者结果算法A稳健公议",
+      "uncertainty_source": "教学示例：算法A稳健标准差与结果数",
+      "sigma_procedure": "教学示例：预设能力评定标准差",
+      "sigma_source": "其他"
+    }
+  }
+]

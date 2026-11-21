@@ -155,7 +155,7 @@ def template(path: str | Path) -> None:
         ws.cell(1, 1).comment = Comment("示例不参与计算，请复制表头和数据到正式工作表。", "OpenPT")
     for col, header in enumerate(("标准不确定度u(x)", "扩展不确定度U(x)", "包含因子k"), 4):
         book["参加者结果"].cell(1, col, header)
-    for name in ("均匀性", "稳定性", "报告声称值"):
+    for name in ("均匀性", "稳定性", "参加者结果", "报告声称值"):
         ws = book[name]
         ws.cell(1, ws.max_column + 1, "被测量")
     trend_sheet = book.create_sheet("趋势稳定性")
@@ -731,6 +731,7 @@ def read_workbook(
         subdata = {}
         for item in separated:
             part = read_workbook(BytesIO(item["bytes"]), columns)
+            part["_source_cells"] = item["sources"]
             for virtual, original in item["sources"].items():
                 if virtual in part["numeric_sources"]:
                     part["numeric_sources"][original] = part["numeric_sources"].pop(virtual)

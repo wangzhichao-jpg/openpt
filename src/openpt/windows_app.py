@@ -283,6 +283,17 @@ def summarize(data: dict[str, Any], result: dict[str, Any]) -> str:
                 else "（含分量映射）"
             )
             lines.append(f"σ′ = {value_text(prime)} {unit}{suffix}")
+    descriptive = result.get("参加者结果统计量")
+    if descriptive:
+        cv = descriptive.get("robust_cv_percent")
+        cv_text = _number(cv) + "%" if cv is not None else "—"
+        lines.extend(
+            [
+                "",
+                f"参加者结果：p={descriptive['n']}，中位值 {_number(descriptive['median'])}，"
+                f"NIQR {_number(descriptive['niqr'])}，稳健 CV {cv_text}",
+            ]
+        )
     scores = result.get("参加者统计量")
     if scores is None and result.get("参加者z"):
         scores = {

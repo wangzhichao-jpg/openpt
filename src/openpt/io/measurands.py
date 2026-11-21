@@ -9,7 +9,7 @@ from openpyxl.utils import get_column_letter
 
 from ..errors import InputError
 
-DATA_SHEETS = ("均匀性", "稳定性", "报告声称值")
+DATA_SHEETS = ("均匀性", "稳定性", "参加者结果", "报告声称值")
 CONFIG_FIELDS = {
     "单位",
     "sigma",
@@ -94,10 +94,6 @@ def split_measurands(book: Any, mapping: dict[str, Any] | None = None) -> list[d
                 raise InputError(f"{sheet}!A{row}: 多被测量数据须指定被测量")
             if col is not None and ws.cell(row, col).value in (None, ""):
                 raise InputError(f"{sheet}!{ws.cell(row, col).coordinate}: 被测量缺失")
-    if len(names) > 1 and "参加者结果" in book.sheetnames:
-        ws = book["参加者结果"]
-        if any(_has_values(ws, row, None) for row in range(2, ws.max_row + 1)):
-            raise InputError("参加者结果：多被测量时尚不支持分别归属，不能混用")
     options: dict[str, dict[str, Any]] = {name: {} for name in names}
     option_sources: dict[str, dict[str, str]] = {name: {} for name in names}
     if "被测量配置" in book.sheetnames:
