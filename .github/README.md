@@ -8,7 +8,7 @@ OpenPT (能力验证样品评价与定值工具) is a free, open-source tool for
 ## Download the Windows portable version
 
 - **GitHub:** [Download Windows portable 0.2.6](https://github.com/wangzhichao-jpg/openpt/releases/tag/v0.2.6)
-- **Gitee (mirror in mainland China):** [Download Windows portable 0.2.5](https://gitee.com/bigtaurus/openpt/releases/tag/v0.2.5) (0.2.6 will follow)
+- **Gitee (mirror in mainland China):** [Download Windows portable 0.2.6](https://gitee.com/bigtaurus/openpt/releases/tag/v0.2.6)
 
 Version 0.2.6 includes five examples: formaldehyde, tensile strength of materials, tapped density of granules, digital multimeter, and a GB/T 28043 synthetic testing example. σ_pt can be computed from participant results (NIQR, Algorithm A, MADe, Algorithm S); the report adds a participant summary table and the Algorithm A iterations; the template explains common scenarios and flags conflicting settings. The window lists σ_pt and every participant's score, and stability criteria can be chosen per time group.
 
