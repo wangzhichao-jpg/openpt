@@ -24,6 +24,7 @@ from .core.homogeneity import analyze as homogeneity
 from .core.homogeneity import analyze_single as single_homogeneity
 from .core.robust import algorithm_a, algorithm_s, median_niqr
 from .core.scores import performance_score
+from .core.sigma_pt import determine as determine_sigma_pt
 from .core.stability import analyze as stability
 from .core.transfer import assess_transfer, summarize_transfer
 from .core.trend import configured_uncertainty, fit_series
@@ -58,7 +59,9 @@ def _participant_results(
             simplified=simplified,
             rule=str(_option(cfg, "algorithm_a_rule", "gl002")),
         ).to_dict()
-        result["中位数NIQR"] = median_niqr(values).to_dict()
+        result["中位数NIQR"] = median_niqr(values, cfg.get("quantile_method") or "linear").to_dict()
+        if cfg.get("quantile_method") not in (None, ""):
+            result["中位数NIQR"]["quantile_method"] = cfg["quantile_method"]
         # 绝对容差对照独立于选定停止规则，供附录和敏感性提示使用。
         result["算法A_收敛对照"] = algorithm_a(
             values, rule="absolute", tolerance=1e-12, max_iterations=10000
@@ -270,6 +273,7 @@ def _assigned_results(
         "trans_in_stab",
     )
     options = {key: a[key] for key in keys if key in a}
+    options["quantile_method"] = data["config"].get("quantile_method") or "linear"
     hom_source = a.get("hom_source") or "manual"
     if hom_source not in ENUMS["hom_source"]:
         raise InputError(
@@ -333,6 +337,14 @@ def _assigned_results(
             assigned, a, calculations.get("GB/T稳定性", {})
         )
     assigned_details = assigned.to_dict()
+    if (
+        a.get("method") == "participant_consensus"
+        and a.get("consensus_method") == "median"
+        and data["config"].get("quantile_method") not in (None, "")
+    ):
+        assigned_details["formula"] = "u(X)=1.25·NIQR/√p；NIQR 四分位算法：" + str(
+            data["config"]["quantile_method"]
+        )
     assigned_details.update(disposition_details)
     if (
         a.get("method") == "participant_consensus"
@@ -670,8 +682,33 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
             issues=problems,
             sheet="方法配置与指定值与不确定度",
         )
+    sigma_info = determine_sigma_pt(data)
+    if sigma_info:
+        procedure = sigma_info["label"]
+        if sigma_info.get("quantile_label"):
+            procedure += "（" + sigma_info["quantile_label"] + "）"
+        if sigma_info.get("sig_digits"):
+            procedure += f"，修约至 {sigma_info['sig_digits']} 位有效数字"
+        sigma_info["procedure"] = procedure
+        assignment = {
+            **assignment,
+            "sigma_final": sigma_info["value"],
+            "sigma_procedure": "；".join(
+                filter(None, [assignment.get("sigma_procedure"), procedure])
+            ),
+        }
     alpha = float(_option(cfg, "alpha", 0.05))
-    sigma = criterion_sigma(cfg)
+    if cfg.get("criterion_sigma_source") == "sigma_pt":
+        sigma = assignment.get("sigma_final")
+        if sigma is None:
+            raise InputError(
+                "选择 sigma_pt 作为判据时须提供最终 sigma_final 或自动计算 σ_pt",
+                sheet="方法配置",
+                field="criterion_sigma_source",
+            )
+        sigma = float(sigma)
+    else:
+        sigma = criterion_sigma(cfg)
     if cfg.get("gbt28043_extension"):
         raise ValueError("旧配置 gbt28043_extension 不支持；请使用 criterion_standard")
     standard = _option(cfg, "criterion_standard", "gl003")
@@ -708,6 +745,8 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
             allowed="technical、adjacent_specimens、other 或 single",
         )
     result: dict[str, Any] = {}
+    if sigma_info:
+        result["σ_pt确定"] = {k: v for k, v in sigma_info.items() if k != "algorithm_s"}
     trend_input = data.get("trend_observations", [])
     trend_method = _option(cfg, "stability_method", "two_sample") == "regression_trend"
     if trend_method and not trend_input:
@@ -793,8 +832,16 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
                     allowed="temporary 或 final",
                 )
             result["均匀性"] = sheet_call("均匀性", single_homogeneity, data["homogeneity"], sigma)
-            result["均匀性"]["sigma_source"] = _option(cfg, "sigma_source", None)
-            result["均匀性"]["sigma_stage"] = stage if sigma is not None else None
+            result["均匀性"]["sigma_source"] = (
+                "最终 σ_pt（显式选择）"
+                if cfg.get("criterion_sigma_source") == "sigma_pt"
+                else _option(cfg, "sigma_source", None)
+            )
+            result["均匀性"]["sigma_stage"] = (
+                ("final" if cfg.get("criterion_sigma_source") == "sigma_pt" else stage)
+                if sigma is not None
+                else None
+            )
             if sigma is not None and stage == "temporary":
                 result["均匀性"]["Ss_status"] = "PROVISIONAL"
         else:
@@ -805,8 +852,12 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
                 sigma,
                 alpha,
                 strict,
-                _option(cfg, "sigma_source", None),
-                _option(cfg, "sigma_stage", None),
+                "最终 σ_pt（显式选择）"
+                if cfg.get("criterion_sigma_source") == "sigma_pt"
+                else _option(cfg, "sigma_source", None),
+                "final"
+                if cfg.get("criterion_sigma_source") == "sigma_pt"
+                else _option(cfg, "sigma_stage", None),
                 gl_criterion,
             ).to_dict()
         if cfg.get("gl003_hom_criterion") not in (None, "") and replicate_type != "single":
@@ -1085,9 +1136,9 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
         if legacy_blocked and cfg.get("assigned") not in (None, ""):
             result["参加者z状态"] = "DESIGN_REVIEW：稳定性未通过或未评价，须登记指定值和处置依据"
     if data.get("assigned_config", {}).get("method"):
-        assignment_data = data
+        assignment_data = {**data, "assigned_config": assignment} if sigma_info else data
         if result.get("趋势不确定度"):
-            assigned_config = dict(data["assigned_config"])
+            assigned_config = dict(assignment_data["assigned_config"])
             if assigned_config.get("u_stab") not in (None, "", 0, 0.0):
                 raise InputError(
                     "趋势 u_stab 与手工 u_stab 不可同时输入",
@@ -1105,15 +1156,19 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
             )
         )
     if data.get("algorithm_s_values"):
-        result["算法S"] = sheet_call(
-            "算法S",
-            algorithm_s,
-            data["algorithm_s_values"],
-            data["algorithm_s_df"],
-            max_iterations=int(_option(cfg, "algorithm_s_max_iterations", 1000)),
-            stop_rule=str(_option(cfg, "algorithm_s_stop_rule", "gl002")),
-            tolerance=float(_option(cfg, "algorithm_s_tolerance", 1e-12)),
-        ).to_dict()
+        result["算法S"] = (
+            sigma_info["algorithm_s"]
+            if sigma_info and "algorithm_s" in sigma_info
+            else sheet_call(
+                "算法S",
+                algorithm_s,
+                data["algorithm_s_values"],
+                data["algorithm_s_df"],
+                max_iterations=int(_option(cfg, "algorithm_s_max_iterations", 1000)),
+                stop_rule=str(_option(cfg, "algorithm_s_stop_rule", "gl002")),
+                tolerance=float(_option(cfg, "algorithm_s_tolerance", 1e-12)),
+            ).to_dict()
+        )
     if not result:
         raise ValueError("没有可计算的数据")
     if standard == "gbt28043":
@@ -1144,6 +1199,24 @@ def _calculate(data: dict[str, Any], review_mode: bool = False) -> dict[str, Any
             },
         }
     diagnostics: list[dict[str, str]] = []
+    if sigma_info and sigma_info["method"] in ("niqr", "made") and sigma_info["p"] < 30:
+        diagnostics.append(
+            {
+                "类型": "σ_pt 方法提示",
+                "层级": "提示",
+                "说明": "GB/T 28043-2019 C.2.3 注2：p<30 时 nIQR 和 MADe 显示显著负偏倚。",
+            }
+        )
+    if sigma_info and sigma_info["method"] == "niqr":
+        diagnostics.append(
+            {
+                "类型": "分位数算法",
+                "层级": "提示",
+                "说明": "GB/T 28043-2019 C.2.3 注3：不同软件的分位数算法可能不同；本次使用 "
+                + sigma_info["quantile_label"]
+                + "。",
+            }
+        )
     for field in ("display_mean_decimals", "display_ss_decimals"):
         if cfg.get(field) not in (None, ""):
             diagnostics.append(

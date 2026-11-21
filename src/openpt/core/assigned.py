@@ -87,6 +87,7 @@ def assign_value(
     expert_values: Any = None,
     known_components: Any = None,
     consensus_method: str = "robust_mean",
+    quantile_method: str = "linear",
     algorithm_a_rule: str = "gl002",
     algorithm_a_tolerance: float = 1e-10,
     algorithm_a_max_iterations: int = 1000,
@@ -178,7 +179,7 @@ def assign_value(
             if not robust.converged or robust.status != "OK":
                 warnings.append("稳健统计未收敛或尺度为零，指定值不作评价")
         elif consensus_method == "median":
-            robust_median = median_niqr(participants)
+            robust_median = median_niqr(participants, quantile_method)
             x, scale, count = robust_median.median, robust_median.niqr, len(participants)
             if scale == 0:
                 warnings.append("NIQR 为零，指定值不作评价")

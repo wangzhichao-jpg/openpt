@@ -69,7 +69,13 @@ def template(path: str | Path) -> None:
     instructions.append(["报告声称值", "填写统计量、数值、显示位数、来源和可选报告模型。"])
     instructions.append(["指定值", "按方法登记值、不确定度、来源、σ_pt 确定程序与分量映射。"])
     instructions.append(["参加者结果", "ζ、En 须填写相应不确定度、k，并登记不相关性。"])
-    instructions.append(["算法S", "输入至少两个同类型标准差或极差，每行填写相同自由度。"])
+    instructions.append(
+        [
+            "算法S",
+            "输入至少两个同类型标准差或极差，每行填写相同自由度；"
+            "引用为 σ_pt 时须在方法配置登记输入类型 standard_deviation。",
+        ]
+    )
     instructions.append(["候选批次", "预实验结果可填英文逗号分隔的数值；软件不自动选择批次。"])
     instructions.append(
         ["长表与宽表", "示例工作表仅供参考，不参与计算；复制相应表头到均匀性或稳定性表后填写数据。"]
@@ -99,7 +105,8 @@ def template(path: str | Path) -> None:
             "σ 与 σ_pt",
             "sigma 用于均匀性及稳定性判据；sigma_pt 是 z 等评价统计量的分母。"
             "仅『方法配置』的 sigma 与 sigma_pt 只填一个时自动沿用，均填写时分别使用；"
-            "指定值表中的 sigma_final 或 sigma_temporary 不用于均匀性和稳定性判据。",
+            "默认指定值表中的 sigma_final 或 sigma_temporary 不用于均匀性和稳定性判据；"
+            "显式设置 criterion_sigma_source=sigma_pt 才使用最终 σ_pt。",
         ),
         (
             "GB/T 均匀性分量",
@@ -245,6 +252,9 @@ def template(path: str | Path) -> None:
         ("参加者传递点映射JSON（transfer_en_map）", ""),
         ("趋势绘图（trend_plot）", False),
         ("量值显示小数位（display_value_decimals）", ""),
+        ("分位数算法（quantile_method）", ""),
+        ("判据标准差来源（criterion_sigma_source）", ""),
+        ("算法S输入类型（algorithm_s_input_type）", ""),
     ]:
         book["方法配置"].append(config_row)
 
@@ -309,6 +319,8 @@ def template(path: str | Path) -> None:
         ("trans_in_stab", False),
         ("stability_disposition", "pending"),
         ("stability_disposition_reason", ""),
+        ("sigma_pt_method", ""),
+        ("sigma_pt_sig_digits", ""),
     ]:
         assigned.append(assigned_row)
     for cell, options in [
@@ -328,6 +340,21 @@ def template(path: str | Path) -> None:
         validation = DataValidation(type="list", formula1=options)
         assigned.add_data_validation(validation)
         validation.add(assigned[cell])
+    for sheet_name, field in (
+        ("方法配置", "quantile_method"),
+        ("方法配置", "criterion_sigma_source"),
+        ("方法配置", "algorithm_s_input_type"),
+        ("指定值与不确定度", "sigma_pt_method"),
+    ):
+        ws = book[sheet_name]
+        cell = next(
+            row[1]
+            for row in ws.iter_rows(min_row=2)
+            if row[0].value == field or str(row[0].value).endswith(f"（{field}）")
+        )
+        validation = DataValidation(type="list", formula1=options_for(field))
+        ws.add_data_validation(validation)
+        validation.add(cell)
     book.save(path)
 
 

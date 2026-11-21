@@ -17,6 +17,7 @@ from openpyxl.utils.cell import column_index_from_string, coordinate_from_string
 
 from .. import __version__
 from ..core.robust import ALG_A_CLIP, MAD_FACTOR
+from ..core.sigma_pt import QUANTILE_LABELS
 from ..formatting import display_value
 from .period_criteria import has_period_overrides, period_fields, selected_periods
 
@@ -432,7 +433,9 @@ def _gbt_homogeneity_results(
     )
     basis = result.get("主判据", {}).get("criterion_basis", "sigma_pt")
     sigma_field = (
-        "sigma"
+        "指定值表最终 σ_pt（显式选择）"
+        if cfg.get("criterion_sigma_source") == "sigma_pt"
+        else "sigma"
         if cfg.get("sigma") not in (None, "")
         else "sigma_pt"
         if cfg.get("sigma_pt") not in (None, "")
@@ -679,11 +682,14 @@ def _other_results(
             doc.add_paragraph("算法 S 收敛对照未收敛，停止规则敏感性未评价。")
     niqr = result.get("中位数NIQR")
     if niqr:
+        quantile_label = QUANTILE_LABELS[data.get("config", {}).get("quantile_method") or "linear"]
         doc.add_paragraph(
-            "GL002 附录 A.4：线性插值 type 7，NIQR=0.7413×(Q3-Q1)；"
+            f"GL002 附录 A.4：{quantile_label}，"
+            "NIQR=0.7413×(Q3-Q1)；"
             f"中位数={_shown(niqr['median'], sig)}，Q1={_shown(niqr['q1'], sig)}，"
             f"Q3={_shown(niqr['q3'], sig)}，NIQR={_shown(niqr['niqr'], sig)}。"
         )
+    _sigma_pt_section(doc, data, result)
     _assigned_table(doc, result, data.get("config", {}))
     _participant_table(doc, data, result, z_places)
 
@@ -796,6 +802,63 @@ def _robust_results(
             converged.get("x"), sig, places=mean_places
         ) or _shown(a.get("s"), sig) != _shown(converged.get("s"), sig):
             doc.add_paragraph("停止规则敏感：选定规则和收敛对照在显示位数下不同，须人工复核。")
+
+
+def _sigma_pt_section(doc: Any, data: dict[str, Any], result: dict[str, Any]) -> None:
+    info = result.get("σ_pt确定")
+    explicit = data.get("config", {}).get("criterion_sigma_source") == "sigma_pt"
+    if not info and not explicit:
+        return
+    doc.add_heading("σ_pt 的确定", 1)
+    if info:
+        doc.add_paragraph(
+            f"方法：{info['procedure']}；依据 GB/T 28043-2019 8.6、CNAS-GL002:2018 A.1。"
+        )
+        if info["method"] != "algorithm_s":
+            doc.add_paragraph(
+                f"参加者结果数 p={info['p']}；使用全部有效结果，包括离群值，不自动剔除。"
+            )
+        else:
+            doc.add_paragraph(f"算法 S 标准差结果数 p={info['p']}；依据 CNAS-GL002:2018 A.3。")
+        if info["method"] == "niqr":
+            doc.add_paragraph(
+                f"分位数算法：{info['quantile_label']}；中位数={info['median']!s}，Q1={info['q1']!s}，Q3={info['q3']!s}，IQR={info['iqr']!s}；NIQR=0.7413×IQR。"
+            )
+            doc.add_paragraph(
+                "GB/T 28043-2019 C.2.3 注3：不同统计软件包可能使用不同分位数算法，nIQR 略有不同。"
+            )
+        elif info["method"] == "made":
+            doc.add_paragraph(
+                f"中位数={info['median']!s}，MAD={info['mad']!s}；MADe=1.483×MAD。"
+                "依据 GB/T 28043-2019 C.2.2。"
+            )
+        elif info["method"] == "algorithm_a":
+            doc.add_paragraph(
+                f"算法 A：s*={info['s']!s}，停止规则={info['algorithm_a_rule']}；"
+                "依据 CNAS-GL002:2018 A.2。"
+            )
+        else:
+            doc.add_paragraph(f"算法 S：w*={info['w']!s}，输入类型为标准差。")
+        if info["method"] in ("niqr", "made") and info["p"] < 30:
+            doc.add_paragraph("GB/T 28043-2019 C.2.3 注2：p<30 时 nIQR 和 MADe 显示显著负偏倚。")
+        doc.add_paragraph(f"未修约 σ_pt={info['raw']!s}；采用值 σ_pt={info['value']!s}。")
+        if info["sig_digits"]:
+            doc.add_paragraph(
+                f"按 GB/T 8170-2008 四舍六入五成双，一次修约至 {info['sig_digits']} "
+                "位有效数字；不得连续修约。"
+            )
+        else:
+            doc.add_paragraph("未指定有效位数，不对计算值修约。")
+    else:
+        doc.add_paragraph("最终 σ_pt 由指定值表 sigma_final 手工登记。")
+    doc.add_paragraph(
+        "判据 σ 来源："
+        + (
+            "显式选择最终 σ_pt。"
+            if explicit
+            else "方法配置 sigma；留空时沿用方法配置 sigma_pt，不自动引用指定值表的 σ_pt。"
+        )
+    )
 
 
 def _assigned_table(doc: Any, result: dict[str, Any], cfg: dict[str, Any]) -> None:
@@ -979,7 +1042,9 @@ def _project_methods(doc: Any, data: dict[str, Any], cfg: dict[str, Any]) -> Non
     )
     sigma_given = cfg.get("sigma") not in (None, "")
     sigma_pt_given = cfg.get("sigma_pt") not in (None, "")
-    if sigma_given and not sigma_pt_given:
+    if cfg.get("criterion_sigma_source") == "sigma_pt":
+        doc.add_paragraph("判据 σ 显式使用指定值表最终 σ_pt。")
+    elif sigma_given and not sigma_pt_given:
         doc.add_paragraph("仅填写判据标准差 sigma；z 等评价分母 sigma_pt 自动沿用该值。")
     elif sigma_pt_given and not sigma_given:
         doc.add_paragraph(

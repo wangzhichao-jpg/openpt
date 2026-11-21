@@ -25,6 +25,10 @@ ENUMS: dict[str, tuple[str, ...]] = {
     "replicate_type": ("technical", "adjacent_specimens", "other", "single"),
     "layout": ("long", "wide"),
     "algorithm_a_rule": ("gl002", "gbt28043", "absolute", "simplified"),
+    "quantile_method": ("linear", "weibull", "hazen", "median_unbiased"),
+    "criterion_sigma_source": ("manual", "sigma_pt"),
+    "algorithm_s_input_type": ("standard_deviation", "range"),
+    "sigma_pt_method": ("manual", "niqr", "algorithm_a", "made", "algorithm_s"),
     "algorithm_s_stop_rule": ("gl002", "absolute"),
     "score_type": ("z", "zprime", "zeta", "En", "D", "D%", "all"),
     "assigned_method": (
@@ -177,6 +181,12 @@ def template_rows() -> list[tuple[str, str]]:
         for kind, fields in TRANSFER_CRITERION_FIELDS.items()
     )
     rows.append(("display_value_decimals", DISPLAY_VALUE_DECIMALS_DESCRIPTION))
+    rows.append(
+        (
+            "sigma_pt_sig_digits",
+            "指定值与不确定度表：自动计算的 σ_pt 一次修约的正整数有效位数；留空不修约。",
+        )
+    )
     rows.append(("稳定性时间组配置", PERIOD_TABLE_DESCRIPTION))
     rows.append(("报告声称统计量", "、".join(CLAIM_NAMES)))
     rows.extend(("报告模型 " + name, description) for name, description in REPORT_MODELS.items())
@@ -192,6 +202,15 @@ def markdown() -> str:
     )
     lines.extend(
         ["", "### 显示精度", "", "`display_value_decimals`：" + DISPLAY_VALUE_DECIMALS_DESCRIPTION]
+    )
+    lines.extend(
+        [
+            "",
+            "### σ_pt 精度",
+            "",
+            "`sigma_pt_sig_digits`：指定值与不确定度表的正整数；"
+            "自动计算值按 GB/T 8170-2008 一次修约到该有效位数，留空不修约。",
+        ]
     )
     lines.extend(["", "### 稳定性时间组配置", "", PERIOD_TABLE_DESCRIPTION])
     lines.extend(["", "### 传递标准判据 JSON 字段", "", "| kind | 字段 |", "|---|---|"])

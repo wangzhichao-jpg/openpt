@@ -29,6 +29,7 @@ BOOLEAN_ENUMS = {
 ASSIGNED_ENUMS = {
     "method": "assigned_method",
     "consensus_method": "consensus_method",
+    "sigma_pt_method": "sigma_pt_method",
     "hom_source": "hom_source",
     "hom_mapping": "hom_mapping",
     "stab_mapping": "stab_mapping",

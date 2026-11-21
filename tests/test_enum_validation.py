@@ -29,6 +29,22 @@ def test_nested_period_enum_is_checked_in_any_standard(tmp_path: Path) -> None:
     assert main(["review", str(path), "--runs-dir", str(tmp_path / "reviews")]) == 2
 
 
+def test_invalid_sigma_pt_method_in_assigned_sheet(tmp_path: Path) -> None:
+    path = tmp_path / "input.xlsx"
+    template(path)
+    book = load_workbook(path)
+    book["项目信息"]["B2"] = "合成"
+    book["项目信息"]["B3"] = "mg"
+    for row in book["指定值与不确定度"].iter_rows(min_row=2):
+        if row[0].value == "sigma_pt_method":
+            row[1].value = "invalid"
+    book.save(path)
+    assert any(
+        i.code == "ASSIGNED_ENUM" and i.field == "sigma_pt_method" for i in inspect_input(path)
+    )
+    assert main(["run", str(path), "--runs-dir", str(tmp_path / "runs")]) == 2
+
+
 @settings(max_examples=25, deadline=None)
 @given(
     st.sampled_from(
@@ -41,6 +57,7 @@ def test_nested_period_enum_is_checked_in_any_standard(tmp_path: Path) -> None:
                 "stability_period_options.kind",
                 "候选批次.状态",
                 "assigned_method",
+                "sigma_pt_method",
                 "independent",
                 "hom_in_base",
                 "stab_in_base",

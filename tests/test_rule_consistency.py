@@ -72,6 +72,17 @@ CASES: dict[str, Callable[[Workbook], None]] = {
     "PERIOD_CRITERIA": _case((M, "stability_period_options", '{"稳定期":{"rule":"bad"}}')),
     "TRANSFER_MAP": _case((M, "transfer_en_map", "{bad")),
     "DELTA_REQUIRED": _case((M, "gbt_criterion_basis", "delta_e"), (M, "delta_e", None)),
+    "SIGMA_PT_CONFLICT": _case((A, "sigma_pt_method", "made")),
+    "SIGMA_PT_DIGITS": _case((A, "sigma_pt_sig_digits", 0)),
+    "SIGMA_PT_METHOD_REQUIRED": _case((A, "method", None), (A, "sigma_pt_method", "made")),
+    "SIGMA_PT_QUANTILE": _case((A, "sigma_pt_method", "niqr")),
+    "SIGMA_CRITERION_CONFLICT": _case((M, "criterion_sigma_source", "sigma_pt")),
+    "SIGMA_FINAL_REQUIRED": _case(
+        (M, "criterion_sigma_source", "sigma_pt"), (M, "sigma", None), (A, "sigma_final", None)
+    ),
+    "SIGMA_S_TYPE": _case(
+        (A, "sigma_pt_method", "algorithm_s"), (M, "algorithm_s_input_type", "range")
+    ),
 }
 
 

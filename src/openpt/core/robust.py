@@ -257,7 +257,7 @@ def algorithm_s(
     )
 
 
-def median_niqr(values: Any) -> MedianIqrResult:
+def median_niqr(values: Any, method: str = "linear") -> MedianIqrResult:
     """按 GL002 A.4 计算中位数、四分位距和 NIQR=0.7413×IQR。"""
     try:
         data = np.asarray(values, dtype=float)
@@ -265,9 +265,14 @@ def median_niqr(values: Any) -> MedianIqrResult:
         raise InputError("参加者结果必须为有限数值") from None
     if data.ndim != 1 or len(data) < 2 or not np.isfinite(data).all():
         raise InputError("至少两个有限参加者结果")
+    if method not in ENUMS["quantile_method"]:
+        raise InputError("分位数算法无效")
+    if method == "weibull" and len(data) < 3:
+        raise InputError("weibull 四分位数至少需要三个结果，与 Excel QUARTILE.EXC 一致")
+    quantile_method: Any = method
     with np.errstate(over="ignore", invalid="ignore"):
         median = float(np.median(data))
-        q1, q3 = (float(x) for x in np.quantile(data, [0.25, 0.75], method="linear"))
+        q1, q3 = (float(x) for x in np.quantile(data, [0.25, 0.75], method=quantile_method))
         iqr = q3 - q1
         niqr = NIQR_FACTOR * iqr
     if not all(math.isfinite(v) for v in (median, q1, q3, iqr, niqr)):

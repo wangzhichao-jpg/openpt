@@ -36,6 +36,13 @@ RULE_CODES: dict[str, str] = {
     "PERIOD_CRITERIA": "逐时间组准则配置无效",
     "TRANSFER_MAP": "参加者传递标准映射无效",
     "DELTA_REQUIRED": "所选依据缺少 delta_e",
+    "SIGMA_PT_CONFLICT": "自动 σ_pt 与手工值冲突",
+    "SIGMA_PT_DIGITS": "σ_pt 有效位数无效",
+    "SIGMA_PT_METHOD_REQUIRED": "自动 σ_pt 缺少指定值方法",
+    "SIGMA_PT_QUANTILE": "NIQR 须显式选择分位数算法",
+    "SIGMA_CRITERION_CONFLICT": "判据 σ 来源冲突",
+    "SIGMA_S_TYPE": "算法 S 的输入类型无效",
+    "SIGMA_FINAL_REQUIRED": "判据来源缺少最终 σ_pt",
 }
 
 
@@ -58,6 +65,7 @@ class RuleIssue:
 ASSIGNED_ENUMS = {
     "method": "assigned_method",
     "consensus_method": "consensus_method",
+    "sigma_pt_method": "sigma_pt_method",
     "hom_source": "hom_source",
     "hom_mapping": "hom_mapping",
     "stab_mapping": "stab_mapping",
@@ -128,6 +136,33 @@ def check_assigned(
         issues.append(RuleIssue(field, values.get(field), message, allowed, hint, code))
 
     method = values.get("method")
+    procedure = values.get("sigma_procedure")
+    if procedure not in (None, "") and not isinstance(procedure, str):
+        add("sigma_procedure", "σ_pt 确定程序须为文字", "文字", "填写文字说明", "SIGMA_PROCEDURE")
+    sigma_method = values.get("sigma_pt_method") or "manual"
+    if sigma_method != "manual":
+        for field in ("sigma_final", "sigma_temporary"):
+            if values.get(field) not in (None, ""):
+                add(
+                    field,
+                    "自动计算 σ_pt 时不得同时填写手工值",
+                    "留空",
+                    "清空手工值",
+                    "SIGMA_PT_CONFLICT",
+                )
+        if method in (None, ""):
+            add(
+                "sigma_pt_method",
+                "自动 σ_pt 须选择指定值方法",
+                "填写 method",
+                "选择指定值方法",
+                "SIGMA_PT_METHOD_REQUIRED",
+            )
+    digits = values.get("sigma_pt_sig_digits")
+    if digits not in (None, "") and (not _number(digits) or digits != int(digits) or digits < 1):
+        add(
+            "sigma_pt_sig_digits", "有效位数须为正整数", "正整数", "修改有效位数", "SIGMA_PT_DIGITS"
+        )
     for field, enum in ASSIGNED_ENUMS.items():
         value = values.get(field)
         if value not in (None, "") and (not isinstance(value, str) or value not in ENUMS[enum]):
@@ -267,7 +302,7 @@ def check_assigned(
             add(field, f"{field} 数值无效", allowed, "修改数值", "ASSIGNED_NUMBER")
     if any(values.get(field) not in (None, "") for field in ("sigma_temporary", "sigma_final")):
         value = values.get("sigma_procedure")
-        if not isinstance(value, str) or not value.strip():
+        if value in (None, "") or (isinstance(value, str) and not value.strip()):
             add(
                 "sigma_procedure",
                 "须登记 σ_pt 确定程序",
@@ -298,22 +333,76 @@ def check_assigned(
 
 def check_cross(assigned: dict[str, Any], config: dict[str, Any]) -> list[RuleIssue]:
     """检查指定值表与方法配置表之间的静态约束。"""
+    issues = []
+    if assigned.get("sigma_pt_method") == "niqr" and config.get("quantile_method") in (None, ""):
+        issues.append(
+            RuleIssue(
+                "quantile_method",
+                None,
+                "NIQR 须显式选择分位数算法；GB/T 28043 C.2.3 注3",
+                "linear（Excel QUARTILE.INC）、weibull（QUARTILE.EXC）、hazen、median_unbiased",
+                "选择算法并核实软件差异",
+                "SIGMA_PT_QUANTILE",
+            )
+        )
+    if (
+        config.get("criterion_sigma_source") == "sigma_pt"
+        and (assigned.get("sigma_pt_method") or "manual") == "manual"
+        and (assigned.get("sigma_final") in (None, "") or assigned.get("method") in (None, ""))
+    ):
+        issues.append(
+            RuleIssue(
+                "criterion_sigma_source",
+                "sigma_pt",
+                "选用 sigma_pt 须有指定值方法和最终 sigma_final，临时值不能替代",
+                "指定值方法及最终 sigma_final，或选择自动 σ_pt",
+                "登记最终值或选择自动计算",
+                "SIGMA_FINAL_REQUIRED",
+            )
+        )
+    if config.get("criterion_sigma_source") == "sigma_pt" and config.get("sigma") not in (None, ""):
+        issues.append(
+            RuleIssue(
+                "sigma",
+                config.get("sigma"),
+                "选用 sigma_pt 作为判据时不得同时填写 sigma",
+                "sigma 留空",
+                "清空 sigma",
+                "SIGMA_CRITERION_CONFLICT",
+            )
+        )
+    if (
+        assigned.get("sigma_pt_method") == "algorithm_s"
+        and config.get("algorithm_s_input_type") != "standard_deviation"
+    ):
+        issues.append(
+            RuleIssue(
+                "algorithm_s_input_type",
+                config.get("algorithm_s_input_type"),
+                "σ_pt 只能使用标准差的算法 S 联合值，极差不能直接用作标准差",
+                "standard_deviation",
+                "登记算法 S 输入为标准差；极差不可直接用于 σ_pt",
+                "SIGMA_S_TYPE",
+            )
+        )
     if (
         assigned.get("method") not in (None, "")
         and assigned.get("hom_source") == "gbt_ss"
         and config.get("criterion_standard") != "gbt28043"
     ):
-        return [
-            RuleIssue(
-                "criterion_standard",
-                config.get("criterion_standard"),
-                "hom_source=gbt_ss 时 criterion_standard 须为 gbt28043",
-                "gbt28043",
-                "修改方法配置的标准模式",
-                "HOM_SS_STANDARD",
-            )
-        ]
-    return []
+        issues.extend(
+            [
+                RuleIssue(
+                    "criterion_standard",
+                    config.get("criterion_standard"),
+                    "hom_source=gbt_ss 时 criterion_standard 须为 gbt28043",
+                    "gbt28043",
+                    "修改方法配置的标准模式",
+                    "HOM_SS_STANDARD",
+                )
+            ]
+        )
+    return issues
 
 
 def period_criteria_problem(values: dict[str, Any]) -> str | None:

@@ -39,6 +39,18 @@ def make_template(target: Path) -> None:
         for row in book["方法配置"].iter_rows(min_row=2)
     ):
         book["方法配置"].append(["量值显示小数位（display_value_decimals）", None])
+    for label, field in (
+        ("分位数算法", "quantile_method"),
+        ("判据标准差来源", "criterion_sigma_source"),
+        ("算法S输入类型", "algorithm_s_input_type"),
+    ):
+        if not any(
+            f"（{field}）" in str(row[0].value) for row in book["方法配置"].iter_rows(min_row=2)
+        ):
+            book["方法配置"].append([f"{label}（{field}）", None])
+    for field in ("sigma_pt_method", "sigma_pt_sig_digits"):
+        if not any(row[0].value == field for row in book["指定值与不确定度"].iter_rows(min_row=2)):
+            book["指定值与不确定度"].append([field, None])
     for row in book["方法配置"].iter_rows(min_row=2):
         if row[0].value and any(
             key in str(row[0].value) for key in ("（sigma）", "（sigma_source）", "（sigma_stage）")
@@ -248,7 +260,18 @@ def summarize(data: dict[str, Any], result: dict[str, Any]) -> str:
             if assigned:
                 source += "；未用于指定值表的参加者统计量"
         source_label = source if sigma is not None else "未提供"
-        lines.append(f"σ_pt = {value_text(sigma)} {unit}（来源：{source_label}）")
+        sigma_info = result.get("σ_pt确定")
+        if sigma_info:
+            source_label = sigma_info["procedure"]
+        shown_sigma = (
+            display_value(sigma, sigma_info["sig_digits"])
+            if sigma_info
+            and sigma_info.get("sig_digits")
+            and sigma_info["sig_digits"] <= 15
+            and places is None
+            else value_text(sigma)
+        )
+        lines.append(f"σ_pt = {shown_sigma} {unit}（来源：{source_label}）")
         prime = assigned.get("sigma_prime")
         if prime is not None and (
             prime != sigma
