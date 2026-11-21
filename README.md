@@ -15,6 +15,12 @@ Windows 11 的智能应用控制可能阻止未签名程序；本程序目前未
 
 本工具提供均匀性、稳定性和指定值计算。本项目采用 Apache-2.0 许可证。
 
+## 视频讲解
+
+能力验证统计学避坑指南（竖屏短视频，约 3 分钟一集）：
+
+- 01 F检验过了，均匀性就够了吗？（F 检验与 Ss ≤ 0.3σ 准则、异常单元复核）：[B站](https://www.bilibili.com/video/BV1vPyizHE3K/) ｜ [YouTube](https://youtube.com/shorts/oF8_y89ukRg)
+
 ## Windows 快速开始
 
 1. 解压 `能力验证样品评价与定值工具_Windows.zip`，双击文件夹内的 `能力验证样品评价与定值工具.exe`。

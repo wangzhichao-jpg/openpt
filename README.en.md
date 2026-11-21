@@ -15,6 +15,12 @@ Unzip the whole Windows ZIP and double-click the program. No Python, other runti
 
 Windows 11 Smart App Control may block unsigned applications. This program is not currently code-signed: the project has selected SignPath Foundation's free code signing for open-source projects as the future option, but the application has not been submitted yet. See the [user guide (Chinese)](docs/使用手册.md#smart-app-control) for options.
 
+## Video lessons
+
+PT statistics pitfalls series (vertical short videos in Chinese, about 3 minutes each):
+
+- 01 Passing the F-test: is homogeneity good enough? (F-test vs. the Ss ≤ 0.3σ criterion, reviewing an outlying unit): [Bilibili](https://www.bilibili.com/video/BV1vPyizHE3K/) | [YouTube](https://youtube.com/shorts/oF8_y89ukRg)
+
 ## Windows quick start
 
 1. Unzip `能力验证样品评价与定值工具_Windows.zip` and double-click `能力验证样品评价与定值工具.exe` in the extracted folder.
