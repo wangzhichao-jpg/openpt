@@ -21,6 +21,7 @@ PT statistics pitfalls series (vertical short videos in Chinese, about 3 minutes
 
 - 01 Passing the F-test: is homogeneity good enough? (F-test vs. the Ss ≤ 0.3σ criterion, reviewing an outlying unit): [Bilibili](https://www.bilibili.com/video/BV1vPyizHE3K/) | [YouTube](https://youtube.com/shorts/oF8_y89ukRg)
 - 02 Ten units measured twice: 20 values or 10 units? (pseudo-replication and degrees of freedom in stability testing): [Bilibili](https://www.bilibili.com/video/BV1oryLzvEZh/) | [YouTube](https://youtube.com/shorts/XXDXruBJP8I)
+- 03 The data look similar, so why do z-scores fail? (outliers, robust assigned values and z′ scores): [Bilibili](https://www.bilibili.com/video/BV1qCyLzNEGf/) | [YouTube](https://youtube.com/shorts/duAYoEz9MOs)
 
 ## Windows quick start
 

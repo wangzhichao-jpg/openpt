@@ -21,6 +21,7 @@ Windows 11 的智能应用控制可能阻止未签名程序；本程序目前未
 
 - 01 F检验过了，均匀性就够了吗？（F 检验与 Ss ≤ 0.3σ 准则、异常单元复核）：[B站](https://www.bilibili.com/video/BV1vPyizHE3K/) ｜ [YouTube](https://youtube.com/shorts/oF8_y89ukRg)
 - 02 10 瓶各测 2 次，算 20 个数还是 10 瓶？（稳定性检验的伪重复与自由度）：[B站](https://www.bilibili.com/video/BV1oryLzvEZh/) ｜ [YouTube](https://youtube.com/shorts/XXDXruBJP8I)
+- 03 数据看着差不多，为什么 z 分数却翻车？（离群处理、稳健定值与 z′ 评价）：[B站](https://www.bilibili.com/video/BV1qCyLzNEGf/) ｜ [YouTube](https://youtube.com/shorts/duAYoEz9MOs)
 
 ## Windows 快速开始
 
